@@ -268,13 +268,10 @@ static void DrawWorldPanel(Game *g)
     DrawText(title, (int)(b.x + b.width - tw - 12), (int)b.y + 10, 16, (Color){ 120, 255, 160, 255 });
 
     World *w = &g->world;
-    float areaW = b.width - 40, areaH = b.height - 70;
-    float tile = areaW / w->cols;
-    if (areaH / w->rows < tile) tile = areaH / w->rows;
-    if (tile > 64) tile = 64;
-    w->tileSize = tile;
-    w->originX = b.x + (b.width - tile * w->cols) / 2;
-    w->originY = b.y + 40 + (areaH - tile * w->rows) / 2;
+    w->viewX = b.x + 2;
+    w->viewY = b.y + 32;
+    w->viewW = b.width - 4;
+    w->viewH = b.height - 34;
 
     World_Draw(w);
 
