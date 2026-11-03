@@ -1,0 +1,11 @@
+# Build output
+bitty
+*.o
+*.exe
+build/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
