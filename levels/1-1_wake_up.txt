@@ -1,0 +1,38 @@
+title: 1-1  Wake Up
+type: escape
+
+[story]
+Bitty: "Where... am I? Everything's made of numbers."
+Bitty can't move on its own. Your code is the only way out.
+Goal: reach the green EXIT tile.
+
+[lesson]
+A C program is a list of STATEMENTS.
+They run from top to bottom, one at a time.
+
+Every statement ends with a semicolon ;
+
+    move(EAST);
+    move(SOUTH);
+
+move() is a FUNCTION CALL: the name, then
+brackets with the value it needs inside.
+
+Watch out: forget the ; and C won't compile.
+
+[map]
+#######
+#B..###
+###..E#
+#######
+
+[code]
+// LEVEL 1-1: WAKE UP
+// Bitty can't move by itself.
+// Your code is the only way out!
+// Get Bitty to the green EXIT tile.
+//
+//   move(NORTH);   move(EAST);
+//   move(SOUTH);   move(WEST);
+
+move(EAST);

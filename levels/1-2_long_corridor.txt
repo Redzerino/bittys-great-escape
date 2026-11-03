@@ -1,0 +1,37 @@
+title: 1-2  The Long Corridor
+type: escape
+
+[story]
+Bitty: "That's a LONG way. My battery won't last if you type every step."
+Goal: reach the EXIT using a loop.
+
+[lesson]
+A for loop repeats code a set number of times.
+
+    for (int i = 0; i < 3; i++) {
+        move(EAST);
+    }
+
+It has three parts, split by ;
+  int i = 0   start: make a counter
+  i < 3       keep going while this is true
+  i++         after each loop, add 1 to i
+
+i goes 0, 1, 2 so the body runs 3 times.
+Watch the Inspector: you'll see i count up.
+
+[map]
+##############
+#B..........E#
+##############
+
+[code]
+// LEVEL 1-2: THE LONG CORRIDOR
+// Typing move(EAST); eleven times
+// is painful. A for loop repeats
+// code for you:
+//
+//   for (int i = 0; i < 3; i++) {
+//       move(EAST);  // 3 times
+//   }
+

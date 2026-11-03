@@ -3,9 +3,11 @@
 //   CODE (editor)  |  MEMORY (Bitty's world)  |  INSPECTOR (live variables)
 //                  |  CONSOLE (output)        |
 //
-// Press RUN (F5) and the player's code is compiled by the VM, then run a few
-// hundred instructions per frame. When it calls move() the VM waits while
-// Bitty slides to the next tile, then carries on.
+// Press RUN (F5) and the player's code is compiled by the VM.
+//   Escape levels: the code runs a few hundred instructions per frame. When it
+//                  calls move() the VM waits while Bitty slides to the next tile.
+//   Repair levels: the player writes a function. Each test is a gate on the
+//                  path: pass it and the gate opens, fail it and Bitty is stuck.
 
 #include "raylib.h"
 
@@ -14,6 +16,7 @@
 #include "game_api.h"
 #include "inspector.h"
 #include "levels.h"
+#include "repair.h"
 #include "vm.h"
 
 #include <stdio.h>
@@ -34,6 +37,11 @@ typedef enum {
     MODE_DONE           // finished, crashed or escaped: showing the result
 } GameMode;
 
+typedef enum {
+    REPAIR_TESTING = 0,   // about to run the next test
+    REPAIR_WALKING        // a gate opened: Bitty walks to the next gate (or the exit)
+} RepairPhase;
+
 typedef struct {
     World      world;
     Editor     editor;
@@ -42,7 +50,17 @@ typedef struct {
     bool       stepping;
     int        speedIndex;
     int        level;
-    char       savedCode[16][EDITOR_MAX_TEXT];   // each level keeps its own code
+    char       savedCode[LEVEL_MAX_LEVELS][EDITOR_MAX_TEXT];   // each level keeps its own code
+
+    // repair levels
+    RepairPhase repairPhase;
+    int        repairTest;      // next test to run
+    int        repairGates;     // gates in the map at the start
+    float      repairTimer;     // small pauses so the player can follow along
+    bool       hintShown;
+
+    // the lesson card ("memory dump") over the world
+    bool       showLesson;
     VmVariable vars[MAX_VARS];
     int        varCount;
     Font       codeFont;
@@ -99,7 +117,9 @@ static void HostWarning(void *user, int line, const char *message)
 static void LoadWorld(Game *g)
 {
     const Level *lv = Levels_Get(g->level);
-    World_LoadMap(&g->world, lv->map, lv->mapRows);
+    const char *rows[LEVEL_MAX_ROWS];
+    for (int i = 0; i < lv->mapRows; i++) rows[i] = lv->map[i];
+    World_LoadMap(&g->world, rows, lv->mapRows);
     g->world.speed = SPEEDS[g->speedIndex];
 }
 
@@ -129,7 +149,12 @@ static void LoadLevel(Game *g, int index)
 
     Console_Clear();
     Console_PrintKind(CONSOLE_SUCCESS, TextFormat("LEVEL %s\n", lv->title));
-    Console_PrintKind(CONSOLE_STORY, lv->story);
+    Console_PrintKind(CONSOLE_STORY, TextFormat("%s\n", lv->story));
+    if (lv->type == LEVEL_REPAIR)
+        Console_PrintKind(CONSOLE_STORY, TextFormat("Each gate tests your code (%d tests). Press RUN to try.\n", lv->testCount));
+
+    g->showLesson = lv->lesson[0] != '\0';
+    g->hintShown = false;
 }
 
 // ===========================================================================
@@ -143,8 +168,12 @@ static void StartProgram(Game *g, bool step)
 
     Console_Clear();
 
+    const Level *lv = Levels_Get(g->level);
+    g->showLesson = false;
+
     VmHost host = { g, HostCallBuiltin, HostPrint, HostWarning };
-    VmOptions options = { false, 0 };   // escape levels: infinite loops are allowed
+    VmOptions options = { lv->banIndexing, 0 };       // escape levels: infinite loops are allowed
+    if (lv->type == LEVEL_REPAIR) options.maxInstructions = lv->maxSteps;   // repair: a test must finish
     VmBuildResult result;
     g->vm = Vm_Build(Editor_GetText(&g->editor), &options, &host, &result);
 
@@ -158,6 +187,21 @@ static void StartProgram(Game *g, bool step)
         g->world.mood = MOOD_ERROR;
         g->world.shake = 0.4f;
         g->mode = MODE_EDITING;
+        return;
+    }
+
+    if (lv->type == LEVEL_REPAIR)
+    {
+        // Tests run one at a time in UpdateRepair
+        g->repairPhase = REPAIR_TESTING;
+        g->repairTest  = 0;
+        g->repairGates = World_CountGates(&g->world);
+        g->repairTimer = 0.4f;
+        g->stepping    = false;
+        g->mode = MODE_RUNNING;
+        g->editor.readOnly = true;
+        g->world.mood = MOOD_RUNNING;
+        Console_PrintKind(CONSOLE_STORY, TextFormat("Testing your code against %d gates...\n", lv->testCount));
         return;
     }
 
@@ -177,12 +221,106 @@ static void FinishRun(Game *g)
     g->stepping = false;
 }
 
+static void ShowHint(Game *g)
+{
+    const Level *lv = Levels_Get(g->level);
+    if (!g->hintShown && lv->hint[0])
+    {
+        Console_PrintKind(CONSOLE_STORY, TextFormat("Hint: %s\n", lv->hint));
+        g->hintShown = true;
+    }
+}
+
+// Repair levels: run each test; a pass opens a gate and Bitty walks on
+static void UpdateRepair(Game *g, float dt)
+{
+    World *w = &g->world;
+    const Level *lv = Levels_Get(g->level);
+
+    if (w->state == WORLD_WON)
+    {
+        Console_PrintKind(CONSOLE_SUCCESS, TextFormat("All %d tests passed! Bitty escaped this sector. Press NEXT.\n", lv->testCount));
+        FinishRun(g);
+        return;
+    }
+
+    if (g->repairTimer > 0) { g->repairTimer -= dt; return; }
+    if (!World_ActionDone(w)) return;
+
+    if (g->repairPhase == REPAIR_WALKING)
+    {
+        // Walk east until the next closed gate (or the exit, which wins)
+        int nx = w->bittyX + 1;
+        bool gateAhead = nx < w->cols && w->tiles[w->bittyY][nx].type == TILE_GATE;
+        if (gateAhead || nx >= w->cols)
+        {
+            g->repairPhase = REPAIR_TESTING;
+            g->repairTimer = 0.25f;
+            return;
+        }
+        Action a = { ACT_MOVE, EAST, 0, 0 };
+        World_StartAction(w, a);
+        return;
+    }
+
+    // ---- REPAIR_TESTING ----
+    if (g->repairTest >= lv->testCount)
+    {
+        g->repairPhase = REPAIR_WALKING;   // all passed: walk to the exit
+        return;
+    }
+
+    const LevelTest *t = &lv->tests[g->repairTest];
+    TestOutcome result;
+    Repair_RunTest(g->vm, t, &result);
+    Console_PrintKind(result.passed ? CONSOLE_SUCCESS : CONSOLE_ERROR, TextFormat("%s\n", result.message));
+
+    if (!result.passed)
+    {
+        // Bonk into the gate
+        Action a = { ACT_MOVE, EAST, 0, 0 };
+        World_StartAction(w, a);
+        w->mood = MOOD_ERROR;
+        if (result.crashed)
+        {
+            g->editor.errorLine = Vm_ErrorLine(g->vm);
+            VmErrorKind kind = Vm_GetErrorKind(g->vm);
+            if (kind == VM_ERR_SEGFAULT || kind == VM_ERR_OUT_OF_BOUNDS) w->glitch = 1.2f;
+        }
+        ShowHint(g);
+        FinishRun(g);
+        return;
+    }
+
+    // Passed. Gates are shared out over the tests, so open one when this test completes a group.
+    int n = lv->testCount;
+    int done = ++g->repairTest;
+    int gates = g->repairGates;
+    if (gates > 0 && (done * gates) / n > ((done - 1) * gates) / n)
+    {
+        int gx, gy;
+        if (World_NextGate(w, &gx, &gy)) World_OpenGate(w, gx, gy);
+        g->repairPhase = REPAIR_WALKING;
+        g->repairTimer = 0.45f;
+    }
+    else
+    {
+        g->repairTimer = 0.3f;
+    }
+}
+
 static void UpdateProgram(Game *g, float dt)
 {
     World *w = &g->world;
     World_Update(w, dt);
 
     if (g->mode != MODE_RUNNING || !g->vm) return;
+
+    if (Levels_Get(g->level)->type == LEVEL_REPAIR)
+    {
+        UpdateRepair(g, dt);
+        return;
+    }
 
     // ---- Did that last move win or crash? ----
     if (w->state == WORLD_WON)
@@ -289,6 +427,74 @@ static void DrawWorldPanel(Game *g)
     }
 }
 
+// Draw text word-wrapped inside a width. Returns the height used.
+static float DrawWrapped(Font font, const char *text, float x, float y, float width, float size, Color col)
+{
+    char line[256] = "";
+    float lineH = size + 4, cy = y;
+    const char *p = text;
+
+    while (*p)
+    {
+        if (*p == '\n')
+        {
+            DrawTextEx(font, line, (Vector2){ x, cy }, size, 0, col);
+            cy += lineH;
+            line[0] = '\0';
+            p++;
+            continue;
+        }
+
+        // next word (keep leading spaces so code examples keep their indent)
+        char word[128];
+        int n = 0;
+        while (*p == ' ' && n < 120) word[n++] = *p++;
+        while (*p && *p != ' ' && *p != '\n' && n < 126) word[n++] = *p++;
+        word[n] = '\0';
+
+        char trial[384];
+        snprintf(trial, sizeof trial, "%s%s", line, word);
+        if (line[0] && MeasureTextEx(font, trial, size, 0).x > width)
+        {
+            DrawTextEx(font, line, (Vector2){ x, cy }, size, 0, col);
+            cy += lineH;
+            const char *w = word;
+            while (*w == ' ') w++;
+            snprintf(line, sizeof line, "%s", w);
+        }
+        else
+        {
+            memcpy(line, trial, sizeof line - 1);
+            line[sizeof line - 1] = '\0';
+        }
+    }
+    if (line[0]) { DrawTextEx(font, line, (Vector2){ x, cy }, size, 0, col); cy += lineH; }
+    return cy - y;
+}
+
+static void DrawLessonCard(Game *g)
+{
+    if (!g->showLesson) return;
+    const Level *lv = Levels_Get(g->level);
+
+    Rectangle b = WORLD_PANEL;
+    Rectangle card = { b.x + 24, b.y + 40, b.width - 48, b.height - 64 };
+    DrawRectangleRec(b, (Color){ 5, 6, 14, 170 });
+    DrawRectangleRounded(card, 0.04f, 8, (Color){ 16, 20, 36, 245 });
+    DrawRectangleRoundedLinesEx(card, 0.04f, 8, 2, (Color){ 120, 200, 255, 255 });
+
+    DrawText("MEMORY DUMP", (int)card.x + 18, (int)card.y + 14, 20, (Color){ 120, 255, 160, 255 });
+    DrawTextEx(g->codeFont, lv->title, (Vector2){ card.x + 18, card.y + 40 }, 15, 0, (Color){ 140, 160, 200, 255 });
+
+    BeginScissorMode((int)card.x + 10, (int)card.y + 64, (int)card.width - 20, (int)card.height - 116);
+    DrawWrapped(g->codeFont, lv->lesson, card.x + 18, card.y + 68, card.width - 36, 16, (Color){ 225, 232, 245, 255 });
+    EndScissorMode();
+
+    if (Button((Rectangle){ card.x + card.width - 130, card.y + card.height - 46, 112, 32 }, "GOT IT",
+               (Color){ 40, 150, 80, 255 }, true))
+        g->showLesson = false;
+}
+
 static void DrawToolbar(Game *g)
 {
     DrawText("BITTY'S GREAT ESCAPE", 10, 12, 26, (Color){ 120, 255, 160, 255 });
@@ -303,7 +509,11 @@ static void DrawToolbar(Game *g)
 
     if (Button((Rectangle){ x, y, 80, h }, "STEP", (Color){ 50, 110, 170, 255 }, true) || IsKeyPressed(KEY_F10))
     {
-        if (running && g->vm && Vm_GetStatus(g->vm) == VM_PAUSED)
+        if (Levels_Get(g->level)->type == LEVEL_REPAIR)
+        {
+            if (!running) StartProgram(g, false);   // repair levels run test by test anyway
+        }
+        else if (running && g->vm && Vm_GetStatus(g->vm) == VM_PAUSED)
         {
             Vm_PauseAtNextLine(g->vm);
             Vm_Run(g->vm, 1);   // leave the paused line
@@ -351,6 +561,10 @@ static void DrawToolbar(Game *g)
     Color nextCol = (g->world.state == WORLD_WON) ? (Color){ 40, 150, 80, 255 } : (Color){ 70, 70, 100, 255 };
     if (Button((Rectangle){ x, y, 70, h }, "NEXT >", nextCol, canNext))
         LoadLevel(g, g->level + 1);
+
+    bool hasLesson = Levels_Get(g->level)->lesson[0] != '\0';
+    if (Button((Rectangle){ 1180, y, 90, h }, "LESSON", (Color){ 120, 90, 170, 255 }, hasLesson && !running))
+        g->showLesson = !g->showLesson;
 }
 
 // ===========================================================================
@@ -394,9 +608,20 @@ int main(void)
 
     g->codeFont = LoadCodeFont(&g->ownsFont);
     Editor_Init(&g->editor, EDITOR_PANEL, g->codeFont, 16);
+
+    // Levels live in the levels/ folder next to the game (or the current folder)
+    char levelError[256];
+    const char *folder = TextFormat("%slevels", GetApplicationDirectory());
+    if (!FileExists(TextFormat("%s/levels.txt", folder))) folder = "levels";
+    char folderCopy[512];
+    snprintf(folderCopy, sizeof folderCopy, "%s", folder);
+    int loaded = Levels_LoadFolder(folderCopy, levelError, sizeof levelError);
+
     g->level = 0;
     LoadLevel(g, 0);
     g->savedCode[0][0] = '\0';
+    if (levelError[0])
+        Console_PrintKind(loaded ? CONSOLE_WARNING : CONSOLE_ERROR, TextFormat("Level problem: %s\n", levelError));
 
     while (!WindowShouldClose())
     {
@@ -417,6 +642,7 @@ int main(void)
         DrawToolbar(g);
         Editor_Draw(&g->editor);
         DrawWorldPanel(g);
+        DrawLessonCard(g);
         Console_Draw(CONSOLE_PANEL, g->codeFont);
         Inspector_Draw(g->vars, g->varCount, INSPECT_PANEL, g->codeFont,
                        g->mode == MODE_RUNNING ? g->editor.runLine : 0);

@@ -1,0 +1,43 @@
+title: 1-3  Mind the Gap
+type: escape
+
+[story]
+Bitty: "Careful! That glowing purple memory isn't allocated. If I step in, I'm gone."
+You don't know how long the corridor is. Use scan() to check before you move.
+Goal: go east until the wall, then south to the EXIT.
+
+[lesson]
+A while loop repeats AS LONG AS its
+condition is true. Use it when you don't
+know how many times you'll need.
+
+    while (scan(EAST) != TILE_WALL) {
+        move(EAST);
+    }
+
+scan(EAST) looks at the next tile east.
+!= means "is not equal to".
+
+Watch out: == compares, = assigns.
+while (x = 5) is a classic bug!
+
+[map]
+#########
+#B.....##
+#xxxxx.##
+######E##
+#########
+
+[code]
+// LEVEL 1-3: MIND THE GAP
+// scan(EAST) tells you what's in
+// the next tile east: TILE_EMPTY,
+// TILE_WALL, TILE_EXIT, TILE_VOID...
+//
+// A while loop repeats while its
+// condition is true:
+//   while (scan(EAST) != TILE_WALL)
+//   {
+//       ...
+//   }
+

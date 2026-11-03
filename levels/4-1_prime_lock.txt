@@ -1,0 +1,54 @@
+title: 4-1  Prime Lock
+type: repair
+max_steps: 5000000
+
+[story]
+Bitty: "These locks only open for prime numbers. Even a really, REALLY big one."
+Write isAPrimeNumber(). A prime is only divisible by itself and 1.
+
+[lesson]
+Loop through possible divisors and check:
+
+    if (n % i == 0) return false;
+
+You can return early from inside a loop.
+If the loop ends without finding one: prime!
+
+Edge cases: 0 and 1 are NOT prime.
+
+Exam trap: i * i <= n looks clever, but for
+huge n, i * i gets bigger than an int can
+hold and wraps around (overflow).
+Use  i <= n / i  instead.
+
+Exam 1, Q3.
+
+[hint]
+if (n < 2) return false; then for (int i = 2; i <= n / i; i++) check n % i == 0. Using i * i <= n overflows on the last gate.
+
+[code]
+// LEVEL 4-1: PRIME LOCK
+// Prime: only divisible by itself and 1.
+// The last gate is 2147483647 (the
+// biggest int there is). Be careful!
+
+bool isAPrimeNumber(int n) {
+
+    return false;
+}
+
+[solution]
+bool isAPrimeNumber(int n) {
+    if (n < 2) return false;
+    for (int i = 2; i <= n / i; i++) {
+        if (n % i == 0) return false;
+    }
+    return true;
+}
+
+[tests]
+isAPrimeNumber(3) == true
+isAPrimeNumber(4) == false
+isAPrimeNumber(1) == false
+isAPrimeNumber(97) == true
+isAPrimeNumber(2147483647) == true

@@ -1,0 +1,47 @@
+title: 8-1  Swap Wires
+type: repair
+ban_indexing: yes
+
+[story]
+Bitty: "Pointer Wires. Two cables are crossed. Swap what's at the ends."
+Write swap_ints() using pointers. In this world [ ] is banned.
+
+[lesson]
+A POINTER holds an ADDRESS: where a value
+lives in memory.
+
+  &x   "address of x"
+  *p   "the value p points at"
+
+    int *a     a is a pointer to an int
+    *a = 5;    change the int a points at
+
+To change the caller's variables, the
+function needs their addresses:
+    swap_ints(&x, &y);
+
+Exam 2, Q1.
+
+[hint]
+int temp = *a; *a = *b; *b = temp;
+
+[code]
+// LEVEL 8-1: SWAP WIRES
+// x = 5, y = 10  ->  swap_ints(&x, &y)
+//                ->  x = 10, y = 5
+
+void swap_ints(int *a, int *b) {
+
+}
+
+[solution]
+void swap_ints(int *a, int *b) {
+    int temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+[tests]
+swap_ints(&5, &10) then #1 == 10, #2 == 5
+swap_ints(&-3, &3) then #1 == 3, #2 == -3
+swap_ints(&7, &7) then #1 == 7, #2 == 7

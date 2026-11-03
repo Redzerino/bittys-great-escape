@@ -1,0 +1,49 @@
+title: 2-1  Digit Peeler
+type: repair
+
+[story]
+Bitty: "This door reads its code backwards. 123 has to become 321."
+Write Reversed() so it returns the digits of a number in reverse.
+
+[lesson]
+Two operators peel digits off a number:
+
+  %  remainder:  123 % 10  is  3  (last digit)
+  /  divide:     123 / 10  is  12 (drop it)
+
+int / int throws the decimal away.
+That's exactly what we want here!
+
+Build the answer one digit at a time:
+    result = result * 10 + digit;
+
+Exam 1, Q2 (helper for the palindrome).
+
+[hint]
+Loop while number > 0. Each time: take number % 10, add it onto result * 10, then do number /= 10.
+
+[code]
+// LEVEL 2-1: DIGIT PEELER
+// Write Reversed(): turn 123 into 321.
+
+int Reversed(int number) {
+    int result = 0;
+
+    return result;
+}
+
+[solution]
+int Reversed(int number) {
+    int result = 0;
+    while (number > 0) {
+        result = result * 10 + number % 10;
+        number /= 10;
+    }
+    return result;
+}
+
+[tests]
+Reversed(123) == 321
+Reversed(1) == 1
+Reversed(1200) == 21
+Reversed(90817) == 71809

@@ -1,0 +1,51 @@
+title: 2-2  Binary Decoder
+type: repair
+
+[story]
+Bitty: "The machine talks in binary. 110 means 6 down here."
+Write convertBinarytoDecimal() without using the shift operator.
+
+[lesson]
+In binary each place is worth double the
+one to its right:
+
+  place:   4  2  1
+  digits:  1  1  0   =  4 + 2 + 0  =  6
+
+The binary digits are stored as a normal
+int here: 110 really is one hundred and ten.
+So peel the digits off with % 10 and / 10,
+and keep a "place" that doubles: 1, 2, 4, 8...
+
+Exam 1, Q4.
+
+[hint]
+Start with result = 0 and place = 1. While the number is > 0: result += (number % 10) * place; place *= 2; number /= 10;
+
+[code]
+// LEVEL 2-2: BINARY DECODER
+// 110 -> 6     111 -> 7
+// No shift operator (<< >>) allowed!
+
+int convertBinarytoDecimal(int binaryNumber) {
+
+    return 0;
+}
+
+[solution]
+int convertBinarytoDecimal(int binaryNumber) {
+    int result = 0, place = 1;
+    while (binaryNumber > 0) {
+        result += (binaryNumber % 10) * place;
+        place *= 2;
+        binaryNumber /= 10;
+    }
+    return result;
+}
+
+[tests]
+convertBinarytoDecimal(110) == 6
+convertBinarytoDecimal(111) == 7
+convertBinarytoDecimal(1) == 1
+convertBinarytoDecimal(0) == 0
+convertBinarytoDecimal(1010) == 10

@@ -1,0 +1,46 @@
+title: 3-1  Leap Year Gate
+type: repair
+
+[story]
+Bitty: "The clock chip is broken. It doesn't know which years are leap years."
+Write isLeapYear(). Every gate checks a different year.
+
+[lesson]
+A leap year is divisible by 4,
+BUT not by 100,
+UNLESS it's also divisible by 400.
+
+"x is divisible by 4" in C:   x % 4 == 0
+
+Combine conditions with:
+  &&  AND  (both must be true)
+  ||  OR   (at least one is true)
+  !   NOT
+
+Watch out: == compares, = assigns.
+
+Exam 1, Q1.
+
+[hint]
+Try: return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+
+[code]
+// LEVEL 3-1: LEAP YEAR GATE
+// Divisible by 4, but not by 100,
+// unless also divisible by 400.
+
+bool isLeapYear(int year) {
+    return true;
+}
+
+[solution]
+bool isLeapYear(int year) {
+    return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+}
+
+[tests]
+isLeapYear(2016) == true
+isLeapYear(1700) == false
+isLeapYear(1600) == true
+isLeapYear(2023) == false
+isLeapYear(2000) == true

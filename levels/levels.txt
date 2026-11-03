@@ -1,0 +1,24 @@
+# Play order. One level file per line. Lines starting with # are ignored.
+
+# World 1: Boot Sector (sequence, loops, conditions)
+1-1_wake_up.txt
+1-2_long_corridor.txt
+1-3_mind_the_gap.txt
+
+# World 2: The Registers (variables, operators)
+2-1_digit_peeler.txt
+2-2_binary_decoder.txt
+
+# World 3: Branch Junction (if / else, && ||)
+3-1_leap_year_gate.txt
+
+# World 4: Loop Corridors
+4-1_prime_lock.txt
+
+# World 5: Array Bay
+5-1_search_the_bay.txt
+5-2_mirror_mirror.txt
+
+# World 8: Pointer Wires ([ ] is banned here)
+8-1_swap_wires.txt
+8-2_measure_the_string.txt
