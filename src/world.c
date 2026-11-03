@@ -33,7 +33,7 @@ void World_Init(World *w, int cols, int rows)
     w->mood  = MOOD_IDLE;
 }
 
-// Map letters:  # wall   . empty   E exit   x void   B Bitty's start   0-9 data tile with that value
+// Map letters:  # wall   . empty   E exit   x void   B Bitty's start   G gate   0-9 data tile with that value
 void World_LoadMap(World *w, const char *const *rows, int rowCount)
 {
     int cols = 0;
@@ -57,6 +57,7 @@ void World_LoadMap(World *w, const char *const *rows, int rowCount)
 
             if (ch == '#')                   t->type = TILE_WALL;
             else if (ch == 'E')              t->type = TILE_EXIT;
+            else if (ch == 'G')              t->type = TILE_GATE;
             else if (ch == 'x' || ch == ' ') t->type = TILE_VOID;
             else if (ch >= '0' && ch <= '9') { t->type = TILE_DATA; t->value = ch - '0'; }
             else                             t->type = TILE_EMPTY;
@@ -124,7 +125,8 @@ bool World_StartAction(World *w, Action a)
         if (a.dir == SOUTH) w->facing = 0;
         if (a.dir == NORTH) w->facing = 0;
 
-        bool blocked = InGrid(w, nx, ny) && w->tiles[ny][nx].type == TILE_WALL;
+        bool blocked = InGrid(w, nx, ny) &&
+                       (w->tiles[ny][nx].type == TILE_WALL || w->tiles[ny][nx].type == TILE_GATE);
         if (blocked)
         {
             w->lastResult = 0;          // bumped: stays put
@@ -152,6 +154,35 @@ bool World_StartAction(World *w, Action a)
     return true;
 }
 
+// ===========================================================================
+// Gates
+// ===========================================================================
+void World_OpenGate(World *w, int x, int y)
+{
+    if (!InGrid(w, x, y) || w->tiles[y][x].type != TILE_GATE) return;
+    w->tiles[y][x].type = TILE_EMPTY;
+    w->gateFlash  = 0.8f;
+    w->gateFlashX = x;
+    w->gateFlashY = y;
+}
+
+bool World_NextGate(const World *w, int *x, int *y)
+{
+    for (int r = 0; r < w->rows; r++)
+        for (int c = 0; c < w->cols; c++)
+            if (w->tiles[r][c].type == TILE_GATE) { *x = c; *y = r; return true; }
+    return false;
+}
+
+int World_CountGates(const World *w)
+{
+    int n = 0;
+    for (int r = 0; r < w->rows; r++)
+        for (int c = 0; c < w->cols; c++)
+            if (w->tiles[r][c].type == TILE_GATE) n++;
+    return n;
+}
+
 bool World_ActionDone(const World *w)
 {
     return w->current.type == ACT_NONE;
@@ -167,6 +198,7 @@ void World_Update(World *w, float dt)
     if (w->shake  > 0) w->shake  -= dt;
     if (w->flash  > 0) w->flash  -= dt;
     if (w->glitch > 0) w->glitch -= dt;
+    if (w->gateFlash > 0) w->gateFlash -= dt;
 
     if (w->current.type == ACT_NONE) return;
 
@@ -481,6 +513,13 @@ static int GatherLights(const World *w, float t, Light *lights)
                 lights[n++] = (Light){ TilePos(w, (float)c, (float)r, 0.6f), (Color){ 110, 255, 170, 255 },
                                        1.2f + sinf(t * 3) * 0.2f, 2.6f };
 
+    // Gates
+    for (int r = 0; r < w->rows && n < MAX_LIGHTS; r++)
+        for (int c = 0; c < w->cols && n < MAX_LIGHTS; c++)
+            if (w->tiles[r][c].type == TILE_GATE)
+                lights[n++] = (Light){ TilePos(w, (float)c, (float)r, 0.5f), (Color){ 255, 140, 60, 255 },
+                                       0.8f + sinf(t * 9 + c) * 0.08f, 1.6f };
+
     // Crystals
     for (int r = 0; r < w->rows && n < MAX_LIGHTS; r++)
         for (int c = 0; c < w->cols && n < MAX_LIGHTS; c++)
@@ -606,6 +645,13 @@ static void DrawTiles(const World *w)
 
                 case TILE_EXIT:
                     DrawStone((Vector3){ p.x, -0.12f, p.z }, (Vector3){ 0.96f, 0.2f, 0.96f }, COL_EXIT);
+                    break;
+
+                case TILE_GATE:
+                    // floor plus two posts; the energy barrier itself is drawn in the glow pass
+                    DrawStone((Vector3){ p.x, -0.12f, p.z }, (Vector3){ 0.96f, 0.2f, 0.96f }, COL_FLOOR2);
+                    DrawCubeV((Vector3){ p.x, 0.35f, p.z - 0.42f }, (Vector3){ 0.16f, 0.75f, 0.12f }, (Color){ 80, 76, 120, 255 });
+                    DrawCubeV((Vector3){ p.x, 0.35f, p.z + 0.42f }, (Vector3){ 0.16f, 0.75f, 0.12f }, (Color){ 80, 76, 120, 255 });
                     break;
 
                 case TILE_DATA:
@@ -893,6 +939,19 @@ static void DrawGlows(const World *w, Camera3D cam, float t)
                          (Color){ 160, 255, 200, (unsigned char)((1 - k) * 200) });
                 }
             }
+            else if (type == TILE_GATE)
+            {
+                // a crackling energy barrier across the path
+                float flicker = 0.75f + 0.25f * sinf(t * 23 + c * 3) * sinf(t * 7 + r);
+                unsigned char a = (unsigned char)(110 * flicker);
+                DrawCubeV((Vector3){ p.x, 0.35f, p.z }, (Vector3){ 0.05f, 0.62f, 0.76f }, (Color){ 255, 110, 50, a });
+                for (int i = 0; i < 4; i++)
+                {
+                    float y = 0.1f + i * 0.17f + sinf(t * 3 + i) * 0.02f;
+                    DrawCubeV((Vector3){ p.x, y, p.z }, (Vector3){ 0.07f, 0.02f, 0.8f }, (Color){ 255, 200, 120, (unsigned char)(160 * flicker) });
+                }
+                Glow(cam, (Vector3){ p.x, 0.35f, p.z }, 1.3f, (Color){ 255, 120, 50, (unsigned char)(80 * flicker) });
+            }
             else if (HasCrystal(w, c, r))
             {
                 Color cc = CrystalColor(c, r);
@@ -918,6 +977,21 @@ static void DrawGlows(const World *w, Camera3D cam, float t)
             {
                 Glow(cam, (Vector3){ p.x, 0.1f, p.z }, 0.9f, (Color){ 90, 150, 255, 45 });
             }
+        }
+    }
+
+    // a gate bursting open
+    if (w->gateFlash > 0)
+    {
+        float k = w->gateFlash / 0.8f;                  // 1 -> 0
+        Vector3 p = TilePos(w, (float)w->gateFlashX, (float)w->gateFlashY, 0.35f);
+        Glow(cam, p, 0.6f + (1 - k) * 2.5f, (Color){ 120, 255, 170, (unsigned char)(220 * k) });
+        for (int i = 0; i < 10; i++)
+        {
+            float a = i * 0.628f;
+            float d = (1 - k) * 0.9f;
+            Glow(cam, (Vector3){ p.x + sinf(a) * d * 0.4f, p.y + cosf(a) * d * 0.5f, p.z + cosf(a) * d },
+                 0.18f, (Color){ 180, 255, 210, (unsigned char)(255 * k) });
         }
     }
 
@@ -989,7 +1063,10 @@ static void DrawLabels(const World *w, Camera3D cam, int vw, int vh, float t)
 // ---------------------------------------------------------------------------
 static Camera3D MakeCamera(const World *w, float aspect)
 {
-    float needW = w->cols + 1.0f;
+    // Wide levels (like a corridor of gates) don't zoom right out: the camera
+    // shows about 11 columns and follows Bitty along instead.
+    bool wide = w->cols + 1 > 11;
+    float needW = wide ? 11.0f : w->cols + 1.0f;
     float needD = w->rows + 1.0f;
     float fitW = needW / (2 * tanf(22.5f * PI_F / 180) * aspect);
     float fitD = needD * 1.05f;
@@ -999,7 +1076,7 @@ static Camera3D MakeCamera(const World *w, float aspect)
 
     // Ease the camera a little towards Bitty, with a slow sway, so the world feels alive
     Vector3 b = TilePos(w, w->drawX, w->drawY, 0);
-    Vector3 want = { b.x * 0.3f, 0, b.z * 0.25f };
+    Vector3 want = { b.x * (wide ? 0.85f : 0.3f), 0, b.z * 0.25f };
     if (!camFollowSet) { camFollow = want; camFollowSet = true; }
     float ease = 1 - expf(-GetFrameTime() * 2.5f);
     camFollow.x += (want.x - camFollow.x) * ease;

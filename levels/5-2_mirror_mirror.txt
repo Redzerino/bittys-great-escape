@@ -1,0 +1,51 @@
+title: 5-2  Mirror Mirror
+type: repair
+
+[story]
+Bitty: "This bridge is built back to front. Flip it and I can cross."
+Write reverse(): reverse the array IN PLACE (no second array).
+
+[lesson]
+Swap the first and last, then the second
+and second-last, and so on.
+
+To swap two boxes you need a temporary:
+    int temp = arr[a];
+    arr[a] = arr[b];
+    arr[b] = temp;
+
+Only go HALF way (i < size / 2).
+Go all the way and you swap everything
+back again!
+
+Arrays are passed by reference: changes
+inside the function stick.
+
+Exam 1, Q15.
+
+[hint]
+for (int i = 0; i < size / 2; i++) swap arr[i] with arr[size - 1 - i].
+
+[code]
+// LEVEL 5-2: MIRROR MIRROR
+// Reverse the array in place.
+// {1, 2, 3} becomes {3, 2, 1}
+
+void reverse(int size, int arr[]) {
+
+}
+
+[solution]
+void reverse(int size, int arr[]) {
+    for (int i = 0; i < size / 2; i++) {
+        int temp = arr[i];
+        arr[i] = arr[size - 1 - i];
+        arr[size - 1 - i] = temp;
+    }
+}
+
+[tests]
+reverse(5, {1, 2, 3, 4, 5}) then #2 == {5, 4, 3, 2, 1}
+reverse(4, {10, 20, 30, 40}) then #2 == {40, 30, 20, 10}
+reverse(1, {7}) then #2 == {7}
+reverse(2, {8, 9}) then #2 == {9, 8}

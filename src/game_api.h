@@ -90,6 +90,8 @@ typedef struct {
     float  flash;             // write flash on Bitty's tile, counts down
     float  glitch;            // segfault: Bitty falling into the void, counts down
     float  facing;            // which way Bitty is turned (degrees, 0 = towards the camera)
+    float  gateFlash;         // a gate just opened: burst of light, counts down
+    int    gateFlashX, gateFlashY;
     BittyMood mood;
 
     WorldState state;
@@ -103,6 +105,11 @@ void World_Init(World *w, int cols, int rows);
 void World_LoadMap(World *w, const char *const *rows, int rowCount);   // see levels.c for the map letters
 void World_Update(World *w, float dt);   // advances animations
 void World_Draw(const World *w);
+
+// ---- Gates (repair levels: each passed test opens one) ----
+void World_OpenGate(World *w, int x, int y);
+bool World_NextGate(const World *w, int *x, int *y);   // first closed gate, false if none
+int  World_CountGates(const World *w);
 
 // ---- Timed actions (called for the VM) ----
 bool World_StartAction(World *w, Action a);   // false if already busy

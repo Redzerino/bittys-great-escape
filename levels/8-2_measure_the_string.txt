@@ -1,0 +1,48 @@
+title: 8-2  Measure the String
+type: repair
+ban_indexing: yes
+
+[story]
+Bitty: "This wire carries a message. I need to know how long it is."
+Write strlen_ptr() with pointer arithmetic only.
+
+[lesson]
+A string is a char array ending in '\0'.
+There's no stored length: you count until
+you hit the '\0'.
+
+A pointer can walk along an array:
+    char *p = str;
+    p++;          now points at the next char
+    *p            the char it points at
+
+Subtracting two pointers gives how many
+elements apart they are:   p - str
+
+Exam 2, Q5.
+
+[hint]
+char *p = str; while (*p != '\0') p++; return p - str;
+
+[code]
+// LEVEL 8-2: MEASURE THE STRING
+// "Hello" -> 5
+// No [ ] allowed: walk a pointer.
+
+int strlen_ptr(char *str) {
+
+    return 0;
+}
+
+[solution]
+int strlen_ptr(char *str) {
+    char *p = str;
+    while (*p != '\0') p++;
+    return p - str;
+}
+
+[tests]
+strlen_ptr("Hello") == 5
+strlen_ptr("") == 0
+strlen_ptr("Bitty escapes!") == 14
+strlen_ptr("a") == 1

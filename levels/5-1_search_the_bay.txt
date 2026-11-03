@@ -1,0 +1,50 @@
+title: 5-1  Search the Bay
+type: repair
+
+[story]
+Bitty: "The Array Bay. Rows of boxes, each with a number. I need to find the right one."
+Write find(): return the INDEX where toFind is, or -1 if it isn't there.
+
+[lesson]
+An array is boxes side by side, all the
+same type. The first index is 0.
+
+    int arr[5] = {4, 9, 2, 8, 5};
+    arr[0] is 4      arr[4] is 5
+
+The last valid index is size - 1.
+C will NOT stop you going past it.
+
+A function can't tell how big an array is,
+so you pass the size in as well:
+    int find(int size, int arr[], int toFind)
+
+Exam 1, Q8.
+
+[hint]
+for (int i = 0; i < size; i++) { if (arr[i] == toFind) return i; } and after the loop, return -1.
+
+[code]
+// LEVEL 5-1: SEARCH THE BAY
+// Return the index of toFind,
+// or -1 if it isn't in the array.
+
+int find(int size, int arr[], int toFind) {
+
+    return -1;
+}
+
+[solution]
+int find(int size, int arr[], int toFind) {
+    for (int i = 0; i < size; i++) {
+        if (arr[i] == toFind) return i;
+    }
+    return -1;
+}
+
+[tests]
+find(5, {4, 9, 2, 8, 5}, 8) == 3
+find(5, {4, 9, 2, 8, 5}, 4) == 0
+find(5, {4, 9, 2, 8, 5}, 5) == 4
+find(5, {4, 9, 2, 8, 5}, 7) == -1
+find(1, {42}, 42) == 0
