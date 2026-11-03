@@ -10,10 +10,11 @@
 //   int y = get_y();    // Bitty's row                                (instant)
 //   printf("%d", v);    // print to the console panel                 (instant)
 //
-// HOW THE VM USES THIS:
-//   - Instant functions: call them and use the return value straight away.
-//   - Timed functions (move, write): call World_StartAction(), then pause the
-//     VM until World_ActionDone() returns true. That is what makes the code
+// HOW THE GAME USES THIS:
+//   - Instant functions: answered straight away.
+//   - Timed functions (move, write): World_StartAction() starts the animation,
+//     the VM waits, and once World_ActionDone() is true the game calls
+//     Vm_ActionDone(vm, world.lastResult). That is what makes the code
 //     visibly run step by step.
 
 #ifndef GAME_API_H
@@ -64,36 +65,55 @@ typedef enum {
     WORLD_SEGFAULT    // Bitty stepped into the void
 } WorldState;
 
+typedef enum {
+    MOOD_IDLE = 0,    // blue eye
+    MOOD_RUNNING,     // green eye: code is running
+    MOOD_ERROR,       // red eye: compile error / crash
+    MOOD_HAPPY        // escaped!
+} BittyMood;
+
 typedef struct {
     int   cols, rows;
     Tile  tiles[WORLD_MAX_ROWS][WORLD_MAX_COLS];
 
     int   bittyX, bittyY;     // logical tile position
-    float drawX, drawY;       // animated position in pixels
+    float drawX, drawY;       // animated position, in tiles (e.g. 2.5 = half way between 2 and 3)
+    float fromX, fromY;       // where the current move started
 
     Action current;           // action being animated (ACT_NONE when idle)
     float  actionTimer;       // seconds left on the current animation
+    float  actionLength;      // total seconds for the current animation
     float  speed;             // 1.0 = normal, higher = faster
+    int    lastResult;        // result of the last action (move: 1 = moved, 0 = bumped)
+
+    float  shake;             // bump / error wobble, counts down
+    float  flash;             // write flash on Bitty's tile, counts down
+    float  glitch;            // segfault glitch effect, counts down
+    BittyMood mood;
 
     WorldState state;
+
+    // Where to draw (set by the game every frame before World_Draw)
+    float originX, originY, tileSize;
 } World;
 
 // ---- Setup / per-frame (game side) ----
 void World_Init(World *w, int cols, int rows);
+void World_LoadMap(World *w, const char *const *rows, int rowCount);   // see levels.c for the map letters
 void World_Update(World *w, float dt);   // advances animations
 void World_Draw(const World *w);
 
-// ---- Timed actions (called by the VM) ----
+// ---- Timed actions (called for the VM) ----
 bool World_StartAction(World *w, Action a);   // false if already busy
 bool World_ActionDone(const World *w);
 
-// ---- Instant queries (called by the VM) ----
+// ---- Instant queries (called for the VM) ----
 int  World_Read(const World *w);
 int  World_Scan(const World *w, Direction d);
 int  World_GetX(const World *w);
 int  World_GetY(const World *w);
 
-// ---- Console (called by the VM for printf) ----
+// ---- Console (printf output) ----
 void Console_Print(const char *text);
 
 #endif
