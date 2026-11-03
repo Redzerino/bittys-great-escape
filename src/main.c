@@ -38,8 +38,9 @@ typedef enum {
 } GameMode;
 
 typedef enum {
-    REPAIR_TESTING = 0,   // about to run the next test
-    REPAIR_WALKING        // a gate opened: Bitty walks to the next gate (or the exit)
+    REPAIR_WALKING = 0,   // Bitty walks to the next gate (or the exit)
+    REPAIR_RUNNING,       // a test is running, line by line, so the player can watch
+    REPAIR_RESULT         // showing PASS / FAIL on the gate terminal for a moment
 } RepairPhase;
 
 typedef struct {
@@ -58,6 +59,10 @@ typedef struct {
     int        repairGates;     // gates in the map at the start
     float      repairTimer;     // small pauses so the player can follow along
     bool       hintShown;
+    RepairRun  repairRun;       // where the current test's data lives in memory
+    TestOutcome repairOutcome;
+    float      lineTimer;       // time left showing the current line
+    int        linesShown;      // lines shown at normal pace (then fast-forward)
 
     // the lesson card ("memory dump") over the world
     bool       showLesson;
@@ -193,7 +198,7 @@ static void StartProgram(Game *g, bool step)
     if (lv->type == LEVEL_REPAIR)
     {
         // Tests run one at a time in UpdateRepair
-        g->repairPhase = REPAIR_TESTING;
+        g->repairPhase = REPAIR_WALKING;
         g->repairTest  = 0;
         g->repairGates = World_CountGates(&g->world);
         g->repairTimer = 0.4f;
@@ -231,7 +236,166 @@ static void ShowHint(Game *g)
     }
 }
 
-// Repair levels: run each test; a pass opens a gate and Bitty walks on
+// ---------------------------------------------------------------------------
+// Repair levels: Bitty walks to a gate, the gate's test runs line by line
+// while the player watches the variables and memory change, then the gate
+// opens (pass) or Bitty is stuck (fail).
+// ---------------------------------------------------------------------------
+#define PACE_FIRST_TEST   0.38f   // seconds per line for the first test
+#define PACE_LATER_TESTS  0.16f   // later tests run quicker
+#define LINES_BEFORE_FF   32      // after this many lines, fast-forward
+
+// Copy the function's plain variables and the test's arrays/strings into the
+// world's TestDisplay, so they float above the corridor
+static void UpdateTestDisplay(Game *g, const LevelTest *t)
+{
+    TestDisplay *td = &g->world.test;
+
+    // ---- registers: plain variables of the function ----
+    int n = 0;
+    for (int i = 0; i < g->varCount && n < TEST_MAX_REGISTERS; i++)
+    {
+        const VmVariable *v = &g->vars[i];
+        if (v->isGlobal || v->isArray || v->isPointer || v->isRef) continue;
+
+        TestRegister *r = &td->regs[n];
+        bool same = strcmp(r->name, v->name) == 0;
+        if (same && r->known && (r->value != v->values[0] || !v->initialized[0])) r->flash = 0.6f;
+        if (!same) { memset(r, 0, sizeof *r); snprintf(r->name, sizeof r->name, "%.15s", v->name); r->flash = 0.6f; }
+        r->value  = v->values[0];
+        r->known  = v->initialized[0];
+        r->isChar = v->isChar;
+        r->isBool = strcmp(v->type, "bool") == 0;
+        n++;
+    }
+    td->regCount = n;
+
+    // ---- data rows: the test's arrays, strings and &values ----
+    int reads[VM_MAX_ACCESSES], writes[VM_MAX_ACCESSES], rc, wc;
+    Vm_TakeAccesses(g->vm, reads, &rc, writes, &wc);
+
+    int rows = 0;
+    for (int k = 0; k < t->argc && rows < TEST_MAX_DATA_ROWS; k++)
+    {
+        const LevelValue *arg = &t->args[k];
+        if (arg->kind == VALUE_INT) continue;
+
+        TestDataRow *d = &td->rows[rows++];
+        int base = g->repairRun.argAddr[k];
+        int count = arg->kind == VALUE_ARRAY ? (arg->count > 0 ? arg->count : 1) :
+                    arg->kind == VALUE_STRING ? (int)strlen(arg->text) + 1 : 1;
+        if (count > TEST_ROW_MAX) count = TEST_ROW_MAX;
+
+        snprintf(d->name, sizeof d->name, "#%d", k + 1);
+        d->count  = count;
+        d->isChar = arg->kind == VALUE_STRING;
+        for (int i = 0; i < count; i++) d->values[i] = Vm_ReadMemory(g->vm, base + i);
+
+        for (int i = 0; i < rc; i++) if (reads[i]  >= base && reads[i]  < base + count) d->readFlash[reads[i] - base]   = 0.5f;
+        for (int i = 0; i < wc; i++) if (writes[i] >= base && writes[i] < base + count) d->writeFlash[writes[i] - base] = 0.5f;
+
+        // pointers (and array parameters) aimed into this row
+        d->markerCount = 0;
+        for (int i = 0; i < g->varCount && d->markerCount < TEST_MAX_MARKERS; i++)
+        {
+            const VmVariable *v = &g->vars[i];
+            if (!(v->isPointer || v->isRef) || v->isGlobal) continue;
+            int at = v->pointsTo - base;
+            if (at < 0 || at > count) continue;
+            d->markerIndex[d->markerCount] = at;
+            snprintf(d->markerName[d->markerCount], sizeof d->markerName[0], "%.15s", v->name);
+            d->markerCount++;
+        }
+    }
+    td->rowCount = rows;
+}
+
+static void StartNextTest(Game *g)
+{
+    const Level *lv = Levels_Get(g->level);
+    const LevelTest *t = &lv->tests[g->repairTest];
+    TestDisplay *td = &g->world.test;
+
+    memset(td, 0, sizeof *td);
+    td->active = true;
+    int gx = g->world.bittyX + 1, gy = g->world.bittyY;
+    World_NextGate(&g->world, &gx, &gy);
+    td->gateX = gx;
+    td->gateY = gy;
+    snprintf(td->title, sizeof td->title, "GATE TEST %d / %d", g->repairTest + 1, lv->testCount);
+    Repair_Describe(t, td->call, sizeof td->call, td->expect, sizeof td->expect);
+    td->state = TEST_RUNNING;
+    g->world.focus = 1.0f;
+
+    g->linesShown = 0;
+    g->lineTimer = 0;
+    g->repairPhase = REPAIR_RUNNING;
+
+    if (!Repair_BeginTest(g->vm, t, &g->repairRun, &g->repairOutcome))
+    {
+        g->repairPhase = REPAIR_RESULT;   // couldn't even start: show why
+        td->state = TEST_FAILED;
+        snprintf(td->result, sizeof td->result, "%s", g->repairOutcome.summary);
+        g->repairTimer = 0.2f;
+        return;
+    }
+    Vm_PauseAtNextLine(g->vm);   // stop on the first line so the player sees it start
+}
+
+static void RunTestFrame(Game *g, float dt)
+{
+    const Level *lv = Levels_Get(g->level);
+    const LevelTest *t = &lv->tests[g->repairTest];
+    TestDisplay *td = &g->world.test;
+    float speed = SPEEDS[g->speedIndex];
+    float pace = (g->repairTest == 0 ? PACE_FIRST_TEST : PACE_LATER_TESTS) / speed;
+
+    VmStatus s = Vm_GetStatus(g->vm);
+    if (s == VM_WAITING) { Vm_ActionDone(g->vm, 0); s = Vm_GetStatus(g->vm); }   // move() does nothing here
+
+    bool ff = g->linesShown >= LINES_BEFORE_FF;
+    td->fastForward = ff;
+
+    if (s == VM_PAUSED || (s == VM_RUNNING && !ff))
+    {
+        g->lineTimer -= dt;
+        if (g->lineTimer <= 0)
+        {
+            g->linesShown++;
+            if (g->linesShown < LINES_BEFORE_FF) Vm_PauseAtNextLine(g->vm);
+            g->lineTimer = pace;
+            s = Vm_Run(g->vm, 200000);
+        }
+    }
+    else if (s == VM_RUNNING)
+    {
+        s = Vm_Run(g->vm, (int)(30000 * speed));   // fast-forward
+    }
+
+    g->editor.runLine = Vm_CurrentLine(g->vm);
+    g->varCount = Vm_GetVariables(g->vm, g->vars, MAX_VARS);
+    if (s != VM_FINISHED) UpdateTestDisplay(g, t);   // after it finishes the frame is gone; keep the last picture
+    else
+    {
+        // refresh the data rows one last time (registers keep their final values)
+        int keepRegs = td->regCount;
+        TestRegister regs[TEST_MAX_REGISTERS];
+        memcpy(regs, td->regs, sizeof regs);
+        UpdateTestDisplay(g, t);
+        memcpy(td->regs, regs, sizeof regs);
+        td->regCount = keepRegs;
+    }
+
+    if (s == VM_FINISHED || s == VM_ERROR)
+    {
+        Repair_FinishTest(g->vm, t, &g->repairRun, &g->repairOutcome);
+        td->state = g->repairOutcome.passed ? TEST_PASSED : TEST_FAILED;
+        snprintf(td->result, sizeof td->result, "%s", g->repairOutcome.summary);
+        g->repairPhase = REPAIR_RESULT;
+        g->repairTimer = (g->repairTest == 0 ? 1.2f : 0.7f) / speed;
+    }
+}
+
 static void UpdateRepair(Game *g, float dt)
 {
     World *w = &g->world;
@@ -244,69 +408,67 @@ static void UpdateRepair(Game *g, float dt)
         return;
     }
 
+    if (g->repairPhase == REPAIR_RUNNING)
+    {
+        RunTestFrame(g, dt);
+        return;
+    }
+
     if (g->repairTimer > 0) { g->repairTimer -= dt; return; }
     if (!World_ActionDone(w)) return;
 
-    if (g->repairPhase == REPAIR_WALKING)
+    if (g->repairPhase == REPAIR_RESULT)
     {
-        // Walk east until the next closed gate (or the exit, which wins)
-        int nx = w->bittyX + 1;
-        bool gateAhead = nx < w->cols && w->tiles[w->bittyY][nx].type == TILE_GATE;
-        if (gateAhead || nx >= w->cols)
+        TestOutcome *o = &g->repairOutcome;
+        Console_PrintKind(o->passed ? CONSOLE_SUCCESS : CONSOLE_ERROR, TextFormat("%s\n", o->message));
+
+        if (!o->passed)
         {
-            g->repairPhase = REPAIR_TESTING;
-            g->repairTimer = 0.25f;
+            Action a = { ACT_MOVE, EAST, 0, 0 };   // bonk into the gate
+            World_StartAction(w, a);
+            w->mood = MOOD_ERROR;
+            if (o->crashed)
+            {
+                g->editor.errorLine = Vm_ErrorLine(g->vm);
+                VmErrorKind kind = Vm_GetErrorKind(g->vm);
+                if (kind == VM_ERR_SEGFAULT || kind == VM_ERR_OUT_OF_BOUNDS) w->glitch = 1.2f;
+            }
+            ShowHint(g);
+            FinishRun(g);   // the gate terminal stays up showing what went wrong
             return;
         }
-        Action a = { ACT_MOVE, EAST, 0, 0 };
-        World_StartAction(w, a);
-        return;
-    }
 
-    // ---- REPAIR_TESTING ----
-    if (g->repairTest >= lv->testCount)
-    {
-        g->repairPhase = REPAIR_WALKING;   // all passed: walk to the exit
-        return;
-    }
-
-    const LevelTest *t = &lv->tests[g->repairTest];
-    TestOutcome result;
-    Repair_RunTest(g->vm, t, &result);
-    Console_PrintKind(result.passed ? CONSOLE_SUCCESS : CONSOLE_ERROR, TextFormat("%s\n", result.message));
-
-    if (!result.passed)
-    {
-        // Bonk into the gate
-        Action a = { ACT_MOVE, EAST, 0, 0 };
-        World_StartAction(w, a);
-        w->mood = MOOD_ERROR;
-        if (result.crashed)
+        // Passed. Gates are shared out over the tests: open one when this test completes a group.
+        int n = lv->testCount;
+        int done = ++g->repairTest;
+        int gates = g->repairGates;
+        if (gates > 0 && (done * gates) / n > ((done - 1) * gates) / n)
         {
-            g->editor.errorLine = Vm_ErrorLine(g->vm);
-            VmErrorKind kind = Vm_GetErrorKind(g->vm);
-            if (kind == VM_ERR_SEGFAULT || kind == VM_ERR_OUT_OF_BOUNDS) w->glitch = 1.2f;
+            int gx, gy;
+            if (World_NextGate(w, &gx, &gy)) World_OpenGate(w, gx, gy);
+            w->test.active = false;
+            w->focus = 0;
+            g->repairPhase = REPAIR_WALKING;
+            g->repairTimer = 0.45f;
         }
-        ShowHint(g);
-        FinishRun(g);
+        else
+        {
+            StartNextTest(g);   // same gate, next test
+        }
         return;
     }
 
-    // Passed. Gates are shared out over the tests, so open one when this test completes a group.
-    int n = lv->testCount;
-    int done = ++g->repairTest;
-    int gates = g->repairGates;
-    if (gates > 0 && (done * gates) / n > ((done - 1) * gates) / n)
+    // ---- REPAIR_WALKING: east until the next closed gate, then test it ----
+    int nx = w->bittyX + 1;
+    bool gateAhead = nx < w->cols && w->tiles[w->bittyY][nx].type == TILE_GATE;
+    if (gateAhead && g->repairTest < lv->testCount)
     {
-        int gx, gy;
-        if (World_NextGate(w, &gx, &gy)) World_OpenGate(w, gx, gy);
-        g->repairPhase = REPAIR_WALKING;
-        g->repairTimer = 0.45f;
+        StartNextTest(g);
+        return;
     }
-    else
-    {
-        g->repairTimer = 0.3f;
-    }
+    if (nx >= w->cols) return;
+    Action a = { ACT_MOVE, EAST, 0, 0 };
+    World_StartAction(w, a);
 }
 
 static void UpdateProgram(Game *g, float dt)
