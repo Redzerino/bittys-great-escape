@@ -88,13 +88,14 @@ typedef struct {
 
     float  shake;             // bump / error wobble, counts down
     float  flash;             // write flash on Bitty's tile, counts down
-    float  glitch;            // segfault glitch effect, counts down
+    float  glitch;            // segfault: Bitty falling into the void, counts down
+    float  facing;            // which way Bitty is turned (degrees, 0 = towards the camera)
     BittyMood mood;
 
     WorldState state;
 
-    // Where to draw (set by the game every frame before World_Draw)
-    float originX, originY, tileSize;
+    // The screen area to draw the 3D scene in (set by the game every frame before World_Draw)
+    float viewX, viewY, viewW, viewH;
 } World;
 
 // ---- Setup / per-frame (game side) ----
