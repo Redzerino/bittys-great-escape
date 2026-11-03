@@ -63,7 +63,21 @@ struct Vm {
     // Warn about each uninitialised cell only once
     int       warnedAddr[MAX_WARNED];
     int       warnedCount;
+
+    // Recent memory accesses, for the game to show
+    int       reads[VM_MAX_ACCESSES], readCount;
+    int       writes[VM_MAX_ACCESSES], writeCount;
 };
+
+static void Remember(int *list, int *count, int addr)
+{
+    if (*count == VM_MAX_ACCESSES)
+    {
+        memmove(list, list + 1, sizeof(int) * (VM_MAX_ACCESSES - 1));
+        (*count)--;
+    }
+    list[(*count)++] = addr;
+}
 
 // ===========================================================================
 // Errors and warnings
@@ -177,6 +191,7 @@ static int Garbage(int addr)
 
 static int ReadCell(Vm *vm, int addr)
 {
+    Remember(vm->reads, &vm->readCount, addr);
     Cell *c = &vm->cells[addr];
     if (c->init) return vm->mem[addr];
 
@@ -199,6 +214,7 @@ static int ReadCell(Vm *vm, int addr)
 
 static void WriteCell(Vm *vm, int addr, int value)
 {
+    Remember(vm->writes, &vm->writeCount, addr);
     vm->mem[addr] = value;
     vm->cells[addr].init = 1;
 }
@@ -817,6 +833,15 @@ void Vm_ActionDone(Vm *vm, int result)
 }
 
 void Vm_PauseAtNextLine(Vm *vm) { vm->pauseAtLine = true; }
+
+void Vm_TakeAccesses(Vm *vm, int *reads, int *readCount, int *writes, int *writeCount)
+{
+    *readCount = vm->readCount;
+    *writeCount = vm->writeCount;
+    memcpy(reads, vm->reads, sizeof(int) * (size_t)vm->readCount);
+    memcpy(writes, vm->writes, sizeof(int) * (size_t)vm->writeCount);
+    vm->readCount = vm->writeCount = 0;
+}
 
 VmStatus    Vm_GetStatus(const Vm *vm)    { return vm->status; }
 int         Vm_CurrentLine(const Vm *vm)  { return vm->line; }

@@ -200,6 +200,16 @@ void World_Update(World *w, float dt)
     if (w->glitch > 0) w->glitch -= dt;
     if (w->gateFlash > 0) w->gateFlash -= dt;
 
+    // fade the flashes on the test's memory blocks and registers
+    for (int r = 0; r < w->test.rowCount; r++)
+        for (int i = 0; i < w->test.rows[r].count; i++)
+        {
+            if (w->test.rows[r].readFlash[i]  > 0) w->test.rows[r].readFlash[i]  -= dt;
+            if (w->test.rows[r].writeFlash[i] > 0) w->test.rows[r].writeFlash[i] -= dt;
+        }
+    for (int i = 0; i < w->test.regCount; i++)
+        if (w->test.regs[i].flash > 0) w->test.regs[i].flash -= dt;
+
     if (w->current.type == ACT_NONE) return;
 
     w->actionTimer -= dt;
@@ -1074,9 +1084,21 @@ static Camera3D MakeCamera(const World *w, float aspect)
     dist *= 1.12f;                       // leave room to see the world around the board
     if (dist < 6.0f) dist = 6.0f;
 
+    // During a repair test the camera moves in and looks more from the front,
+    // so the floating variables and memory blocks above the corridor are easy to read
+    static float focusCur = 0;
+    focusCur += (w->focus - focusCur) * (1 - expf(-GetFrameTime() * 3.0f));
+    dist *= 1.0f - 0.3f * focusCur;
+
     // Ease the camera a little towards Bitty, with a slow sway, so the world feels alive
     Vector3 b = TilePos(w, w->drawX, w->drawY, 0);
     Vector3 want = { b.x * (wide ? 0.85f : 0.3f), 0, b.z * 0.25f };
+    if (w->test.active)
+    {
+        Vector3 a = TilePos(w, w->test.gateX - 0.5f, (float)w->test.gateY, 0);
+        want.x = want.x + (a.x - want.x) * focusCur;
+        want.z = want.z + (a.z - 0.4f - want.z) * focusCur;
+    }
     if (!camFollowSet) { camFollow = want; camFollowSet = true; }
     float ease = 1 - expf(-GetFrameTime() * 2.5f);
     camFollow.x += (want.x - camFollow.x) * ease;
@@ -1086,12 +1108,178 @@ static Camera3D MakeCamera(const World *w, float aspect)
     float swayX = sinf(t * 0.23f) * 0.25f, swayY = sinf(t * 0.31f) * 0.12f;
 
     Camera3D cam = { 0 };
-    cam.target     = (Vector3){ camFollow.x, 0, camFollow.z + 0.25f };
-    cam.position   = (Vector3){ camFollow.x + swayX, dist * 1.0f + swayY, camFollow.z + dist * 0.50f };
+    cam.target     = (Vector3){ camFollow.x, 0.95f * focusCur, camFollow.z + 0.25f };
+    cam.position   = (Vector3){ camFollow.x + swayX, dist * (1.0f - 0.25f * focusCur) + swayY,
+                                camFollow.z + dist * (0.50f + 0.3f * focusCur) };
     cam.up         = (Vector3){ 0, 1, 0 };
     cam.fovy       = 45;
     cam.projection = CAMERA_PERSPECTIVE;
     return cam;
+}
+
+// ===========================================================================
+// Repair tests: floating variables and memory blocks above the corridor
+// ===========================================================================
+#define DATA_SPACING 0.56f
+#define REG_SPACING  1.4f
+
+static Vector3 RegisterPos(const World *w, int i)
+{
+    Vector3 a = TilePos(w, w->test.gateX - 0.5f, (float)w->test.gateY, 0);
+    float x0 = a.x - (w->test.regCount - 1) * REG_SPACING / 2;
+    return (Vector3){ x0 + i * REG_SPACING, 1.05f, a.z - 0.95f };
+}
+
+// Short rows (like two &values) sit side by side; long ones (arrays, strings) stack
+#define ROW_GAP 1.0f
+
+static bool RowsSideBySide(const World *w)
+{
+    float total = 0;
+    for (int r = 0; r < w->test.rowCount; r++) total += w->test.rows[r].count * DATA_SPACING;
+    total += (w->test.rowCount - 1) * ROW_GAP;
+    return w->test.rowCount > 1 && total <= 7.0f;
+}
+
+static Vector3 DataPos(const World *w, int row, int i)
+{
+    const TestDisplay *td = &w->test;
+    Vector3 a = TilePos(w, td->gateX - 0.5f, (float)td->gateY, 0);
+    float baseY = 1.05f + (td->regCount > 0 ? 0.95f : 0);
+
+    if (RowsSideBySide(w))
+    {
+        float total = (td->rowCount - 1) * ROW_GAP;
+        for (int r = 0; r < td->rowCount; r++) total += td->rows[r].count * DATA_SPACING;
+        float x = a.x - total / 2 + DATA_SPACING / 2;
+        for (int r = 0; r < row; r++) x += td->rows[r].count * DATA_SPACING + ROW_GAP;
+        return (Vector3){ x + i * DATA_SPACING, baseY, a.z - 0.95f };
+    }
+
+    const TestDataRow *d = &td->rows[row];
+    float x0 = a.x - (d->count - 1) * DATA_SPACING / 2;
+    return (Vector3){ x0 + i * DATA_SPACING, baseY + row * 0.85f, a.z - 0.95f };
+}
+
+static Color Lerp(Color a, Color b, float t)
+{
+    if (t < 0) t = 0;
+    if (t > 1) t = 1;
+    return Mix(a, b, t);
+}
+
+static void DrawTestBlocks(const World *w)
+{
+    const TestDisplay *td = &w->test;
+    if (!td->active) return;
+
+    for (int i = 0; i < td->regCount; i++)
+    {
+        Vector3 p = RegisterPos(w, i);
+        Color c = Lerp((Color){ 44, 52, 92, 255 }, (Color){ 255, 214, 100, 255 }, td->regs[i].flash / 0.6f);
+        DrawCubeV(p, (Vector3){ 1.2f, 0.58f, 0.08f }, c);
+        DrawCubeWiresV(p, (Vector3){ 1.21f, 0.59f, 0.09f }, (Color){ 120, 170, 255, 255 });
+    }
+
+    for (int r = 0; r < td->rowCount; r++)
+    {
+        const TestDataRow *d = &td->rows[r];
+        for (int i = 0; i < d->count; i++)
+        {
+            Vector3 p = DataPos(w, r, i);
+            Color c = (Color){ 30, 44, 84, 255 };
+            c = Lerp(c, (Color){ 90, 220, 255, 255 }, d->readFlash[i] / 0.5f);
+            c = Lerp(c, (Color){ 255, 150, 60, 255 }, d->writeFlash[i] / 0.5f);
+            DrawCubeV(p, (Vector3){ 0.5f, 0.42f, 0.08f }, c);
+            DrawCubeWiresV(p, (Vector3){ 0.51f, 0.43f, 0.09f }, (Color){ 90, 130, 220, 255 });
+        }
+        // pointer markers: little orange arrows above the block they point at
+        for (int m = 0; m < d->markerCount; m++)
+        {
+            Vector3 p = (d->markerIndex[m] < d->count) ? DataPos(w, r, d->markerIndex[m])
+                                                       : DataPos(w, r, d->count - 1);
+            if (d->markerIndex[m] >= d->count) p.x += DATA_SPACING;   // one past the end
+            float top = p.y + 0.21f + 0.06f + m * 0.0f;
+            DrawCylinderEx((Vector3){ p.x, top + 0.3f, p.z + 0.06f }, (Vector3){ p.x, top, p.z + 0.06f },
+                           0.09f, 0.0f, 8, (Color){ 255, 170, 70, 255 });
+        }
+    }
+}
+
+static void DrawTestLabels(const World *w, Camera3D cam, int vw, int vh)
+{
+    const TestDisplay *td = &w->test;
+    if (!td->active) return;
+
+    for (int i = 0; i < td->regCount; i++)
+    {
+        const TestRegister *g = &td->regs[i];
+        Vector3 p = RegisterPos(w, i);
+        DrawLabel((Vector3){ p.x, p.y + 0.45f, p.z }, cam, vw, vh, g->name, 16, (Color){ 170, 190, 230, 255 });
+        const char *v = !g->known ? "?" :
+                        g->isBool ? (g->value ? "true" : "false") :
+                        (g->isChar && g->value >= 32 && g->value < 127) ? TextFormat("'%c'", g->value) :
+                        TextFormat("%d", g->value);
+        DrawLabel(p, cam, vw, vh, v, 24, g->known ? WHITE : (Color){ 255, 120, 120, 255 });
+    }
+
+    for (int r = 0; r < td->rowCount; r++)
+    {
+        const TestDataRow *d = &td->rows[r];
+        if (d->count == 0) continue;
+        Vector3 first = DataPos(w, r, 0);
+        DrawLabel((Vector3){ first.x - 0.55f, first.y, first.z }, cam, vw, vh, d->name, 14, (Color){ 170, 190, 230, 255 });
+
+        for (int i = 0; i < d->count; i++)
+        {
+            Vector3 p = DataPos(w, r, i);
+            int v = d->values[i];
+            const char *text = !d->isChar ? TextFormat("%d", v) :
+                               v == 0 ? "\\0" : (v >= 32 && v < 127) ? TextFormat("%c", v) : "?";
+            DrawLabel(p, cam, vw, vh, text, d->isChar ? 18 : 16, WHITE);
+            DrawLabel((Vector3){ p.x, p.y - 0.3f, p.z }, cam, vw, vh, TextFormat("%d", i), 10, (Color){ 110, 130, 175, 255 });
+        }
+        for (int m = 0; m < d->markerCount; m++)
+        {
+            Vector3 p = (d->markerIndex[m] < d->count) ? DataPos(w, r, d->markerIndex[m]) : DataPos(w, r, d->count - 1);
+            if (d->markerIndex[m] >= d->count) p.x += DATA_SPACING;
+            DrawLabel((Vector3){ p.x + 0.17f, p.y + 0.48f + m * 0.2f, p.z }, cam, vw, vh, d->markerName[m], 16,
+                      (Color){ 255, 190, 110, 255 });
+        }
+    }
+}
+
+// The gate terminal: the question this gate asks, and how the code is doing
+static void DrawTestHud(const World *w, int vw)
+{
+    const TestDisplay *td = &w->test;
+    if (!td->active) return;
+
+    Color edge = td->state == TEST_PASSED ? (Color){ 110, 240, 150, 255 } :
+                 td->state == TEST_FAILED ? (Color){ 255, 100, 110, 255 } : (Color){ 255, 205, 90, 255 };
+    Rectangle box = { 10, 8, (float)vw - 20, 84 };
+    DrawRectangleRounded(box, 0.15f, 6, (Color){ 8, 10, 22, 225 });
+    DrawRectangleRoundedLinesEx(box, 0.15f, 6, 2, edge);
+
+    DrawText(td->title, 22, 16, 14, edge);
+    if (td->fastForward && td->state == TEST_RUNNING)
+        DrawText("FAST-FORWARD >>", vw - 160, 16, 14, (Color){ 140, 200, 255, 255 });
+
+    int fs = 22;
+    while (fs > 12 && MeasureText(td->call, fs) > vw - 44) fs -= 2;
+    DrawText(td->call, 22, 34, fs, WHITE);
+    DrawText(td->expect, 22, 62, 14, (Color){ 160, 175, 210, 255 });
+
+    const char *status = td->state == TEST_PASSED ? "PASS" : td->state == TEST_FAILED ? "FAIL" : "running...";
+    const char *res = td->state == TEST_RUNNING ? status : TextFormat("%s   %s", td->result, status);
+    int rs = 14;
+    int rw = MeasureText(res, rs);
+    int rx = vw - 22 - rw;
+    int ew = MeasureText(td->expect, 14);
+    if (rx < 22 + ew + 16) { rx = 22; }               // not enough room: put it on its own line
+    int ry = (rx == 22) ? 78 : 62;
+    if (rx == 22) { DrawRectangle(12, 76, vw - 24, 16, (Color){ 8, 10, 22, 225 }); }
+    DrawText(res, rx, ry, rs, edge);
 }
 
 static void DrawVignette(int vw, int vh)
@@ -1149,11 +1337,14 @@ void World_Draw(const World *w)
     }
 
     DrawBitty(w, t);
+    DrawTestBlocks(w);
     DrawGlows(w, cam, t);
     EndMode3D();
 
     DrawLabels(w, cam, vw, vh, t);
+    DrawTestLabels(w, cam, vw, vh);
     DrawVignette(vw, vh);
+    DrawTestHud(w, vw);
     EndTextureMode();
 
     // Render textures are stored upside down, hence the negative height

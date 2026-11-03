@@ -72,6 +72,50 @@ typedef enum {
     MOOD_HAPPY        // escaped!
 } BittyMood;
 
+// ---- What a repair test shows while it runs ----
+#define TEST_MAX_DATA_ROWS  3
+#define TEST_ROW_MAX        24
+#define TEST_MAX_REGISTERS  6
+#define TEST_MAX_MARKERS    4
+
+// An array, string or &value argument, floating as a row of memory blocks
+typedef struct {
+    char  name[16];                     // "#2" (argument number, matching the test)
+    int   count;
+    int   values[TEST_ROW_MAX];
+    bool  isChar;
+    float readFlash[TEST_ROW_MAX];      // cyan: the code just read this block
+    float writeFlash[TEST_ROW_MAX];     // orange: the code just wrote this block
+    int   markerCount;                  // pointers aimed at this row
+    int   markerIndex[TEST_MAX_MARKERS];
+    char  markerName[TEST_MAX_MARKERS][16];
+} TestDataRow;
+
+// A plain variable (int, char, bool) of the function being tested
+typedef struct {
+    char  name[16];
+    int   value;
+    bool  isChar, isBool, known;
+    float flash;                        // its value just changed
+} TestRegister;
+
+typedef enum { TEST_RUNNING = 0, TEST_PASSED, TEST_FAILED } TestState;
+
+typedef struct {
+    bool  active;
+    int   gateX, gateY;                 // the gate being tested
+    char  title[32];                    // "GATE 2 / 5"
+    char  call[128];                    // "isLeapYear(1700)"
+    char  expect[160];                  // "should return false"
+    char  result[200];                  // "returned true"
+    TestState state;
+    bool  fastForward;
+    TestDataRow  rows[TEST_MAX_DATA_ROWS];
+    int          rowCount;
+    TestRegister regs[TEST_MAX_REGISTERS];
+    int          regCount;
+} TestDisplay;
+
 typedef struct {
     int   cols, rows;
     Tile  tiles[WORLD_MAX_ROWS][WORLD_MAX_COLS];
@@ -95,6 +139,9 @@ typedef struct {
     BittyMood mood;
 
     WorldState state;
+
+    TestDisplay test;         // repair levels: what the current test is doing
+    float  focus;             // 0 = normal camera, 1 = zoomed in on a test
 
     // The screen area to draw the 3D scene in (set by the game every frame before World_Draw)
     float viewX, viewY, viewW, viewH;

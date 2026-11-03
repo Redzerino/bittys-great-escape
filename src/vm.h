@@ -151,4 +151,9 @@ VmErrorKind Vm_GetErrorKind(const Vm *vm);
 // Variables visible right now (current function + globals). Returns how many were written.
 int Vm_GetVariables(const Vm *vm, VmVariable *out, int max);
 
+// Memory addresses read and written since the last call (most recent last).
+// The game uses these to flash the blocks the code is touching.
+#define VM_MAX_ACCESSES 16
+void Vm_TakeAccesses(Vm *vm, int *reads, int *readCount, int *writes, int *writeCount);
+
 #endif
