@@ -152,6 +152,8 @@ void World_Init(World *w, int cols, int rows);
 void World_LoadMap(World *w, const char *const *rows, int rowCount);   // see levels.c for the map letters
 void World_Update(World *w, float dt);   // advances animations
 void World_Draw(const World *w);
+// Draw the existing customised character inside an active 3D camera.
+void World_DrawBittyPreview(const World *w, float time);
 
 // ---- Gates (repair levels: each passed test opens one) ----
 void World_OpenGate(World *w, int x, int y);
