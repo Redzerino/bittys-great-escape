@@ -919,6 +919,11 @@ static void DrawBitty(const World *w, float t)
 // Glows (additive, after everything solid, no depth writes)
 // ---------------------------------------------------------------------------
 
+void World_DrawBittyPreview(const World *w, float time)
+{
+    DrawBitty(w, time);
+}
+
 static void DrawGlows(const World *w, Camera3D cam, float t)
 {
     rlDrawRenderBatchActive();

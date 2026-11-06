@@ -11,6 +11,7 @@
 
 #include "raylib.h"
 
+#include "startup.h"
 #include "customisation.h"
 #include "console.h"
 #include "editor.h"
@@ -797,9 +798,20 @@ int main(void)
     if (levelError[0])
         Console_PrintKind(loaded ? CONSOLE_WARNING : CONSOLE_ERROR, TextFormat("Level problem: %s\n", levelError));
 
+    Startup_Init(g->codeFont);
+    bool startupActive = true;
+
     while (!WindowShouldClose())
     {
         float dt = GetFrameTime();
+        if (startupActive)
+        {
+            if (Startup_Update(dt)) startupActive = false;
+            BeginDrawing();
+            Startup_Draw();
+            EndDrawing();
+            continue;
+        }
 
         if (!g->showWorkshop)
         {
@@ -842,6 +854,7 @@ int main(void)
     }
 
     StopProgram(g);
+    Startup_Shutdown();
     if (g->ownsFont) UnloadFont(g->codeFont);
     CloseWindow();
     return 0;
