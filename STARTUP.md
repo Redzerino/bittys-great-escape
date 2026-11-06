@@ -22,6 +22,6 @@ Files:
 - src/game_api.h and src/world.c: shared drawing entry point for Bitty.
 
 Verification: Windows GCC/raylib compilation and git diff whitespace check
-passed. Interactive verification of this build was blocked on the development
-machine by Windows Application Control. Before merging, check the complete
-sequence, skip-to-title, replay, Start, muted audio, and saved accessories.
+passed. The user built and ran the startup animation locally and confirmed its appearance.
+Additional checks for future changes: skip-to-title, replay, Start, muted audio,
+and saved accessories.
