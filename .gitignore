@@ -9,3 +9,6 @@ build/
 .idea/
 *.swp
 .DS_Store
+
+# Local player cosmetics and unlocks
+bitty-customisation.save

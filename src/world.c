@@ -11,6 +11,7 @@
 #include "game_api.h"
 #include "raylib.h"
 #include "rlgl.h"
+#include "customisation.h"
 
 #include <math.h>
 #include <string.h>
@@ -469,7 +470,7 @@ static Color MoodColor(const World *w)
         case MOOD_RUNNING: return (Color){ 120, 250, 170, 255 };
         case MOOD_ERROR:   return (Color){ 255, 90, 110, 255 };
         case MOOD_HAPPY:   return (Color){ 255, 215, 120, 255 };
-        default:           return (Color){ 130, 210, 255, 255 };
+        default:           return Customisation_Glow();
     }
 }
 
@@ -808,12 +809,13 @@ static void DrawBitty(const World *w, float t)
     rlScalef(1.5f / sqrtf(squashY), 1.5f * squashY, 1.5f / sqrtf(squashY));
 
     // Slate-grey stone, like Bulder from Pode: matte, darker underneath, no shine
-    const Color BODY   = { 104, 112, 128, 255 };
-    const Color BODY_HI= { 122, 130, 146, 255 };
-    const Color BODY_D = { 76, 82, 98, 255 };
+    const Color BODY = Customisation_Body();
+    const Color BODY_HI = Customisation_Highlight();
+    const Color BODY_D = Customisation_Shadow();
     const Color DARK   = { 50, 54, 68, 255 };
     const Color SCREEN = { 16, 20, 34, 255 };
     Color eye = MoodColor(w);
+    Color trim = Customisation_Glow();
 
     // feet
     DrawBlob((Vector3){ -0.11f, 0.05f, 0.04f }, (Vector3){ 0.085f, 0.055f, 0.1f }, DARK);
@@ -831,20 +833,21 @@ static void DrawBitty(const World *w, float t)
 
     // a glowing seam around his middle
     DrawRoundedBox((Vector3){ 0, 0.215f, 0 }, (Vector3){ 0.635f, 0.022f, 0.515f }, 0.011f,
-                   (Color){ eye.r, eye.g, eye.b, 255 });
+                   (Color){ trim.r, trim.g, trim.b, 255 });
 
     // stubby arms (wave when happy)
     float wave = (w->mood == MOOD_HAPPY) ? sinf(t * 12) * 0.07f : sinf(t * 2.5f) * 0.01f;
     DrawBlob((Vector3){ -0.34f, 0.22f + wave, 0.05f }, (Vector3){ 0.055f, 0.075f, 0.055f }, BODY_D);
     DrawBlob((Vector3){  0.34f, 0.22f - wave, 0.05f }, (Vector3){ 0.055f, 0.075f, 0.055f }, BODY_D);
 
-    // headphone ear-pieces with glowing rings
+    // Optional classic headphone ear-pieces.
+    if (Customisation_Headphones())
     for (int side = -1; side <= 1; side += 2)
     {
         DrawCylinderEx((Vector3){ side * 0.30f, 0.37f, 0 }, (Vector3){ side * 0.37f, 0.37f, 0 },
                        0.09f, 0.08f, 16, DARK);
         DrawCylinderEx((Vector3){ side * 0.37f, 0.37f, 0 }, (Vector3){ side * 0.385f, 0.37f, 0 },
-                       0.055f, 0.045f, 16, eye);
+                       0.055f, 0.045f, 16, trim);
     }
 
     // flat screen face with rounded corners
@@ -864,6 +867,19 @@ static void DrawBitty(const World *w, float t)
         {
             DrawBar(e, 0.085f, 0.024f,  45, eye);                                      // x
             DrawBar(e, 0.085f, 0.024f, -45, eye);
+        }
+        else if (Customisation_Face() == 1)
+        {
+            DrawBar((Vector3){e.x - 0.022f,e.y,e.z},0.065f,0.024f,45,eye);
+            DrawBar((Vector3){e.x + 0.022f,e.y,e.z},0.065f,0.024f,-45,eye);
+        }
+        else if (Customisation_Face() == 2)
+        {
+            DrawBar(e,0.085f,0.025f,side * 12,eye);
+        }
+        else if (Customisation_Face() == 3)
+        {
+            DrawBar(e,0.075f,0.014f,0,eye);
         }
         else
         {
@@ -894,10 +910,7 @@ static void DrawBitty(const World *w, float t)
     }
 
 
-    // antenna with a glowing bulb
-    float wob = sinf(t * 4) * 0.03f + (w->current.type == ACT_MOVE ? sinf(t * 25) * 0.03f : 0);
-    DrawCylinderEx((Vector3){ 0.08f, 0.50f, -0.05f }, (Vector3){ 0.08f + wob, 0.72f, -0.05f }, 0.014f, 0.011f, 6, DARK);
-    DrawSphereEx((Vector3){ 0.08f + wob, 0.74f, -0.05f }, 0.05f, 8, 10, eye);
+    Customisation_DrawAccessories(t);
 
     rlPopMatrix();
 }

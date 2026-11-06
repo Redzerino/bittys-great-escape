@@ -11,6 +11,7 @@
 
 #include "raylib.h"
 
+#include "customisation.h"
 #include "console.h"
 #include "editor.h"
 #include "game_api.h"
@@ -66,6 +67,7 @@ typedef struct {
 
     // the lesson card ("memory dump") over the world
     bool       showLesson;
+    bool       showWorkshop;
     VmVariable vars[MAX_VARS];
     int        varCount;
     Font       codeFont;
@@ -661,6 +663,15 @@ static void DrawToolbar(Game *g)
 {
     DrawText("BITTY'S GREAT ESCAPE", 10, 12, 26, (Color){ 120, 255, 160, 255 });
 
+    if (Button((Rectangle){1080, 10, 90, 30},
+               g->showWorkshop ? "BACK" : "WORKSHOP",
+               (Color){90, 65, 145, 255}, g->mode != MODE_RUNNING))
+    {
+        g->showWorkshop = !g->showWorkshop;
+        if (g->showWorkshop) g->showLesson = false;
+    }
+    if (g->showWorkshop) return;
+
     bool running = (g->mode == MODE_RUNNING);
     float x = 420, y = 10, h = 30;
 
@@ -763,6 +774,7 @@ int main(void)
     InitWindow(SCREEN_W, SCREEN_H, "Bitty's Great Escape");
     SetExitKey(KEY_NULL);   // Esc shouldn't close the game
     SetTargetFPS(60);
+    Customisation_Init();
 
     static Game game;       // big (saved code), so not on the stack
     Game *g = &game;
@@ -789,22 +801,39 @@ int main(void)
     {
         float dt = GetFrameTime();
 
-        Editor_Update(&g->editor);
-        if (Editor_TakeChanged(&g->editor) && g->mode != MODE_RUNNING)
+        if (!g->showWorkshop)
         {
-            g->editor.errorLine = 0;   // editing clears the old error
-            if (g->mode == MODE_DONE) { g->mode = MODE_EDITING; g->editor.runLine = 0; }
-        }
+            Editor_Update(&g->editor);
+            if (Editor_TakeChanged(&g->editor) && g->mode != MODE_RUNNING)
+            {
+                g->editor.errorLine = 0;   // editing clears the old error
+                if (g->mode == MODE_DONE) { g->mode = MODE_EDITING; g->editor.runLine = 0; }
+            }
 
-        UpdateProgram(g, dt);
+            UpdateProgram(g, dt);
+            if (g->world.state == WORLD_WON)
+                Customisation_RecordCompletion(g->level);
+        }
 
         BeginDrawing();
         ClearBackground((Color){ 10, 12, 20, 255 });
 
         DrawToolbar(g);
-        Editor_Draw(&g->editor);
-        DrawWorldPanel(g);
-        DrawLessonCard(g);
+        if (g->showWorkshop)
+        {
+            Customisation_Draw();
+            // Preview the chosen face even after a successful or failed run.
+            BittyMood previousMood = g->world.mood;
+            g->world.mood = MOOD_IDLE;
+            DrawWorldPanel(g);
+            g->world.mood = previousMood;
+        }
+        else
+        {
+            Editor_Draw(&g->editor);
+            DrawWorldPanel(g);
+            DrawLessonCard(g);
+        }
         Console_Draw(CONSOLE_PANEL, g->codeFont);
         Inspector_Draw(g->vars, g->varCount, INSPECT_PANEL, g->codeFont,
                        g->mode == MODE_RUNNING ? g->editor.runLine : 0);
