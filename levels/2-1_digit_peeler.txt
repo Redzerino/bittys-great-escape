@@ -5,6 +5,13 @@ type: repair
 Bitty: "This door reads its code backwards. 123 has to become 321."
 Write Reversed() so it returns the digits of a number in reverse.
 
+[talk]
+@walk EAST 1
+This gate reads numbers backwards. It wants 123 turned into 321.
+Two tools peel a number apart. `%` gives the remainder: `123 % 10` is 3, the last digit.
+And `/` divides: `123 / 10` is 12. With whole numbers C throws the decimals away, which chops off that last digit.
+So: grab the last digit, stick it on the end of `result`, chop it off, and repeat while there are digits left.
+
 [lesson]
 Two operators peel digits off a number:
 

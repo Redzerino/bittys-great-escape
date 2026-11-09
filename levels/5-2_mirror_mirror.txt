@@ -5,6 +5,13 @@ type: repair
 Bitty: "This bridge is built back to front. Flip it and I can cross."
 Write reverse(): reverse the array IN PLACE (no second array).
 
+[talk]
+@walk EAST 1
+This bridge was built back to front. Flip the array and I can cross.
+The trick: swap the first box with the last, the second with the second-last, and stop in the middle.
+To swap two boxes you need a spare: put one in `temp`, copy the other across, then put `temp` back.
+Watch the boxes above my head. They flash blue when they're read and orange when they're written.
+
 [lesson]
 Swap the first and last, then the second
 and second-last, and so on.

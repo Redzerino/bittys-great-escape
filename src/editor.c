@@ -7,15 +7,18 @@
 #include <stdio.h>
 #include <string.h>
 
-#define GUTTER_WIDTH 36
 #define PADDING      8
 #define TITLE_HEIGHT 30
+#define MIN_FONT     12
+#define MAX_FONT     32
 
 static bool changedFlag = false;
 
-// ---------------------------------------------------------------------------
+enum { EDIT_NONE = 0, EDIT_TYPE, EDIT_DELETE, EDIT_OTHER };
+
+// ===========================================================================
 // Text helpers
-// ---------------------------------------------------------------------------
+// ===========================================================================
 static int LineStart(const Editor *e, int index)
 {
     while (index > 0 && e->text[index - 1] != '\n') index--;
@@ -52,6 +55,104 @@ static int StartOfLine(const Editor *e, int line)
     return i;
 }
 
+static float GutterWidth(const Editor *e) { return e->fontSize * 2.3f; }
+static float TextLeft(const Editor *e)    { return e->bounds.x + GutterWidth(e) + PADDING; }
+static float TextTop(const Editor *e)     { return e->bounds.y + TITLE_HEIGHT; }
+
+static int VisibleLines(const Editor *e)
+{
+    return (int)((e->bounds.height - TITLE_HEIGHT - PADDING) / e->lineHeight);
+}
+
+static void KeepCursorVisible(Editor *e)
+{
+    int line = LineOf(e, e->cursor);
+    int visible = VisibleLines(e);
+    if (line < e->scrollLine) e->scrollLine = line;
+    if (line >= e->scrollLine + visible) e->scrollLine = line - visible + 1;
+    if (e->scrollLine < 0) e->scrollLine = 0;
+}
+
+// Width of text[from..to) in pixels
+static float Width(const Editor *e, int from, int to)
+{
+    char buf[512];
+    int n = to - from;
+    if (n <= 0) return 0;
+    if (n > (int)sizeof buf - 1) n = (int)sizeof buf - 1;
+    memcpy(buf, e->text + from, (size_t)n);
+    buf[n] = '\0';
+    return MeasureTextEx(e->font, buf, e->fontSize, e->spacing).x + e->spacing;
+}
+
+// ===========================================================================
+// Selection
+// ===========================================================================
+static bool HasSelection(const Editor *e) { return e->anchor >= 0 && e->anchor != e->cursor; }
+static int  SelStart(const Editor *e)     { return e->anchor < e->cursor ? e->anchor : e->cursor; }
+static int  SelEnd(const Editor *e)       { return e->anchor > e->cursor ? e->anchor : e->cursor; }
+static void ClearSelection(Editor *e)     { e->anchor = -1; }
+
+// ===========================================================================
+// Undo / redo
+// ===========================================================================
+static void Snapshot(const Editor *e, EditorSnapshot *s)
+{
+    memcpy(s->text, e->text, (size_t)e->len + 1);
+    s->len = e->len;
+    s->cursor = e->cursor;
+}
+
+static void Restore(Editor *e, const EditorSnapshot *s)
+{
+    memcpy(e->text, s->text, (size_t)s->len + 1);
+    e->len = s->len;
+    e->cursor = s->cursor;
+    ClearSelection(e);
+    changedFlag = true;
+}
+
+static void PushSnapshot(EditorSnapshot *stack, int *count, const Editor *e)
+{
+    if (*count == EDITOR_UNDO_MAX)
+    {
+        memmove(stack, stack + 1, sizeof(EditorSnapshot) * (EDITOR_UNDO_MAX - 1));
+        (*count)--;
+    }
+    Snapshot(e, &stack[(*count)++]);
+}
+
+// Call before every change. Typing (or deleting) in a row counts as one step.
+static void BeginEdit(Editor *e, int kind)
+{
+    double now = GetTime();
+    bool merge = (kind == EDIT_TYPE || kind == EDIT_DELETE) && kind == e->lastEditKind &&
+                 now - e->lastEditTime < 1.0;
+    if (!merge) PushSnapshot(e->undo, &e->undoCount, e);
+    e->redoCount = 0;
+    e->lastEditKind = kind;
+    e->lastEditTime = now;
+}
+
+static void Undo(Editor *e)
+{
+    if (e->undoCount == 0) return;
+    PushSnapshot(e->redo, &e->redoCount, e);
+    Restore(e, &e->undo[--e->undoCount]);
+    e->lastEditKind = EDIT_NONE;
+}
+
+static void Redo(Editor *e)
+{
+    if (e->redoCount == 0) return;
+    PushSnapshot(e->undo, &e->undoCount, e);
+    Restore(e, &e->redo[--e->redoCount]);
+    e->lastEditKind = EDIT_NONE;
+}
+
+// ===========================================================================
+// Changing the text
+// ===========================================================================
 static void Insert(Editor *e, const char *s, int n)
 {
     if (e->len + n >= EDITOR_MAX_TEXT) n = EDITOR_MAX_TEXT - 1 - e->len;
@@ -76,74 +177,27 @@ static void DeleteRange(Editor *e, int from, int to)
     changedFlag = true;
 }
 
-// Width of text[from..to) in pixels
-static float Width(const Editor *e, int from, int to)
+static void DeleteSelection(Editor *e)
 {
-    char buf[512];
-    int n = to - from;
-    if (n <= 0) return 0;
-    if (n > (int)sizeof buf - 1) n = (int)sizeof buf - 1;
-    memcpy(buf, e->text + from, (size_t)n);
+    if (!HasSelection(e)) return;
+    DeleteRange(e, SelStart(e), SelEnd(e));
+    ClearSelection(e);
+}
+
+static void CopySelection(const Editor *e)
+{
+    static char buf[EDITOR_MAX_TEXT];
+    int n = SelEnd(e) - SelStart(e);
+    memcpy(buf, e->text + SelStart(e), (size_t)n);
     buf[n] = '\0';
-    return MeasureTextEx(e->font, buf, e->fontSize, e->spacing).x + e->spacing;
-}
-
-static float TextLeft(const Editor *e) { return e->bounds.x + GUTTER_WIDTH + PADDING; }
-static float TextTop(const Editor *e)  { return e->bounds.y + TITLE_HEIGHT; }
-static int   VisibleLines(const Editor *e)
-{
-    return (int)((e->bounds.height - TITLE_HEIGHT - PADDING) / e->lineHeight);
-}
-
-static void KeepCursorVisible(Editor *e)
-{
-    int line = LineOf(e, e->cursor);
-    int visible = VisibleLines(e);
-    if (line < e->scrollLine) e->scrollLine = line;
-    if (line >= e->scrollLine + visible) e->scrollLine = line - visible + 1;
-}
-
-// ---------------------------------------------------------------------------
-// Public
-// ---------------------------------------------------------------------------
-void Editor_Init(Editor *e, Rectangle bounds, Font font, float fontSize)
-{
-    memset(e, 0, sizeof *e);
-    e->bounds     = bounds;
-    e->font       = font;
-    e->fontSize   = fontSize;
-    e->spacing    = 0;
-    e->lineHeight = fontSize + 4;
-    e->focused    = true;
-}
-
-void Editor_SetText(Editor *e, const char *text)
-{
-    snprintf(e->text, EDITOR_MAX_TEXT, "%s", text);
-    e->len = (int)strlen(e->text);
-    e->cursor = e->len;
-    e->scrollLine = 0;
-    e->runLine = e->errorLine = 0;
-    KeepCursorVisible(e);
-}
-
-const char *Editor_GetText(const Editor *e) { return e->text; }
-
-bool Editor_TakeChanged(Editor *e)
-{
-    (void)e;
-    bool c = changedFlag;
-    changedFlag = false;
-    return c;
-}
-
-static bool KeyRepeat(int key)
-{
-    return IsKeyPressed(key) || IsKeyPressedRepeat(key);
+    SetClipboardText(buf);
 }
 
 static void TypeNewline(Editor *e)
 {
+    BeginEdit(e, EDIT_OTHER);
+    DeleteSelection(e);
+
     // Keep the same indent as the line above, plus 4 after a {
     int start = LineStart(e, e->cursor);
     int indent = 0;
@@ -162,6 +216,12 @@ static void TypeNewline(Editor *e)
 
 static void TypeChar(Editor *e, int ch)
 {
+    // Typing over a selection starts a new undo step, and the letters
+    // typed after it join that same step (so one Ctrl+Z brings it all back)
+    if (HasSelection(e)) e->lastEditKind = EDIT_NONE;
+    BeginEdit(e, EDIT_TYPE);
+    DeleteSelection(e);
+
     // Typing } on a line that's only spaces: step the indent back by 4
     if (ch == '}')
     {
@@ -177,7 +237,9 @@ static void TypeChar(Editor *e, int ch)
 static void Paste(Editor *e)
 {
     const char *clip = GetClipboardText();
-    if (!clip) return;
+    if (!clip || !clip[0]) return;
+    BeginEdit(e, EDIT_OTHER);
+    DeleteSelection(e);
     for (int i = 0; clip[i]; i++)
     {
         char c = clip[i];
@@ -187,10 +249,101 @@ static void Paste(Editor *e)
     }
 }
 
+static void Backspace(Editor *e)
+{
+    if (HasSelection(e)) { BeginEdit(e, EDIT_OTHER); DeleteSelection(e); return; }
+    if (e->cursor == 0) return;
+    BeginEdit(e, EDIT_DELETE);
+
+    // Backspace over a 4-space indent in one go
+    int start = LineStart(e, e->cursor);
+    bool spaces = e->cursor - start >= 4;
+    for (int i = e->cursor - 4; spaces && i < e->cursor; i++) if (e->text[i] != ' ') spaces = false;
+    bool onlyIndent = true;
+    for (int i = start; i < e->cursor; i++) if (e->text[i] != ' ') onlyIndent = false;
+    if (spaces && onlyIndent) DeleteRange(e, e->cursor - 4, e->cursor);
+    else                      DeleteRange(e, e->cursor - 1, e->cursor);
+}
+
+static void DeleteForward(Editor *e)
+{
+    if (HasSelection(e)) { BeginEdit(e, EDIT_OTHER); DeleteSelection(e); return; }
+    if (e->cursor >= e->len) return;
+    BeginEdit(e, EDIT_DELETE);
+    DeleteRange(e, e->cursor, e->cursor + 1);
+}
+
+static void SetFontSize(Editor *e, float size)
+{
+    if (size < MIN_FONT) size = MIN_FONT;
+    if (size > MAX_FONT) size = MAX_FONT;
+    e->fontSize = size;
+    e->lineHeight = size + 4;
+    KeepCursorVisible(e);
+}
+
+// ===========================================================================
+// Public
+// ===========================================================================
+void Editor_Init(Editor *e, Rectangle bounds, Font font, float fontSize)
+{
+    memset(e, 0, sizeof *e);
+    e->bounds  = bounds;
+    e->font    = font;
+    e->spacing = 0;
+    e->focused = true;
+    e->anchor  = -1;
+    SetFontSize(e, fontSize);
+}
+
+void Editor_SetBounds(Editor *e, Rectangle bounds)
+{
+    e->bounds = bounds;
+}
+
+void Editor_SetText(Editor *e, const char *text)
+{
+    snprintf(e->text, EDITOR_MAX_TEXT, "%s", text);
+    e->len = (int)strlen(e->text);
+    e->cursor = e->len;
+    e->scrollLine = 0;
+    e->runLine = e->errorLine = 0;
+    e->undoCount = e->redoCount = 0;
+    e->lastEditKind = EDIT_NONE;
+    ClearSelection(e);
+    KeepCursorVisible(e);
+}
+
+void Editor_ReplaceAll(Editor *e, const char *text)
+{
+    BeginEdit(e, EDIT_OTHER);
+    snprintf(e->text, EDITOR_MAX_TEXT, "%s", text);
+    e->len = (int)strlen(e->text);
+    e->cursor = e->len;
+    ClearSelection(e);
+    changedFlag = true;
+    KeepCursorVisible(e);
+}
+
+const char *Editor_GetText(const Editor *e) { return e->text; }
+
+bool Editor_TakeChanged(Editor *e)
+{
+    (void)e;
+    bool c = changedFlag;
+    changedFlag = false;
+    return c;
+}
+
+static bool KeyRepeat(int key)
+{
+    return IsKeyPressed(key) || IsKeyPressedRepeat(key);
+}
+
 static int IndexFromMouse(const Editor *e, Vector2 m)
 {
-    int line = (int)((m.y - TextTop(e)) / e->lineHeight) + e->scrollLine;
-    if (line < 0) line = 0;
+    int line = (int)floorf((m.y - TextTop(e)) / e->lineHeight) + e->scrollLine;
+    if (line < 0) return 0;
     if (line >= LineCount(e)) return e->len;
 
     int start = StartOfLine(e, line);
@@ -204,44 +357,87 @@ static int IndexFromMouse(const Editor *e, Vector2 m)
     return end;
 }
 
+// Move the cursor; with Shift held the selection grows, without it the selection goes
+static void MoveTo(Editor *e, int index, bool shift)
+{
+    if (shift) { if (e->anchor < 0) e->anchor = e->cursor; }
+    else       ClearSelection(e);
+    e->cursor = index;
+}
+
 void Editor_Update(Editor *e)
 {
     e->blink += GetFrameTime();
+    Vector2 m = GetMousePosition();
+    bool ctrl  = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+    bool shift = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
 
-    // Focus: clicking in the editor focuses it; clicking another panel unfocuses it.
-    // (Clicks on the toolbar above the panels leave it focused.)
+    // ---- Mouse: focus, click to place the cursor, drag to select ----
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
     {
-        Vector2 m = GetMousePosition();
         bool inside = CheckCollisionPointRec(m, e->bounds);
-        if (inside || m.y >= e->bounds.y) e->focused = inside;
+        if (inside || m.y >= e->bounds.y) e->focused = inside;   // toolbar clicks keep focus
         if (e->focused && m.y > TextTop(e))
         {
-            e->cursor = IndexFromMouse(e, m);
+            int at = IndexFromMouse(e, m);
+            if (shift) { if (e->anchor < 0) e->anchor = e->cursor; }
+            else       e->anchor = at;
+            e->cursor = at;
+            e->dragging = true;
             e->blink = 0;
         }
     }
+    if (e->dragging)
+    {
+        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+        {
+            e->cursor = IndexFromMouse(e, m);
+            if (m.y < TextTop(e) && e->scrollLine > 0) e->scrollLine--;                         // drag up: scroll
+            if (m.y > e->bounds.y + e->bounds.height - 4) e->scrollLine++;                      // drag down: scroll
+        }
+        else
+        {
+            e->dragging = false;
+            if (e->anchor == e->cursor) ClearSelection(e);
+        }
+    }
 
-    // Scroll
-    if (CheckCollisionPointRec(GetMousePosition(), e->bounds))
+    // ---- Mouse wheel: scroll, or Ctrl + wheel to zoom ----
+    if (CheckCollisionPointRec(m, e->bounds))
     {
         float wheel = GetMouseWheelMove();
-        e->scrollLine -= (int)(wheel * 3);
-        int maxScroll = LineCount(e) - VisibleLines(e);
-        if (e->scrollLine > maxScroll) e->scrollLine = maxScroll;
-        if (e->scrollLine < 0) e->scrollLine = 0;
+        if (ctrl && wheel != 0) SetFontSize(e, e->fontSize + (wheel > 0 ? 1 : -1));
+        else
+        {
+            e->scrollLine -= (int)(wheel * 3);
+            int maxScroll = LineCount(e) - VisibleLines(e);
+            if (e->scrollLine > maxScroll) e->scrollLine = maxScroll;
+            if (e->scrollLine < 0) e->scrollLine = 0;
+        }
     }
 
     if (!e->focused) return;
 
-    bool ctrl = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
     int before = e->cursor;
 
-    // ---- Movement ----
-    if (KeyRepeat(KEY_LEFT)  && e->cursor > 0)      e->cursor--;
-    if (KeyRepeat(KEY_RIGHT) && e->cursor < e->len) e->cursor++;
-    if (KeyRepeat(KEY_HOME)) e->cursor = LineStart(e, e->cursor);
-    if (KeyRepeat(KEY_END))  e->cursor = LineEnd(e, e->cursor);
+    // ---- Text size ----
+    if (ctrl && (KeyRepeat(KEY_EQUAL) || KeyRepeat(KEY_KP_ADD)))      SetFontSize(e, e->fontSize + 1);
+    if (ctrl && (KeyRepeat(KEY_MINUS) || KeyRepeat(KEY_KP_SUBTRACT))) SetFontSize(e, e->fontSize - 1);
+    if (ctrl && IsKeyPressed(KEY_ZERO))                               SetFontSize(e, 16);
+
+    // ---- Movement (Shift = select) ----
+    if (KeyRepeat(KEY_LEFT))
+    {
+        if (HasSelection(e) && !shift) MoveTo(e, SelStart(e), false);
+        else if (e->cursor > 0)        MoveTo(e, e->cursor - 1, shift);
+    }
+    if (KeyRepeat(KEY_RIGHT))
+    {
+        if (HasSelection(e) && !shift) MoveTo(e, SelEnd(e), false);
+        else if (e->cursor < e->len)   MoveTo(e, e->cursor + 1, shift);
+    }
+    if (KeyRepeat(KEY_HOME)) MoveTo(e, ctrl ? 0 : LineStart(e, e->cursor), shift);
+    if (KeyRepeat(KEY_END))  MoveTo(e, ctrl ? e->len : LineEnd(e, e->cursor), shift);
     if (KeyRepeat(KEY_UP) || KeyRepeat(KEY_DOWN))
     {
         int start = LineStart(e, e->cursor);
@@ -251,14 +447,25 @@ void Editor_Update(Editor *e)
         {
             int s = StartOfLine(e, line);
             int end = LineEnd(e, s);
-            e->cursor = (s + col < end) ? s + col : end;
+            MoveTo(e, (s + col < end) ? s + col : end, shift);
         }
+    }
+    if (ctrl && IsKeyPressed(KEY_A)) { e->anchor = 0; e->cursor = e->len; }
+
+    // ---- Copy works even while the program runs ----
+    if (ctrl && IsKeyPressed(KEY_C))
+    {
+        if (HasSelection(e)) CopySelection(e);
+        else                 SetClipboardText(e->text);   // nothing selected: copy all the code
     }
 
     // ---- Editing (not while the program is running) ----
     if (!e->readOnly)
     {
+        if (ctrl && IsKeyPressed(KEY_X) && HasSelection(e)) { CopySelection(e); BeginEdit(e, EDIT_OTHER); DeleteSelection(e); }
         if (ctrl && IsKeyPressed(KEY_V)) Paste(e);
+        if (ctrl && KeyRepeat(KEY_Z))   { if (shift) Redo(e); else Undo(e); }
+        if (ctrl && KeyRepeat(KEY_Y))   Redo(e);
 
         int ch;
         while ((ch = GetCharPressed()) > 0)
@@ -268,37 +475,25 @@ void Editor_Update(Editor *e)
         }
 
         if (KeyRepeat(KEY_ENTER) || KeyRepeat(KEY_KP_ENTER)) TypeNewline(e);
-        if (KeyRepeat(KEY_TAB)) Insert(e, "    ", 4);
-        if (KeyRepeat(KEY_BACKSPACE) && e->cursor > 0)
-        {
-            // Backspace over a 4-space indent in one go
-            int start = LineStart(e, e->cursor);
-            bool spaces = e->cursor - start >= 4;
-            for (int i = e->cursor - 4; spaces && i < e->cursor; i++) if (e->text[i] != ' ') spaces = false;
-            bool onlyIndent = true;
-            for (int i = start; i < e->cursor; i++) if (e->text[i] != ' ') onlyIndent = false;
-            if (spaces && onlyIndent) DeleteRange(e, e->cursor - 4, e->cursor);
-            else                      DeleteRange(e, e->cursor - 1, e->cursor);
-        }
-        if (KeyRepeat(KEY_DELETE) && e->cursor < e->len) DeleteRange(e, e->cursor, e->cursor + 1);
+        if (KeyRepeat(KEY_TAB)) { BeginEdit(e, EDIT_OTHER); DeleteSelection(e); Insert(e, "    ", 4); }
+        if (KeyRepeat(KEY_BACKSPACE)) Backspace(e);
+        if (KeyRepeat(KEY_DELETE))    DeleteForward(e);
     }
     else
     {
         while (GetCharPressed() > 0) {}   // ignore typing while running
     }
 
-    if (ctrl && IsKeyPressed(KEY_C)) SetClipboardText(e->text);   // copy all code
-
     if (e->cursor != before || changedFlag)
     {
         e->blink = 0;
-        KeepCursorVisible(e);
+        if (!e->dragging) KeepCursorVisible(e);
     }
 }
 
-// ---------------------------------------------------------------------------
+// ===========================================================================
 // Drawing with syntax colours
-// ---------------------------------------------------------------------------
+// ===========================================================================
 static const Color COL_TEXT     = { 220, 225, 235, 255 };
 static const Color COL_COMMENT  = { 110, 120, 140, 255 };
 static const Color COL_KEYWORD  = { 200, 140, 255, 255 };
@@ -390,6 +585,7 @@ static void DrawCodeLine(const Editor *e, int start, int end, float x, float y)
 void Editor_Draw(const Editor *e)
 {
     Rectangle b = e->bounds;
+    float gutter = GutterWidth(e);
     DrawRectangleRec(b, (Color){ 20, 24, 36, 255 });
     DrawRectangleLinesEx(b, 2, e->focused ? (Color){ 90, 220, 255, 255 } : (Color){ 60, 200, 255, 160 });
     DrawText("CODE", (int)b.x + 10, (int)b.y + 8, 18, (Color){ 60, 200, 255, 255 });
@@ -397,7 +593,7 @@ void Editor_Draw(const Editor *e)
         DrawText("running...", (int)(b.x + b.width - 90), (int)b.y + 10, 14, (Color){ 90, 230, 120, 255 });
 
     // Gutter
-    DrawRectangle((int)b.x + 2, (int)TextTop(e) - 4, GUTTER_WIDTH, (int)(b.height - TITLE_HEIGHT + 2),
+    DrawRectangle((int)b.x + 2, (int)TextTop(e) - 4, (int)gutter, (int)(b.height - TITLE_HEIGHT + 2),
                   (Color){ 16, 19, 29, 255 });
 
     BeginScissorMode((int)b.x + 2, (int)TextTop(e) - 4, (int)b.width - 4, (int)(b.height - TITLE_HEIGHT + 2));
@@ -405,11 +601,15 @@ void Editor_Draw(const Editor *e)
     int lines = LineCount(e);
     int visible = VisibleLines(e);
     int cursorLine = LineOf(e, e->cursor);
+    bool sel = HasSelection(e);
+    int s0 = sel ? SelStart(e) : 0, s1 = sel ? SelEnd(e) : 0;
 
     for (int L = e->scrollLine; L < lines && L < e->scrollLine + visible + 1; L++)
     {
         float y = TextTop(e) + (L - e->scrollLine) * e->lineHeight;
         int lineNo = L + 1;
+        int start = StartOfLine(e, L);
+        int end = LineEnd(e, start);
 
         // highlight bars
         Rectangle bar = { b.x + 2, y - 2, b.width - 4, e->lineHeight };
@@ -417,17 +617,25 @@ void Editor_Draw(const Editor *e)
             DrawRectangleRec(bar, (Color){ 140, 30, 40, 160 });
         else if (lineNo == e->runLine)
             DrawRectangleRec(bar, (Color){ 140, 120, 20, 150 });
-        else if (e->focused && !e->readOnly && L == cursorLine)
+        else if (e->focused && !e->readOnly && L == cursorLine && !sel)
             DrawRectangleRec(bar, (Color){ 255, 255, 255, 10 });
+
+        // selection on this line
+        if (sel && s0 <= end && s1 >= start && !(s0 == s1))
+        {
+            int a = s0 > start ? s0 : start;
+            int z = s1 < end ? s1 : end;
+            float x0 = TextLeft(e) + Width(e, start, a);
+            float x1 = TextLeft(e) + Width(e, start, z) + ((s1 > end) ? e->fontSize * 0.4f : 0);
+            if (x1 > x0) DrawRectangle((int)x0, (int)y - 2, (int)(x1 - x0), (int)e->lineHeight, (Color){ 60, 110, 200, 120 });
+        }
 
         const char *num = TextFormat("%d", lineNo);
         Color numCol = (lineNo == e->runLine) ? (Color){ 255, 220, 90, 255 } :
                        (lineNo == e->errorLine) ? (Color){ 255, 120, 120, 255 } : (Color){ 80, 90, 115, 255 };
-        DrawTextEx(e->font, num, (Vector2){ b.x + GUTTER_WIDTH - 6 - MeasureTextEx(e->font, num, e->fontSize - 2, 0).x, y + 1 },
+        DrawTextEx(e->font, num, (Vector2){ b.x + gutter - 6 - MeasureTextEx(e->font, num, e->fontSize - 2, 0).x, y + 1 },
                    e->fontSize - 2, 0, numCol);
 
-        int start = StartOfLine(e, L);
-        int end = LineEnd(e, start);
         DrawCodeLine(e, start, end, TextLeft(e), y);
     }
 

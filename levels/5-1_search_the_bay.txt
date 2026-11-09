@@ -5,6 +5,13 @@ type: repair
 Bitty: "The Array Bay. Rows of boxes, each with a number. I need to find the right one."
 Write find(): return the INDEX where toFind is, or -1 if it isn't there.
 
+[talk]
+@walk EAST 1
+Welcome to the Array Bay. An `array` is a row of boxes, all with the same name.
+You pick a box by its position: `arr[0]` is the first, `arr[1]` the second. Yes, counting starts at 0. Robots love that.
+I need to find a number in there. Check each box in a loop, and `return` its position when you find it.
+If you reach the end without finding it, return -1. And never read past the last box. That memory isn't ours!
+
 [lesson]
 An array is boxes side by side, all the
 same type. The first index is 0.

@@ -12,3 +12,7 @@ build/
 
 # Local player cosmetics and unlocks
 bitty-customisation.save
+
+# Player save files (different on every computer)
+bitty_save.txt
+bitty-customisation.save

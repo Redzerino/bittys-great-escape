@@ -5,6 +5,14 @@ type: escape
 Bitty: "That's a LONG way. My battery won't last if you type every step."
 Goal: reach the EXIT using a loop.
 
+[talk]
+@walk EAST 2
+Whoa. Look how far the exit is. Eleven steps!
+You could type `move(EAST);` eleven times... but my battery would die of boredom.
+Programmers are lazy in a smart way. We use a `loop` to repeat things.
+`for (int i = 0; i < 11; i++)` means: count from 0 up to 10, and run the code inside the `{ }` each time.
+`i` is just a counter. Watch it tick up in the Inspector while I walk!
+
 [lesson]
 A for loop repeats code a set number of times.
 
@@ -21,9 +29,9 @@ i goes 0, 1, 2 so the body runs 3 times.
 Watch the Inspector: you'll see i count up.
 
 [map]
-##############
-#B..........E#
-##############
+################
+#b.B..........E#
+################
 
 [code]
 // LEVEL 1-2: THE LONG CORRIDOR

@@ -16,6 +16,7 @@ typedef struct {
 static ConsoleLine lines[CONSOLE_LINES];
 static int lineCount = 0;
 static bool lastLineOpen = false;   // printf("A"); printf("B\n"); should give one line "AB"
+static float scrollUp = 0;          // pixels scrolled back from the newest line (mouse wheel)
 
 static ConsoleLine *NewLine(ConsoleKind kind)
 {
@@ -34,10 +35,12 @@ void Console_Clear(void)
 {
     lineCount = 0;
     lastLineOpen = false;
+    scrollUp = 0;
 }
 
 void Console_PrintKind(ConsoleKind kind, const char *text)
 {
+    scrollUp = 0;   // new output: jump back to the newest line
     ConsoleLine *cur = NULL;
     if (lastLineOpen && lineCount > 0 && lines[lineCount - 1].kind == kind) cur = &lines[lineCount - 1];
 
@@ -110,11 +113,16 @@ void Console_Draw(Rectangle b, Font font)
     float maxWidth = b.width - 36;
     float top = b.y + 32, bottom = b.y + b.height - 8;
 
+    // Mouse wheel over the console scrolls back through older lines
+    if (CheckCollisionPointRec(GetMousePosition(), b) && !IsKeyDown(KEY_LEFT_CONTROL))
+        scrollUp += GetMouseWheelMove() * lineH * 3;
+    if (scrollUp < 0) scrollUp = 0;
+
     BeginScissorMode((int)b.x + 2, (int)top, (int)b.width - 4, (int)(bottom - top));
 
     // Draw from the newest line upwards
-    float y = bottom;
-    for (int i = lineCount - 1; i >= 0 && y > top; i--)
+    float y = bottom + scrollUp;
+    for (int i = lineCount - 1; i >= 0; i--)
     {
         const ConsoleLine *l = &lines[i];
         Color col = (Color){ 230, 230, 235, 255 };
@@ -131,6 +139,8 @@ void Console_Draw(Rectangle b, Font font)
         int breaks[8];
         int pieces = WrapLine(l->text, font, size, maxWidth, breaks, 8);
         y -= pieces * lineH;
+        if (y > bottom) continue;   // below the panel (scrolled up past it)
+        if (y + pieces * lineH < top) break;
 
         int start = 0;
         for (int k = 0; k < pieces; k++)
@@ -147,5 +157,15 @@ void Console_Draw(Rectangle b, Font font)
             while (l->text[start] == ' ') start++;
         }
     }
+    // Can't scroll further than the oldest line
+    if (y > top && scrollUp > 0) { scrollUp -= (y - top); if (scrollUp < 0) scrollUp = 0; }
     EndScissorMode();
+
+    if (scrollUp > 0)
+    {
+        const char *more = "newer lines below - scroll down";
+        float w = MeasureTextEx(font, more, 14, 0).x;
+        DrawRectangleRounded((Rectangle){ b.x + b.width - w - 30, b.y + 7, w + 20, 20 }, 0.5f, 6, (Color){ 40, 60, 90, 255 });
+        DrawTextEx(font, more, (Vector2){ b.x + b.width - w - 20, b.y + 9 }, 14, 0, (Color){ 160, 200, 255, 255 });
+    }
 }

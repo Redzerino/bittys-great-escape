@@ -5,6 +5,13 @@ type: repair
 Bitty: "The machine talks in binary. 110 means 6 down here."
 Write convertBinarytoDecimal() without using the shift operator.
 
+[talk]
+@walk EAST 1
+The machine down here talks in binary: only 1s and 0s. To it, 110 means 6.
+Each place is worth double the one to its right: 1, 2, 4, 8, 16...
+Peel the digits off from the right with `% 10` and `/ 10`, just like last time.
+Every time you see a 1, add what that place is worth. Then double the place value for the next digit.
+
 [lesson]
 In binary each place is worth double the
 one to its right:
