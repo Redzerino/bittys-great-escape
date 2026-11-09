@@ -6,6 +6,13 @@ max_steps: 5000000
 Bitty: "These locks only open for prime numbers. Even a really, REALLY big one."
 Write isAPrimeNumber(). A prime is only divisible by itself and 1.
 
+[talk]
+@walk EAST 1
+Prime locks. They only open for prime numbers.
+A prime can only be divided by 1 and itself. 7 is prime. 8 isn't, because 2 goes into it.
+So try dividing by every number from 2 upwards. If any of them fits exactly, it's not prime.
+Tip: you can stop once `i * i` is bigger than the number. One of these gates has a HUGE number, so it matters!
+
 [lesson]
 Loop through possible divisors and check:
 

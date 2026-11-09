@@ -6,6 +6,13 @@ ban_indexing: yes
 Bitty: "Pointer Wires. Two cables are crossed. Swap what's at the ends."
 Write swap_ints() using pointers. In this world [ ] is banned.
 
+[talk]
+@walk EAST 1
+Pointer Wires. Every box in memory has an address, like a house number.
+A `pointer` is a variable that holds an address. `int *a` means "a holds the address of an int".
+`*a` means "go to that address and use what's there". That's how a function can change a variable that lives somewhere else.
+Two wires are crossed. Swap what's at the ends. Oh, and `[ ]` is banned in this sector. Pointers only!
+
 [lesson]
 A POINTER holds an ADDRESS: where a value
 lives in memory.

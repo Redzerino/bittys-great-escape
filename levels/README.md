@@ -19,6 +19,7 @@ max_steps: 5000000    optional: instruction limit per test (default 2,000,000)
 | Section      | What it's for |
 |--------------|---------------|
 | `[story]`    | Shown in the console when the level loads. Bitty talking + the goal. |
+| `[talk]`     | What Bitty says out loud when the level starts, one speech bubble per line. `@walk EAST 2` makes him walk by himself first. Put C code in `` `backticks` `` to show it in gold. |
 | `[lesson]`   | The "Memory Dump" card: the C concept this level teaches. Keep it to about 14 short lines. |
 | `[hint]`     | Shown in the console after the first failed run. |
 | `[map]`      | Escape levels. Max 16 wide, 12 tall. Repair levels can leave it out and get a corridor of gates. |
@@ -31,6 +32,7 @@ max_steps: 5000000    optional: instruction limit per test (default 2,000,000)
 ```
 #  wall (protected memory)      .  empty memory
 B  Bitty's start                E  exit
+b  where Bitty arrives for his walk-in (optional; pair it with @walk lines in [talk] that end on B)
 x  void (step in = segfault)    G  gate (repair levels)
 0-9  a data tile holding that number (read() returns it)
 ```

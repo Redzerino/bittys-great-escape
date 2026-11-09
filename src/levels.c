@@ -301,12 +301,13 @@ void Level_FormatValue(const LevelValue *v, char *out, int size)
 // Level files
 // ===========================================================================
 typedef enum {
-    SEC_NONE, SEC_STORY, SEC_LESSON, SEC_HINT, SEC_MAP, SEC_CODE, SEC_SOLUTION, SEC_TESTS
+    SEC_NONE, SEC_STORY, SEC_TALK, SEC_LESSON, SEC_HINT, SEC_MAP, SEC_CODE, SEC_SOLUTION, SEC_TESTS
 } Section;
 
 static Section SectionFromHeader(const char *line)
 {
     if (strcmp(line, "[story]") == 0)    return SEC_STORY;
+    if (strcmp(line, "[talk]") == 0)     return SEC_TALK;
     if (strcmp(line, "[lesson]") == 0)   return SEC_LESSON;
     if (strcmp(line, "[hint]") == 0)     return SEC_HINT;
     if (strcmp(line, "[map]") == 0)      return SEC_MAP;
@@ -391,6 +392,7 @@ bool Level_Parse(const char *text, const char *fileName, Level *lv, char *error,
                 break;
             }
             case SEC_STORY:    AppendLine(lv->story, sizeof lv->story, line); break;
+            case SEC_TALK:     AppendLine(lv->talk, sizeof lv->talk, line); break;
             case SEC_LESSON:   AppendLine(lv->lesson, sizeof lv->lesson, line); break;
             case SEC_HINT:     AppendLine(lv->hint, sizeof lv->hint, line); break;
             case SEC_CODE:     AppendLine(lv->starterCode, sizeof lv->starterCode, line); break;

@@ -6,6 +6,14 @@ Bitty: "Where... am I? Everything's made of numbers."
 Bitty can't move on its own. Your code is the only way out.
 Goal: reach the green EXIT tile.
 
+[talk]
+Bzzt... systems online. Hello! I'm Bitty.
+I woke up inside a computer's memory, and it's shutting down. I need to get out!
+One problem: I can't move by myself. I only do what your code tells me.
+A line of code is called a `statement`. Each one is one instruction, like `move(EAST);`
+See the `;` at the end? That's how C knows the instruction is finished. Like a full stop.
+C runs your statements from top to bottom, one at a time. Get me to the green EXIT!
+
 [lesson]
 A C program is a list of STATEMENTS.
 They run from top to bottom, one at a time.

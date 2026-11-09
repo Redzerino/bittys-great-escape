@@ -8,6 +8,8 @@
 //   ban_indexing: no             (yes = arr[i] not allowed, for Pointer Wires)
 //
 //   [story]     shown in the console when the level loads
+//   [talk]      what Bitty says when the level starts, one speech bubble per line.
+//               "@walk EAST 3" makes him walk by himself; `code` is shown in gold.
 //   [lesson]    the "memory dump": the C concept this level teaches
 //   [hint]      shown after the first failed attempt
 //   [map]       escape levels: the grid (repair levels get a corridor of gates)
@@ -83,6 +85,7 @@ typedef struct {
 
     char      story[LEVEL_TEXT_MAX];
     char      lesson[LEVEL_TEXT_MAX];
+    char      talk[LEVEL_TEXT_MAX];     // what Bitty says (and where he walks) when the level starts
     char      hint[512];
 
     char      map[LEVEL_MAX_ROWS][LEVEL_MAX_COLS + 1];

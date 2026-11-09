@@ -6,6 +6,13 @@ ban_indexing: yes
 Bitty: "This wire carries a message. I need to know how long it is."
 Write strlen_ptr() with pointer arithmetic only.
 
+[talk]
+@walk EAST 1
+A string is just an array of letters, and it always ends with a hidden `'\0'`. That's how C knows where it stops.
+I need to know how long this message is, without using `[ ]`.
+Point at the first letter. `p++` slides the pointer along to the next one.
+Keep sliding while `*p` isn't `'\0'`, and count your steps. Watch the marker walk along the letters!
+
 [lesson]
 A string is a char array ending in '\0'.
 There's no stored length: you count until

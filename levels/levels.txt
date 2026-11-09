@@ -1,11 +1,14 @@
 # Play order. One level file per line. Lines starting with # are ignored.
 
-# World 1: Boot Sector (sequence, loops, conditions)
+# World 1: Boot Sector (statements, loops, variables, if / else)
 1-1_wake_up.txt
 1-2_long_corridor.txt
 1-3_mind_the_gap.txt
+1-4_memory_boxes.txt
+1-5_fork_in_the_road.txt
 
 # World 2: The Registers (variables, operators)
+2-0_first_function.txt
 2-1_digit_peeler.txt
 2-2_binary_decoder.txt
 

@@ -5,6 +5,13 @@ type: repair
 Bitty: "The clock chip is broken. It doesn't know which years are leap years."
 Write isLeapYear(). Every gate checks a different year.
 
+[talk]
+@walk EAST 1
+The clock chip is broken. It can't tell which years are leap years.
+The rule: a leap year divides by 4... but not by 100... unless it also divides by 400. Humans, honestly.
+`year % 4 == 0` asks "does 4 go into it with nothing left over?"
+Join questions with `&&` (and) and `||` (or). `!=` means "is not". Each gate will test a different year.
+
 [lesson]
 A leap year is divisible by 4,
 BUT not by 100,

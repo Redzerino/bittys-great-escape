@@ -1,4 +1,5 @@
 #include "customisation.h"
+#include "rlgl.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -92,11 +93,17 @@ static bool Click(Rectangle r)
 {
     return CheckCollisionPointRec(GetMousePosition(), r) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
-void Customisation_Draw(void)
+void Customisation_Draw(Rectangle bounds)
 {
     Color panel = {20,24,36,255}, muted = {160,175,200,255};
-    DrawRectangle(10,50,400,660,panel);
-    DrawRectangleLinesEx((Rectangle){10,50,400,660},2,SKYBLUE);
+    DrawRectangleRec(bounds,panel);
+    DrawRectangleLinesEx(bounds,2,SKYBLUE);
+    // The controls below were laid out for a panel at (10,50). Shift them (and
+    // the mouse) so they sit inside whatever panel the window size gives us.
+    float shiftX = bounds.x - 10 + (bounds.width - 400) / 2, shiftY = bounds.y - 50;
+    rlPushMatrix();
+    rlTranslatef(shiftX, shiftY, 0);
+    SetMouseOffset((int)-shiftX, (int)-shiftY);
     DrawText("BITTY'S WORKSHOP",28,70,24,SKYBLUE);
     DrawText("Your bot. Your escape style.",28,105,18,muted);
     int total = CompletionCount();
@@ -131,6 +138,8 @@ void Customisation_Draw(void)
     DrawText(saveOk ? "Auto-saved" : "Save failed: folder read-only",210,632,saveOk ? 16 : 10,saveOk ? GREEN : ORANGE);
     DrawText("Rewards: 5 levels = Loop Master",28,666,14,muted);
     DrawText("10 = Circuit glow   /   20 = Crown",28,686,14,muted);
+    SetMouseOffset(0, 0);
+    rlPopMatrix();
 }
 
 // Called within Bitty's local transform: every accessory follows his animation.

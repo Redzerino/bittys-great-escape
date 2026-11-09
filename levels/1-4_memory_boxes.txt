@@ -1,0 +1,62 @@
+title: 1-4  Memory Boxes
+type: escape
+
+[story]
+Bitty: "That tile has a number on it. I think it's telling me how far the exit is."
+Step onto the data tile, read its number into a variable, then walk that many steps.
+Goal: reach the EXIT using a variable.
+
+[talk]
+@walk EAST 2
+Ooh, a data tile. See the number on it? Memory is full of these.
+A `variable` is a box with a name that holds a value. `int steps = 3;` makes a box called `steps` with 3 inside.
+`int` means the box holds a whole number, like 4 or -12. No decimals allowed.
+When I stand on a data tile, `read()` gives me its number. So `int steps = read();` saves that number in a box.
+That number is how far the exit is. Use the variable in your loop instead of typing a number!
+
+[lesson]
+A variable is a named box in memory.
+
+    int steps = 4;
+
+  int     the type: a whole number
+  steps   the name you choose
+  = 4     put 4 in the box
+
+You must say the type the first time.
+After that, just use the name:
+
+    steps = steps + 1;    // now it's 5
+
+read() gives the number on the tile
+Bitty is standing on:
+
+    int steps = read();
+
+Watch out: a variable with no value yet
+holds garbage. Always give it a value!
+
+[hint]
+First move(EAST) onto the data tile. Then int steps = read(); and loop while i < steps.
+
+[map]
+##########
+#b.B4...E#
+##########
+
+[code]
+// LEVEL 1-4: MEMORY BOXES
+// 1. Step onto the data tile.
+// 2. Save its number in a variable:
+//      int steps = read();
+// 3. Use a for loop to move EAST
+//    that many times.
+
+move(EAST);
+
+[solution]
+move(EAST);
+int steps = read();
+for (int i = 0; i < steps; i++) {
+    move(EAST);
+}

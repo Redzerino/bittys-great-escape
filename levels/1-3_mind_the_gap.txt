@@ -6,6 +6,14 @@ Bitty: "Careful! That glowing purple memory isn't allocated. If I step in, I'm g
 You don't know how long the corridor is. Use scan() to check before you move.
 Goal: go east until the wall, then south to the EXIT.
 
+[talk]
+@walk EAST 2
+Stop! See that purple glow below? That memory isn't allocated. If I step in, I vanish. Bzzt.
+This time I don't know how long the corridor is, so we can't count the steps.
+A `while` loop keeps going for as long as something is true.
+`scan(EAST)` lets me peek at the next tile. So: while the next tile is not a wall, keep moving.
+`!=` means "is not equal to". Careful: `==` compares two things, but `=` changes a value. Easy to mix up!
+
 [lesson]
 A while loop repeats AS LONG AS its
 condition is true. Use it when you don't
@@ -22,11 +30,11 @@ Watch out: == compares, = assigns.
 while (x = 5) is a classic bug!
 
 [map]
-#########
-#B.....##
-#xxxxx.##
-######E##
-#########
+###########
+#b.B.....##
+#xxxxxxx.##
+########E##
+###########
 
 [code]
 // LEVEL 1-3: MIND THE GAP

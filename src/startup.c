@@ -15,6 +15,18 @@ static const float INTRO_SECONDS = 7.5f;
 static const Color ink = {8,12,24,255};
 static const Color cyan = {90,225,255,255};
 
+// The intro is laid out for a 1280x720 screen. This camera scales it to fit
+// whatever size the window is (centred, keeping its shape).
+static Camera2D FitView(void)
+{
+    float sw=(float)GetScreenWidth(), sh=(float)GetScreenHeight();
+    float zoom=fminf(sw/1280.0f, sh/720.0f);
+    Camera2D view={0};
+    view.zoom=zoom;
+    view.offset=(Vector2){(sw-1280*zoom)/2,(sh-720*zoom)/2};
+    return view;
+}
+static Vector2 Mouse(void) { return GetScreenToWorld2D(GetMousePosition(), FitView()); }
 static float Clamp01(float x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
 static float Ease(float x) { x=Clamp01(x); return x*x*(3-2*x); }
 static void Text(const char *s,float x,float y,float size,Color c)
@@ -76,12 +88,13 @@ bool Startup_Update(float dt)
     }
     Rectangle start={64,500,350,62};
     return IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) ||
-        (CheckCollisionPointRec(GetMousePosition(),start) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT));
+        (CheckCollisionPointRec(Mouse(),start) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT));
 }
 static void CircuitBackground(void)
 {
     ClearBackground(ink);
     DrawRectangleGradientV(0,0,GetScreenWidth(),GetScreenHeight(),(Color){14,25,46,255},ink);
+    BeginMode2D(FitView());   // everything after this is drawn in 1280x720 coordinates
     for(int i=0;i<15;i++)
     {
         float y=65+i*43;
@@ -107,6 +120,7 @@ static void ActorScene(float wake,float run,bool celebrate)
     camera.position=(Vector3){3.0f,2.4f,5.5f};
     camera.target=(Vector3){0,0.45f,0}; camera.up=(Vector3){0,1,0};
     camera.fovy=32; camera.projection=CAMERA_PERSPECTIVE;
+    EndMode2D();              // the 3D preview is drawn into its own texture
     BeginTextureMode(preview);
     ClearBackground((Color){0,0,0,0});
     BeginMode3D(camera);
@@ -129,6 +143,7 @@ static void ActorScene(float wake,float run,bool celebrate)
     rlPopMatrix();
     EndMode3D();
     EndTextureMode();
+    BeginMode2D(FitView());
     DrawTextureRec(preview.texture,(Rectangle){0,0,650,-510},(Vector2){610,100},WHITE);
 }
 void Startup_Draw(void)
@@ -166,7 +181,7 @@ void Startup_Draw(void)
         {
             float pulse=0.7f+0.3f*sinf(elapsed*3);
             Rectangle button={64,500,350,62};
-            bool hover=CheckCollisionPointRec(GetMousePosition(),button);
+            bool hover=CheckCollisionPointRec(Mouse(),button);
             DrawRectangleRounded(button,0.18f,8,hover?(Color){35,85,105,255}:(Color){20,50,68,255});
             DrawRectangleRoundedLinesEx(button,0.18f,8,2,Fade(cyan,pulse));
             Text("PRESS ENTER TO START",85,520,22,WHITE);
@@ -175,6 +190,7 @@ void Startup_Draw(void)
     }
     Text(title?"YOUR CODE IS THE ONLY WAY OUT":"ENTER / SPACE  skip intro",64,671,16,(Color){140,165,185,255});
     Text(muted?"M  sound off":"M  sound on",1080,671,15,(Color){140,165,185,255});
+    EndMode2D();
 }
 void Startup_Shutdown(void)
 {

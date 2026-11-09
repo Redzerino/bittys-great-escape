@@ -10,5 +10,5 @@ Color Customisation_Glow(void);
 int Customisation_Face(void);
 bool Customisation_Headphones(void);
 void Customisation_DrawAccessories(float time);
-void Customisation_Draw(void);
+void Customisation_Draw(Rectangle panel);   // panel = where the Code panel normally sits
 #endif

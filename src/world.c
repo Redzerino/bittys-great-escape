@@ -19,7 +19,104 @@
 #define MOVE_SECONDS  0.40f
 #define WRITE_SECONDS 0.35f
 #define FALL_SECONDS  1.6f
+#define TEETER_SECONDS 0.35f   // Bitty wobbles on the edge before falling
+#define SPAWN_SECONDS 0.75f
+#define LAND_SECONDS  0.32f
 #define PI_F          3.14159265f
+
+// ===========================================================================
+// Particles: dust, sparks and confetti. Purely decoration.
+// ===========================================================================
+#define MAX_PARTICLES 200
+
+typedef struct {
+    Vector3 pos, vel;
+    float   life, maxLife;     // seconds left / seconds it started with
+    float   size;
+    float   gravity;           // pulls it down (0 = floats)
+    Color   col;
+} Particle;
+
+static Particle particles[MAX_PARTICLES];
+
+static void Particles_Clear(void)
+{
+    memset(particles, 0, sizeof particles);
+}
+
+static float Rand01(void) { return GetRandomValue(0, 1000) / 1000.0f; }
+static float RandRange(float lo, float hi) { return lo + (hi - lo) * Rand01(); }
+
+static void Particle_Spawn(Vector3 pos, Vector3 vel, float life, float size, float gravity, Color col)
+{
+    for (int i = 0; i < MAX_PARTICLES; i++)
+    {
+        if (particles[i].life > 0) continue;
+        particles[i] = (Particle){ pos, vel, life, life, size, gravity, col };
+        return;
+    }
+}
+
+static void Particles_Update(float dt)
+{
+    for (int i = 0; i < MAX_PARTICLES; i++)
+    {
+        Particle *p = &particles[i];
+        if (p->life <= 0) continue;
+        p->life -= dt;
+        p->vel.y -= p->gravity * dt;
+        p->pos.x += p->vel.x * dt;
+        p->pos.y += p->vel.y * dt;
+        p->pos.z += p->vel.z * dt;
+        float slow = 1 - 2.2f * dt;            // air resistance
+        if (slow < 0) slow = 0;
+        p->vel.x *= slow;
+        p->vel.z *= slow;
+    }
+}
+
+// World position of a tile (defined further down with the drawing code)
+static Vector3 TilePos(const World *w, float col, float row, float y);
+
+// A ring of dust puffing outwards along the floor
+static void Burst_Dust(const World *w, float col, float row, int count, float power)
+{
+    Vector3 at = TilePos(w, col, row, 0.04f);
+    for (int i = 0; i < count; i++)
+    {
+        float a = (i + Rand01() * 0.6f) * 6.2832f / count;
+        float v = power * RandRange(0.7f, 1.2f);
+        Particle_Spawn((Vector3){ at.x + cosf(a) * 0.18f, at.y, at.z + sinf(a) * 0.14f },
+                       (Vector3){ cosf(a) * v, RandRange(0.15f, 0.45f), sinf(a) * v * 0.8f },
+                       RandRange(0.3f, 0.5f), RandRange(0.22f, 0.34f), 0.2f, (Color){ 150, 165, 215, 110 });
+    }
+}
+
+// Sparks flying off a point (bonks, gates, glitches)
+static void Burst_Sparks(Vector3 at, int count, float power, Color col)
+{
+    for (int i = 0; i < count; i++)
+    {
+        float a = Rand01() * 6.2832f, up = RandRange(0.4f, 1.0f);
+        Particle_Spawn(at, (Vector3){ cosf(a) * power * RandRange(0.4f, 1), up * power * 1.4f, sinf(a) * power * RandRange(0.4f, 1) },
+                       RandRange(0.35f, 0.7f), RandRange(0.1f, 0.2f), 3.5f, col);
+    }
+}
+
+// Confetti for clearing a level
+static void Burst_Confetti(Vector3 at)
+{
+    static const Color COLS[] = {
+        { 255, 215, 120, 255 }, { 120, 255, 170, 255 }, { 120, 220, 255, 255 }, { 255, 140, 200, 255 }, { 200, 150, 255, 255 },
+    };
+    for (int i = 0; i < 46; i++)
+    {
+        float a = Rand01() * 6.2832f, v = RandRange(0.6f, 2.0f);
+        Particle_Spawn((Vector3){ at.x, at.y + 0.3f, at.z },
+                       (Vector3){ cosf(a) * v, RandRange(2.2f, 4.4f), sinf(a) * v },
+                       RandRange(0.9f, 1.6f), RandRange(0.12f, 0.24f), 4.2f, COLS[i % 5]);
+    }
+}
 
 // ===========================================================================
 // Setup
@@ -44,8 +141,12 @@ void World_LoadMap(World *w, const char *const *rows, int rowCount)
         if (len > cols) cols = len;
     }
     float speed = w->speed > 0 ? w->speed : 1.0f;
+    int theme = w->theme;
+    float closeUp = w->closeUp;
     World_Init(w, cols, rowCount);
     w->speed = speed;
+    w->theme = theme;
+    w->closeUp = closeUp;
 
     for (int r = 0; r < w->rows; r++)
     {
@@ -68,10 +169,36 @@ void World_LoadMap(World *w, const char *const *rows, int rowCount)
                 w->bittyX = c;
                 w->bittyY = r;
             }
+            if (ch == 'b')                   // where Bitty arrives for his walk-in (see World_PlayIntro)
+            {
+                w->hasIntroStart = true;
+                w->introX = c;
+                w->introY = r;
+            }
         }
     }
     w->drawX = w->fromX = (float)w->bittyX;
     w->drawY = w->fromY = (float)w->bittyY;
+    Particles_Clear();
+}
+
+void World_PlayIntro(World *w)
+{
+    if (w->spawn <= 0 && w->hasIntroStart && w->current.type == ACT_NONE)
+    {
+        w->bittyX = w->introX;
+        w->bittyY = w->introY;
+        w->drawX = w->fromX = (float)w->bittyX;
+        w->drawY = w->fromY = (float)w->bittyY;
+    }
+    w->spawn = SPAWN_SECONDS;
+}
+
+WorldEvent World_TakeEvent(World *w)
+{
+    WorldEvent e = w->event;
+    w->event = EVENT_NONE;
+    return e;
 }
 
 // ===========================================================================
@@ -131,14 +258,17 @@ bool World_StartAction(World *w, Action a)
         if (blocked)
         {
             w->lastResult = 0;          // bumped: stays put
-            w->shake = 0.35f;
+            w->impactDone = false;      // the wobble and sparks start when Bitty actually hits (World_Update)
         }
         else
         {
             w->lastResult = 1;
+            if (speed < 6) Burst_Dust(w, (float)w->bittyX, (float)w->bittyY, 4, 0.5f);   // push-off
             w->bittyX = nx;             // may be outside the grid = void
             w->bittyY = ny;
         }
+        w->land = 0;
+        w->idleTime = 0;
         w->actionLength = MOVE_SECONDS / speed;
     }
     else if (a.type == ACT_WRITE)
@@ -148,6 +278,13 @@ bool World_StartAction(World *w, Action a)
         if (t->type == TILE_DATA)  t->value = a.value;
         w->lastResult = 1;
         w->flash = 0.5f;
+        w->idleTime = 0;
+        w->tilePress[w->bittyY][w->bittyX] = 1;                 // Bitty stamps the value into the tile
+        if (speed < 6)
+        {
+            Vector3 at = TilePos(w, (float)w->bittyX, (float)w->bittyY, 0.15f);
+            Burst_Sparks(at, 8, 0.9f, (Color){ 150, 210, 255, 255 });
+        }
         w->actionLength = WRITE_SECONDS / speed;
     }
 
@@ -165,6 +302,7 @@ void World_OpenGate(World *w, int x, int y)
     w->gateFlash  = 0.8f;
     w->gateFlashX = x;
     w->gateFlashY = y;
+    Burst_Sparks(TilePos(w, (float)x, (float)y, 0.4f), 16, 1.3f, (Color){ 150, 255, 190, 255 });
 }
 
 bool World_NextGate(const World *w, int *x, int *y)
@@ -189,9 +327,22 @@ bool World_ActionDone(const World *w)
     return w->current.type == ACT_NONE;
 }
 
-static float EaseInOut(float t)
+static float Clamp01(float v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+static float Smooth(float v)  { v = Clamp01(v); return v * v * (3 - 2 * v); }
+
+// How far through the current action we are, 0..1
+static float ActionProgress(const World *w)
 {
-    return t < 0.5f ? 2 * t * t : 1 - powf(-2 * t + 2, 2) / 2;
+    if (w->current.type == ACT_NONE || w->actionLength <= 0) return 0;
+    return Clamp01(1 - w->actionTimer / w->actionLength);
+}
+
+// A hop has three beats: crouch (stay put), fly, and settle.
+// This turns action progress into how far along the jump Bitty is.
+#define HOP_CROUCH 0.14f
+static float HopTravel(float p)
+{
+    return Smooth((p - HOP_CROUCH) / (1 - HOP_CROUCH - 0.04f));
 }
 
 void World_Update(World *w, float dt)
@@ -200,6 +351,38 @@ void World_Update(World *w, float dt)
     if (w->flash  > 0) w->flash  -= dt;
     if (w->glitch > 0) w->glitch -= dt;
     if (w->gateFlash > 0) w->gateFlash -= dt;
+    if (w->land > 0) w->land -= dt;
+    if (w->state == WORLD_WON) w->winTime += dt;
+    w->idleTime += dt;
+    Particles_Update(dt);
+
+    // the camera eases in when Bitty talks, and back out afterwards
+    w->closeUp += ((w->talking ? 1.0f : 0.0f) - w->closeUp) * (1 - expf(-dt * 3.5f));
+
+    // Bitty turns smoothly towards where he's heading
+    w->facingShown += (w->facing - w->facingShown) * (1 - expf(-dt * 14));
+
+    // tiles spring back up, and the footprints fade to a faint trail
+    for (int r = 0; r < w->rows; r++)
+        for (int c = 0; c < w->cols; c++)
+        {
+            if (w->tilePress[r][c] > 0) w->tilePress[r][c] -= dt * 3.2f;
+            if (w->tilePress[r][c] < 0) w->tilePress[r][c] = 0;
+            if (w->tileTrail[r][c] > 0.3f) w->tileTrail[r][c] -= dt * 0.5f;
+        }
+
+    // dropping into the level
+    if (w->spawn > 0)
+    {
+        w->spawn -= dt;
+        if (w->spawn <= 0)
+        {
+            w->spawn = 0;
+            w->land = w->landLength = LAND_SECONDS;
+            if (InGrid(w, w->bittyX, w->bittyY)) w->tilePress[w->bittyY][w->bittyX] = 1;
+            Burst_Dust(w, w->drawX, w->drawY, 10, 1.3f);
+        }
+    }
 
     // fade the flashes on the test's memory blocks and registers
     for (int r = 0; r < w->test.rowCount; r++)
@@ -219,40 +402,76 @@ void World_Update(World *w, float dt)
 
     if (w->current.type == ACT_MOVE)
     {
-        float e = EaseInOut(p);
         if (w->lastResult)
         {
+            float e = HopTravel(p);
             w->drawX = w->fromX + (w->bittyX - w->fromX) * e;
             w->drawY = w->fromY + (w->bittyY - w->fromY) * e;
         }
         else
         {
-            // Bump: lean towards the wall and bounce back
+            // Bump: run at the wall, hit it, and bounce back with a wobble
             int dx, dy;
             Step(w->current.dir, &dx, &dy);
-            float lean = sinf(p * PI_F) * 0.25f;
+            float reach = 0.3f, lean;
+            if (p < 0.4f) lean = reach * (p / 0.4f) * (p / 0.4f);
+            else
+            {
+                float q = (p - 0.4f) / 0.6f;
+                lean = reach * (1 - q) * (1 - q) * cosf(q * PI_F * 1.5f);
+            }
             w->drawX = w->fromX + dx * lean;
             w->drawY = w->fromY + dy * lean;
+
+            if (p >= 0.4f && !w->impactDone)
+            {
+                w->impactDone = true;
+                w->shake = 0.35f;
+                w->event = EVENT_BONK;
+                Vector3 hit = TilePos(w, w->fromX + dx * 0.5f, w->fromY + dy * 0.5f, 0.45f);
+                Burst_Sparks(hit, 9, 1.0f, (Color){ 255, 225, 140, 255 });
+            }
         }
     }
 
     if (w->actionTimer <= 0)
     {
+        bool moved = (w->current.type == ACT_MOVE && w->lastResult);
+        float speed = w->speed > 0 ? w->speed : 1.0f;
         w->drawX = (float)w->bittyX;
         w->drawY = (float)w->bittyY;
         w->current.type = ACT_NONE;
+        w->idleTime = 0;
 
         if (!InGrid(w, w->bittyX, w->bittyY) || w->tiles[w->bittyY][w->bittyX].type == TILE_VOID)
         {
             w->state  = WORLD_SEGFAULT;
             w->glitch = FALL_SECONDS;
             w->mood   = MOOD_ERROR;
+            w->event  = EVENT_FALL;
+            Burst_Sparks(TilePos(w, w->drawX, w->drawY, 0.4f), 18, 1.2f, (Color){ 255, 90, 150, 255 });
         }
-        else if (w->tiles[w->bittyY][w->bittyX].type == TILE_EXIT)
+        else
         {
-            w->state  = WORLD_WON;
-            w->mood   = MOOD_HAPPY;
-            w->facing = 0;              // turn to the camera to celebrate
+            if (moved)
+            {
+                // landing: squash, a puff of dust, the tile dips and remembers the footstep
+                w->land = w->landLength = LAND_SECONDS / (speed > 3 ? 3 : speed);
+                w->tilePress[w->bittyY][w->bittyX] = 1;
+                w->tileTrail[w->bittyY][w->bittyX] = 1;
+                if (InGrid(w, (int)w->fromX, (int)w->fromY) && w->tileTrail[(int)w->fromY][(int)w->fromX] < 0.3f)
+                    w->tileTrail[(int)w->fromY][(int)w->fromX] = 0.3f;      // the start tile joins the trail
+                if (speed < 6) Burst_Dust(w, w->drawX, w->drawY, 7, 0.95f);
+            }
+            if (w->tiles[w->bittyY][w->bittyX].type == TILE_EXIT)
+            {
+                w->state   = WORLD_WON;
+                w->mood    = MOOD_HAPPY;
+                w->facing  = 0;             // turn to the camera to celebrate
+                w->winTime = 0;
+                w->event   = EVENT_WIN;
+                Burst_Confetti(TilePos(w, w->drawX, w->drawY, 0.2f));
+            }
         }
     }
 }
@@ -266,6 +485,38 @@ void World_Update(World *w, float dt)
 // glow warm while everything else falls into deep blue shadow. The exit
 // portal and a few memory crystals give off their own light.
 // ===========================================================================
+
+// Each area of memory has its own colours, so moving on feels like travelling somewhere new
+typedef struct {
+    Color fog;        // what the distance fades into
+    Color sky;        // the glow behind everything
+    Color a, b;       // the two accent colours (lights, streams, windows)
+    float ambient[3]; // colour of the shadows
+} Theme;
+
+static const Theme THEMES[] = {
+    /* 0-1 Boot Sector    */ { {  7,  8, 18, 255 }, { 24, 28, 62, 255 }, { 110, 210, 255, 255 }, { 180, 130, 255, 255 }, { 0.16f, 0.17f, 0.27f } },
+    /* 2 The Registers    */ { {  5, 13, 16, 255 }, { 14, 46, 50, 255 }, { 110, 255, 215, 255 }, { 120, 190, 255, 255 }, { 0.13f, 0.20f, 0.24f } },
+    /* 3 Branch Junction  */ { { 13,  7, 20, 255 }, { 46, 22, 62, 255 }, { 225, 135, 255, 255 }, { 255, 140, 195, 255 }, { 0.20f, 0.15f, 0.27f } },
+    /* 4 Loop Corridors   */ { { 16, 10,  8, 255 }, { 56, 32, 22, 255 }, { 255, 195, 115, 255 }, { 255, 135,  95, 255 }, { 0.24f, 0.18f, 0.18f } },
+    /* 5 Array Bay        */ { {  5, 10, 20, 255 }, { 14, 36, 66, 255 }, { 110, 175, 255, 255 }, { 110, 255, 230, 255 }, { 0.13f, 0.18f, 0.28f } },
+    /* 6+ Pointer Wires   */ { { 16,  6, 12, 255 }, { 60, 18, 40, 255 }, { 255, 115, 155, 255 }, { 255, 205, 125, 255 }, { 0.24f, 0.15f, 0.20f } },
+};
+
+static const Theme *ThemeOf(const World *w)
+{
+    int i = w->theme <= 1 ? 0 : w->theme - 1;
+    if (i > 5) i = 5;
+    return &THEMES[i];
+}
+
+static Color Alpha(Color c, float a)
+{
+    if (a < 0) a = 0;
+    if (a > 255) a = 255;
+    c.a = (unsigned char)a;
+    return c;
+}
 
 #define MAX_LIGHTS 8
 #define MOTE_COUNT 26
@@ -387,7 +638,7 @@ static float Vector3Length3(Vector3 a, Vector3 b)
 
 static unsigned Hash(int a, int b)
 {
-    unsigned h = (unsigned)(a * 73856093) ^ (unsigned)(b * 19349663);
+    unsigned h = ((unsigned)a * 73856093u) ^ ((unsigned)b * 19349663u);
     h ^= h >> 13;
     h *= 0x5bd1e995u;
     return h ^ (h >> 15);
@@ -477,23 +728,43 @@ static Color MoodColor(const World *w)
 // Where Bitty is right now (including the hop and the fall)
 static float BittyHop(const World *w, float t)
 {
-    if (w->mood == MOOD_HAPPY) return fabsf(sinf(t * 7)) * 0.3f;
-    if (w->current.type == ACT_MOVE && w->lastResult && w->actionLength > 0)
+    (void)t;
+    if (w->spawn > 0)                                       // dropping in from above
     {
-        float p = 1 - w->actionTimer / w->actionLength;
-        if (p < 0) p = 0;
-        if (p > 1) p = 1;
-        return sinf(p * PI_F) * 0.35f;
+        float k = w->spawn / SPAWN_SECONDS;
+        return k * k * 3.2f;
+    }
+    if (w->state == WORLD_WON)
+    {
+        if (w->winTime < 0.6f) return sinf(w->winTime / 0.6f * PI_F) * 0.8f;     // one big spinning jump
+        return fabsf(sinf((w->winTime - 0.6f) * 6.5f)) * 0.26f;                  // then happy little hops
+    }
+    if (w->current.type == ACT_MOVE && w->lastResult)
+        return sinf(HopTravel(ActionProgress(w)) * PI_F) * 0.4f;
+    if (w->mood == MOOD_IDLE && w->idleTime > 2.0f)         // idle: a tiny bounce every few seconds
+    {
+        float phase = fmodf(w->idleTime, 6.0f);
+        if (phase > 5.2f && phase < 5.6f) return sinf((phase - 5.2f) / 0.4f * PI_F) * 0.1f;
     }
     return 0;
 }
 
+// Segfault: Bitty teeters on the edge for a moment, then drops
 static float BittyFall(const World *w)
 {
     if (w->state != WORLD_SEGFAULT) return 0;
-    float f = 1 - w->glitch / FALL_SECONDS;
+    float since = FALL_SECONDS - w->glitch;
+    float f = (since - TEETER_SECONDS) / (FALL_SECONDS - TEETER_SECONDS);
     if (f < 0) f = 0;
-    return f * f * 3.0f;
+    return f * f * 3.4f;
+}
+
+// How far the tile under a point has dipped (so Bitty and the tile move together)
+static float TileDip(const World *w, int c, int r)
+{
+    if (c < 0 || r < 0 || c >= w->cols || r >= w->rows) return 0;
+    float k = w->tilePress[r][c];
+    return k * k * 0.07f;
 }
 
 // ---------------------------------------------------------------------------
@@ -564,7 +835,8 @@ static void ApplyLights(const World *w, const Light *lights, int count, Camera3D
         col[i * 3 + 2] = lights[i].color.b / 255.0f * lights[i].strength;
         rad[i] = lights[i].radius;
     }
-    float ambient[3] = { 0.16f, 0.17f, 0.27f };   // deep blue shadows
+    const Theme *th = ThemeOf(w);
+    float ambient[3] = { th->ambient[0], th->ambient[1], th->ambient[2] };   // the colour of the shadows
     float view[3]    = { cam.position.x, cam.position.y, cam.position.z };
 
     SetShaderValue(lightShader, locViewPos, view, SHADER_UNIFORM_VEC3);
@@ -575,7 +847,7 @@ static void ApplyLights(const World *w, const Light *lights, int count, Camera3D
     SetShaderValueV(lightShader, locLightRadius, rad, SHADER_UNIFORM_FLOAT, count);
 
     float camDist = Vector3Length3(cam.position, cam.target);
-    float fogColor[3] = { 7 / 255.0f, 8 / 255.0f, 18 / 255.0f };
+    float fogColor[3] = { th->fog.r / 255.0f, th->fog.g / 255.0f, th->fog.b / 255.0f };
     float fogRange[2] = { camDist * 0.95f, camDist * 2.4f };
     SetShaderValue(lightShader, locFogColor, fogColor, SHADER_UNIFORM_VEC3);
     SetShaderValue(lightShader, locFogRange, fogRange, SHADER_UNIFORM_VEC2);
@@ -621,6 +893,7 @@ static void DrawTiles(const World *w)
             Vector3 p = TilePos(w, (float)c, (float)r, 0);
             unsigned h = Hash(c, r);
             float jitter = (h % 7) * 0.008f;   // tiny height differences feel hand-made
+            jitter -= TileDip(w, c, r);        // the tile sinks a little when Bitty lands on it
 
             // Every solid tile sits on a column, so the board is a floating island
             // (void tiles are holes straight down into the abyss)
@@ -655,7 +928,7 @@ static void DrawTiles(const World *w)
                     break;
 
                 case TILE_EXIT:
-                    DrawStone((Vector3){ p.x, -0.12f, p.z }, (Vector3){ 0.96f, 0.2f, 0.96f }, COL_EXIT);
+                    DrawStone((Vector3){ p.x, -0.12f - TileDip(w, c, r), p.z }, (Vector3){ 0.96f, 0.2f, 0.96f }, COL_EXIT);
                     break;
 
                 case TILE_GATE:
@@ -676,6 +949,16 @@ static void DrawTiles(const World *w)
             }
         }
     }
+
+    // A gate that just opened: its two posts slide down into the floor
+    if (w->gateFlash > 0)
+    {
+        float k = Smooth(w->gateFlash / 0.8f);          // 1 -> 0
+        Vector3 p = TilePos(w, (float)w->gateFlashX, (float)w->gateFlashY, 0);
+        float y = 0.35f - (1 - k) * 0.8f;
+        DrawCubeV((Vector3){ p.x, y, p.z - 0.42f }, (Vector3){ 0.16f, 0.75f, 0.12f }, (Color){ 80, 76, 120, 255 });
+        DrawCubeV((Vector3){ p.x, y, p.z + 0.42f }, (Vector3){ 0.16f, 0.75f, 0.12f }, (Color){ 80, 76, 120, 255 });
+    }
 }
 
 // A soft glowing dot that always faces the camera
@@ -693,6 +976,34 @@ static float BoardRadius(const World *w)
     return sqrtf(a * a + b * b);
 }
 
+#define TOWER_COUNT 34
+#define CABLE_COUNT 7
+
+// The camera looks down on the island, so the scenery lives in the abyss below
+// and around it: a city of memory blocks seen from above.
+// Where block i stands, and how big it is.
+static void TowerShape(const World *w, int i, Vector3 *base, float *wide, float *tall)
+{
+    float R = BoardRadius(w);
+    float a = (i / (float)TOWER_COUNT) * 2 * PI_F + (Hash(i, 31) % 100) / 300.0f;
+    float dist = R + 2.6f + (Hash(i, 37) % 100) / 16.0f;                    // a wide ring round the island
+    *wide = 1.3f + (Hash(i, 33) % 100) / 60.0f;
+    float top = -6.2f + (Hash(i, 35) % 100) / 36.0f;                        // roofs sit well below the board
+    *tall = top + 10.0f;
+    float depth = sinf(a) > 0 ? 0.5f : 0.95f;                               // nearer in front, so they stay in view
+    *base = (Vector3){ cosf(a) * dist * 1.45f, -10.0f, sinf(a) * dist * depth - 0.8f };
+}
+
+// A point along cable i (k = 0 at the island, 1 deep in the abyss). They sway a little.
+static Vector3 CablePoint(const World *w, int i, float k, float t)
+{
+    float x = ((Hash(i, 41) % 100) / 100.0f - 0.5f) * w->cols * 0.9f;
+    float z = ((Hash(i, 43) % 100) / 100.0f - 0.5f) * w->rows * 0.9f + w->rows * 0.25f;
+    float sway = sinf(t * 0.6f + i * 1.7f) * 0.35f * k;
+    float bow = sinf(k * PI_F) * 0.9f * ((i % 2) ? 1 : -1);
+    return (Vector3){ x + sway + bow, -1.2f - k * 7.5f, z + k * 1.5f };
+}
+
 // Solid parts (lit by the shader)
 static void DrawEnvironment(const World *w, float t)
 {
@@ -708,6 +1019,27 @@ static void DrawEnvironment(const World *w, float t)
         float rad = 0.22f + (Hash(i, 5) % 100) / 400.0f;
         DrawCylinderEx((Vector3){ x, -9.0f, z }, (Vector3){ x, top, z }, rad * 1.3f, rad, 10, (Color){ 64, 62, 104, 255 });
         DrawCylinderEx((Vector3){ x, top, z }, (Vector3){ x, top + 0.08f, z }, rad, rad * 0.8f, 10, (Color){ 90, 90, 140, 255 });
+    }
+
+    // Memory towers: huge blocks standing far off in the dark (their windows are drawn in the glow pass)
+    for (int i = 0; i < TOWER_COUNT; i++)
+    {
+        Vector3 base; float wide, tall;
+        TowerShape(w, i, &base, &wide, &tall);
+        DrawCubeV((Vector3){ base.x, base.y + tall / 2, base.z }, (Vector3){ wide, tall, wide }, (Color){ 84, 84, 140, 255 });
+        DrawCubeV((Vector3){ base.x, base.y + tall + 0.1f, base.z }, (Vector3){ wide * 0.55f, 0.2f, wide * 0.55f }, (Color){ 110, 110, 172, 255 });
+    }
+
+    // Cables hanging from under the island down into the abyss
+    for (int i = 0; i < CABLE_COUNT; i++)
+    {
+        Vector3 prev = CablePoint(w, i, 0, t);
+        for (int k = 1; k <= 6; k++)
+        {
+            Vector3 next = CablePoint(w, i, k / 6.0f, t);
+            DrawCylinderEx(prev, next, 0.045f, 0.045f, 5, (Color){ 58, 56, 96, 255 });
+            prev = next;
+        }
     }
 
     // Chips drifting slowly in the distance
@@ -733,7 +1065,8 @@ static void DrawEnvironmentGlow(const World *w, Camera3D cam, float t)
 
     // Circuit traces far below, with pulses of data running along them
     const float deep = -6.0f;
-    Color trace = { 70, 140, 220, 80 };
+    const Theme *th = ThemeOf(w);
+    Color trace = Alpha(th->a, 70);
     for (int i = -6; i <= 6; i++)
     {
         float k = i * span / 6.0f;
@@ -745,8 +1078,92 @@ static void DrawEnvironmentGlow(const World *w, Camera3D cam, float t)
         float lane = ((int)(Hash(i, 9) % 13) - 6) * span / 6.0f;
         float k = fmodf(t * (0.05f + (i % 4) * 0.02f) + i * 0.31f, 1.0f) * 2 - 1;
         Vector3 pos = (i % 2) ? (Vector3){ k * span, deep, lane } : (Vector3){ lane, deep, k * span };
-        Color c = (i % 3) ? (Color){ 90, 200, 255, 200 } : (Color){ 170, 120, 255, 200 };
+        Color c = Alpha((i % 3) ? th->a : th->b, 200);
         Glow(cam, pos, 1.6f, c);
+    }
+
+    // Haze deep in the abyss, so the city below reads as dark shapes against it
+    for (int i = 0; i < 9; i++)
+    {
+        float a = i * 0.698f + t * 0.02f;
+        float d = R + 5.5f;
+        Glow(cam, (Vector3){ cosf(a) * d * 1.4f, -8.5f, sinf(a) * d }, 15.0f, Alpha((i % 2) ? th->a : th->b, 30));
+    }
+
+    // A soft light under the island, as if it's being held up by its own power
+    Glow(cam, (Vector3){ 0, -2.6f, 0.5f }, R * 3.2f, Alpha(th->a, 30));
+
+    // The memory city: lit windows on the side facing us and a light on each roof,
+    // switching on and off as data is used
+    for (int i = 0; i < TOWER_COUNT; i++)
+    {
+        Vector3 base; float wide, tall;
+        TowerShape(w, i, &base, &wide, &tall);
+        float top = base.y + tall;
+        for (int f = 0; f < 4; f++)
+            for (int k = 0; k < 2; k++)
+            {
+                unsigned h = Hash(i * 7 + k, f);
+                float on = sinf(t * (0.25f + (h % 5) * 0.12f) + (h % 628) / 100.0f);
+                if (h % 4 == 0 || on < 0.0f) continue;                 // some stay dark
+                Vector3 p = { base.x + (k - 0.5f) * wide * 0.5f, top - 0.45f - f * 0.6f, base.z + wide * 0.52f };
+                Glow(cam, p, 0.34f, Alpha((h % 3) ? th->a : th->b, 70 + 150 * on));
+            }
+        float blink = 0.5f + 0.5f * sinf(t * 1.1f + i * 2.1f);
+        Color neon = (i % 3) ? th->a : th->b;
+        Glow(cam, (Vector3){ base.x, top + 0.3f, base.z }, 0.7f, Alpha(neon, 60 + 150 * blink));
+
+        // neon edges round the roof and a faintly lit rooftop, like a city at night seen from above
+        float hw = wide / 2;
+        Vector3 c0 = { base.x - hw, top + 0.02f, base.z - hw }, c1 = { base.x + hw, top + 0.02f, base.z - hw };
+        Vector3 c2 = { base.x + hw, top + 0.02f, base.z + hw }, c3 = { base.x - hw, top + 0.02f, base.z + hw };
+        Color edge = Alpha(neon, 110 + 70 * blink);
+        DrawLine3D(c0, c1, edge); DrawLine3D(c1, c2, edge); DrawLine3D(c2, c3, edge); DrawLine3D(c3, c0, edge);
+        DrawLine3D(c2, (Vector3){ c2.x, top - 2.2f, c2.z }, Alpha(neon, 60));
+        DrawLine3D(c3, (Vector3){ c3.x, top - 2.2f, c3.z }, Alpha(neon, 60));
+        DrawCubeV((Vector3){ base.x, top + 0.01f, base.z }, (Vector3){ wide, 0.02f, wide }, Alpha(neon, 22 + 16 * blink));
+    }
+
+    // The core: two rings of light orbiting the island, turning opposite ways
+    {
+        float rx = w->cols / 2.0f + 1.5f, rz = w->rows / 2.0f + 1.5f;
+        for (int i = 0; i < 80; i++)
+        {
+            float a = i * 6.2832f / 80 + t * 0.1f;
+            float bright = 0.5f + 0.5f * sinf(a * 2 - t * 1.4f);            // a brighter band chases round the ring
+            Glow(cam, (Vector3){ cosf(a) * rx, -1.5f, sinf(a) * rz }, 0.42f, Alpha(th->a, 40 + 200 * bright));
+        }
+        for (int i = 0; i < 60; i++)
+        {
+            float a = i * 6.2832f / 60 - t * 0.17f;
+            float bright = 0.5f + 0.5f * sinf(a * 3 + t);
+            Glow(cam, (Vector3){ cosf(a) * (rx + 1.6f), -2.6f, sinf(a) * (rz + 1.4f) }, 0.34f, Alpha(th->b, 30 + 130 * bright));
+        }
+    }
+
+    // Data streams: packets of light racing through the streets of the city, leaving a tail
+    for (int i = 0; i < 12; i++)
+    {
+        float speed = 0.06f + (Hash(i, 51) % 100) / 1200.0f;
+        float k = fmodf(t * speed + (Hash(i, 53) % 100) / 100.0f, 1.0f);
+        float dir = (i % 2) ? 1.0f : -1.0f;
+        float y = -3.2f + (Hash(i, 55) % 100) / 110.0f;
+        float lane = ((Hash(i, 57) % 100) / 100.0f - 0.5f) * 2 * (R + 7);
+        float span2 = R + 12;
+        Color col = (i % 3) ? th->a : th->b;
+        for (int tail = 0; tail < 8; tail++)
+        {
+            float along = dir * ((k - tail * 0.01f) * 2 - 1) * span2;
+            Vector3 p = (i % 4 < 2) ? (Vector3){ along, y, lane } : (Vector3){ lane * 1.3f, y, along };
+            Glow(cam, p, 0.7f - tail * 0.07f, Alpha(col, 230 - tail * 28));
+        }
+    }
+
+    // Pulses of light running down the cables
+    for (int i = 0; i < CABLE_COUNT; i++)
+    {
+        float k = fmodf(t * 0.35f + i * 0.37f, 1.0f);
+        Glow(cam, CablePoint(w, i, k, t), 0.5f, Alpha((i % 2) ? th->a : th->b, 220 * (1 - k)));
     }
 
     // Glowing tips on the pillars
@@ -757,7 +1174,7 @@ static void DrawEnvironmentGlow(const World *w, Camera3D cam, float t)
         float x = cosf(a) * dist * 1.35f, z = sinf(a) * dist * 0.9f;
         float top = -1.4f + (Hash(i, 11) % 100) / 45.0f;
         float blink = 0.6f + 0.4f * sinf(t * (0.8f + (i % 3) * 0.4f) + i);
-        Color c = (i % 2) ? (Color){ 110, 210, 255, 255 } : (Color){ 180, 130, 255, 255 };
+        Color c = (i % 2) ? th->a : th->b;
         c.a = (unsigned char)(200 * blink);
         Glow(cam, (Vector3){ x, top + 0.15f, z }, 1.3f, c);
     }
@@ -768,44 +1185,113 @@ static void DrawEnvironmentGlow(const World *w, Camera3D cam, float t)
 // ---------------------------------------------------------------------------
 static void DrawBitty(const World *w, float t)
 {
-    float squashY = 1, lean = 0;
+    float squashY = 1;          // >1 = stretched tall, <1 = squashed flat
+    float roll = 0;             // lean left / right (degrees)
+    float pitch = 0;            // lean forwards / back
+    float yaw = 0;              // extra turn on top of w->facingShown
+    float armLift = 0;          // arms go up in the air
+    float footSwing = 0;        // feet swing while hopping
     float hop = BittyHop(w, t);
+    float p = ActionProgress(w);
 
-    if (w->current.type == ACT_MOVE && w->actionLength > 0)
+    if (w->spawn > 0)
     {
-        float p = 1 - w->actionTimer / w->actionLength;
-        if (p < 0) p = 0;
-        if (p > 1) p = 1;
+        squashY = 1.2f;                                                 // stretched while dropping in
+        armLift = 0.1f;
+    }
+    else if (w->current.type == ACT_MOVE)
+    {
+        float dirX = (w->current.dir == EAST) ? 1.0f : (w->current.dir == WEST) ? -1.0f : 0.0f;
+        float dirZ = (w->current.dir == SOUTH) ? 1.0f : (w->current.dir == NORTH) ? -1.0f : 0.0f;
         if (w->lastResult)
-            squashY = 1 + sinf(p * PI_F) * 0.18f
-                        - (p < 0.15f ? (0.15f - p) * 1.2f : 0)          // crouch before the jump
-                        - (p > 0.85f ? (p - 0.85f) * 1.2f : 0);         // squish on landing
+        {
+            float q = HopTravel(p);
+            if (p < HOP_CROUCH) squashY = 1 - 0.22f * sinf(p / HOP_CROUCH * PI_F / 2);     // crouch...
+            else                squashY = 0.78f + 0.4f * Smooth(q * 5) - 0.18f * Smooth((q - 0.7f) / 0.3f);   // ...spring up, then reach for the floor
+            float air = sinf(q * PI_F);
+            roll  = -dirX * air * 14;
+            pitch =  dirZ * air * 12;
+            armLift = air * 0.08f;
+            footSwing = sinf(q * PI_F * 2) * 0.06f;
+        }
         else
-            squashY = 1 - sinf(p * PI_F) * 0.15f;                       // bonk!
-        lean = (w->current.dir == EAST ? -1.0f : w->current.dir == WEST ? 1.0f : 0.0f) * sinf(p * PI_F) * 12;
+        {
+            // bonk: stretch into the run, then flatten against the wall and wobble
+            if (p < 0.4f) { squashY = 1 + 0.06f * (p / 0.4f); roll = -dirX * 10 * (p / 0.4f); pitch = dirZ * 10 * (p / 0.4f); }
+            else
+            {
+                float q = (p - 0.4f) / 0.6f;
+                squashY = 1 - 0.2f * (1 - q) * cosf(q * PI_F * 2.5f);
+                roll  = dirX * 16 * (1 - q) * sinf(q * PI_F * 3);
+                pitch = -dirZ * 12 * (1 - q) * sinf(q * PI_F * 3);
+                armLift = 0.07f * (1 - q);
+            }
+        }
+    }
+    else if (w->current.type == ACT_WRITE)
+    {
+        squashY = 1 - 0.2f * sinf(p * PI_F);                            // stamps the value down
+        armLift = -0.05f * sinf(p * PI_F);
+    }
+    else if (w->land > 0 && w->landLength > 0)
+    {
+        float u = 1 - w->land / w->landLength;                          // landed: squash, then spring back
+        squashY = 1 - 0.24f * (1 - u) * cosf(u * PI_F * 2.4f);
     }
     else
     {
         squashY = 1 + sinf(t * 2.5f) * 0.03f;                           // breathing
+        if (w->mood == MOOD_IDLE && w->idleTime > 2.0f)                 // idle: look around now and then
+        {
+            float phase = fmodf(w->idleTime, 6.0f);
+            if (phase > 2.6f && phase < 4.2f) yaw = sinf((phase - 2.6f) / 1.6f * PI_F * 2) * 22;
+        }
+    }
+
+    if (w->state == WORLD_WON)
+    {
+        if (w->winTime < 0.6f) yaw = Smooth(w->winTime / 0.6f) * 360;   // victory spin
+        else roll = sinf((w->winTime - 0.6f) * 6.5f) * 6;               // sway while hopping
+        armLift = 0.1f;
     }
 
     float fall = BittyFall(w);
-    float spin = (w->state == WORLD_SEGFAULT) ? (fall / 3.0f) * 540 : 0;
-    if (fall > 2.6f) return;                                            // gone
+    float spin = 0;
+    if (w->state == WORLD_SEGFAULT)
+    {
+        float since = FALL_SECONDS - w->glitch;
+        if (since < TEETER_SECONDS)                                     // teeter on the edge, arms flailing
+        {
+            roll = sinf(since * 38) * 16;
+            armLift = 0.1f;
+        }
+        else spin = (fall / 3.4f) * 620;
+    }
+    if (fall > 2.9f) return;                                            // gone
+
+    // a memory error (segfault / out of bounds in the code): Bitty glitches
+    float glitchX = 0;
+    if (w->glitch > 0 && w->state != WORLD_SEGFAULT)
+        glitchX = ((int)(t * 30) % 2 ? 0.05f : -0.05f) * Clamp01(w->glitch);
 
     float shakeX = (w->shake > 0) ? sinf(t * 70) * 0.04f * (w->shake / 0.35f) : 0;
     Vector3 base = TilePos(w, w->drawX, w->drawY, 0);
+    float dip = (w->current.type == ACT_MOVE) ? 0 : TileDip(w, w->bittyX, w->bittyY);
 
-    // soft shadow
+    // soft shadow (smaller the higher he is)
     if (fall == 0)
-        DrawCylinderEx((Vector3){ base.x, 0.0f, base.z }, (Vector3){ base.x, 0.005f, base.z },
-                       0.3f - hop * 0.2f, 0.3f - hop * 0.2f, 18, (Color){ 0, 0, 10, 110 });
+    {
+        float sh = 0.32f - hop * 0.09f;
+        if (sh < 0.06f) sh = 0.06f;
+        DrawCylinderEx((Vector3){ base.x, 0.0f - dip, base.z }, (Vector3){ base.x, 0.005f - dip, base.z },
+                       sh, sh, 18, (Color){ 0, 0, 10, 110 });
+    }
 
     rlPushMatrix();
-    rlTranslatef(base.x + shakeX, hop - fall, base.z);
-    rlRotatef(w->facing * 0.6f + spin, 0, 1, 0);
-    rlRotatef(-24, 1, 0, 0);            // lean back a little so the camera sees Bitty's face
-    rlRotatef(lean, 0, 0, 1);
+    rlTranslatef(base.x + shakeX + glitchX, hop - fall - dip, base.z);
+    rlRotatef(w->facingShown * 0.6f + spin + yaw, 0, 1, 0);
+    rlRotatef(-24 + pitch, 1, 0, 0);    // lean back a little so the camera sees Bitty's face
+    rlRotatef(roll, 0, 0, 1);
     rlScalef(1.5f / sqrtf(squashY), 1.5f * squashY, 1.5f / sqrtf(squashY));
 
     // Slate-grey stone, like Bulder from Pode: matte, darker underneath, no shine
@@ -817,9 +1303,9 @@ static void DrawBitty(const World *w, float t)
     Color eye = MoodColor(w);
     Color trim = Customisation_Glow();
 
-    // feet
-    DrawBlob((Vector3){ -0.11f, 0.05f, 0.04f }, (Vector3){ 0.085f, 0.055f, 0.1f }, DARK);
-    DrawBlob((Vector3){  0.11f, 0.05f, 0.04f }, (Vector3){ 0.085f, 0.055f, 0.1f }, DARK);
+    // feet (they swing while he hops)
+    DrawBlob((Vector3){ -0.11f, 0.05f - fabsf(footSwing) * 0.4f, 0.04f + footSwing }, (Vector3){ 0.085f, 0.055f, 0.1f }, DARK);
+    DrawBlob((Vector3){  0.11f, 0.05f - fabsf(footSwing) * 0.4f, 0.04f - footSwing }, (Vector3){ 0.085f, 0.055f, 0.1f }, DARK);
 
     // chunky block of stone with soft edges, like Bulder: wide, flat-ish top
     DrawRoundedBox((Vector3){ 0, 0.30f, 0 }, (Vector3){ 0.62f, 0.40f, 0.50f }, 0.11f, BODY);
@@ -837,8 +1323,8 @@ static void DrawBitty(const World *w, float t)
 
     // stubby arms (wave when happy)
     float wave = (w->mood == MOOD_HAPPY) ? sinf(t * 12) * 0.07f : sinf(t * 2.5f) * 0.01f;
-    DrawBlob((Vector3){ -0.34f, 0.22f + wave, 0.05f }, (Vector3){ 0.055f, 0.075f, 0.055f }, BODY_D);
-    DrawBlob((Vector3){  0.34f, 0.22f - wave, 0.05f }, (Vector3){ 0.055f, 0.075f, 0.055f }, BODY_D);
+    DrawBlob((Vector3){ -0.34f, 0.22f + wave + armLift, 0.05f }, (Vector3){ 0.055f, 0.075f, 0.055f }, BODY_D);
+    DrawBlob((Vector3){  0.34f, 0.22f - wave + armLift, 0.05f }, (Vector3){ 0.055f, 0.075f, 0.055f }, BODY_D);
 
     // Optional classic headphone ear-pieces.
     if (Customisation_Headphones())
@@ -902,6 +1388,12 @@ static void DrawBitty(const World *w, float t)
     {
         if (w->shake > 0)
             DrawBlob((Vector3){ 0, 0.29f, ez }, (Vector3){ 0.016f, 0.018f, 0.01f }, eye);
+        else if (w->speaking)
+        {
+            // talking: his mouth opens and closes like a little speaker
+            float open = 0.35f + 0.65f * fabsf(sinf(t * 16)) * (0.6f + 0.4f * sinf(t * 5.3f));
+            DrawBlob((Vector3){ 0, 0.285f, ez }, (Vector3){ 0.03f, 0.006f + 0.02f * open, 0.01f }, eye);
+        }
         else
         {
             DrawBar((Vector3){ -0.012f, 0.29f, ez }, 0.028f, 0.012f, -22, eye);
@@ -919,6 +1411,17 @@ static void DrawBitty(const World *w, float t)
 // Glows (additive, after everything solid, no depth writes)
 // ---------------------------------------------------------------------------
 
+static Vector2 bittyScreen;
+static bool    bittyScreenKnown = false;
+
+bool World_BittyOnScreen(float *x, float *y)
+{
+    if (!bittyScreenKnown) return false;
+    *x = bittyScreen.x;
+    *y = bittyScreen.y;
+    return true;
+}
+
 void World_DrawBittyPreview(const World *w, float time)
 {
     DrawBitty(w, time);
@@ -934,7 +1437,7 @@ static void DrawGlows(const World *w, Camera3D cam, float t)
 
     // Bitty's halo
     float fall = BittyFall(w);
-    if (fall < 2.6f)
+    if (fall < 2.9f)
     {
         Vector3 b = TilePos(w, w->drawX, w->drawY, 0.5f + BittyHop(w, t) - fall);
         Color m = MoodColor(w);
@@ -958,6 +1461,14 @@ static void DrawGlows(const World *w, Camera3D cam, float t)
                 DrawCylinderEx((Vector3){ p.x, 0.0f, p.z }, (Vector3){ p.x, 1.8f, p.z }, 0.32f, 0.08f, 18,
                                (Color){ 60, 200, 120, (unsigned char)(50 + pulse * 40) });
                 Glow(cam, (Vector3){ p.x, 0.3f, p.z }, 1.8f, (Color){ 90, 255, 160, (unsigned char)(70 + pulse * 40) });
+                // two rings of light circling the portal, turning opposite ways
+                for (int i = 0; i < 10; i++)
+                {
+                    float a = i * 0.6283f + t * 1.6f, b2 = i * 0.6283f - t * 2.3f;
+                    float lift = 0.5f + 0.5f * sinf(t * 1.3f);
+                    Glow(cam, (Vector3){ p.x + cosf(a) * 0.42f, 0.12f, p.z + sinf(a) * 0.42f }, 0.16f, (Color){ 130, 255, 185, 170 });
+                    Glow(cam, (Vector3){ p.x + cosf(b2) * 0.3f, 0.35f + lift * 0.5f, p.z + sinf(b2) * 0.3f }, 0.12f, (Color){ 190, 255, 220, 140 });
+                }
                 // sparkles rising from the portal
                 for (int i = 0; i < 5; i++)
                 {
@@ -1013,6 +1524,15 @@ static void DrawGlows(const World *w, Camera3D cam, float t)
     {
         float k = w->gateFlash / 0.8f;                  // 1 -> 0
         Vector3 p = TilePos(w, (float)w->gateFlashX, (float)w->gateFlashY, 0.35f);
+        // the energy bars turn green, pull apart and fade
+        for (int i = 0; i < 4; i++)
+        {
+            float y = 0.1f + i * 0.17f;
+            float gap = (1 - k) * 0.45f;
+            unsigned char a = (unsigned char)(200 * k);
+            DrawCubeV((Vector3){ p.x, y, p.z - 0.2f - gap }, (Vector3){ 0.07f, 0.02f, 0.4f * k }, (Color){ 140, 255, 180, a });
+            DrawCubeV((Vector3){ p.x, y, p.z + 0.2f + gap }, (Vector3){ 0.07f, 0.02f, 0.4f * k }, (Color){ 140, 255, 180, a });
+        }
         Glow(cam, p, 0.6f + (1 - k) * 2.5f, (Color){ 120, 255, 170, (unsigned char)(220 * k) });
         for (int i = 0; i < 10; i++)
         {
@@ -1030,6 +1550,38 @@ static void DrawGlows(const World *w, Camera3D cam, float t)
         Glow(cam, p, 1.4f, (Color){ 150, 210, 255, (unsigned char)(w->flash / 0.5f * 220) });
     }
 
+    // footprints: the tiles Bitty has stepped on keep a soft glow, so you can see the path the code took
+    Color trail = MoodColor(w);
+    if (w->mood == MOOD_ERROR) trail = Customisation_Glow();
+    for (int r = 0; r < w->rows; r++)
+        for (int c = 0; c < w->cols; c++)
+        {
+            float k = w->tileTrail[r][c];
+            if (k <= 0 || w->tiles[r][c].type == TILE_EXIT) continue;
+            Vector3 p = TilePos(w, (float)c, (float)r, 0.03f);
+            Glow(cam, p, 0.55f + k * 0.5f, (Color){ trail.r, trail.g, trail.b, (unsigned char)(30 + k * 110) });
+        }
+
+    // the beam Bitty arrives in
+    if (w->spawn > 0)
+    {
+        float k = w->spawn / SPAWN_SECONDS;
+        Vector3 p = TilePos(w, w->drawX, w->drawY, 0);
+        Color m = Customisation_Glow();
+        DrawCylinderEx((Vector3){ p.x, 0, p.z }, (Vector3){ p.x, 4.5f, p.z }, 0.3f * k + 0.05f, 0.3f * k + 0.05f, 14,
+                       (Color){ m.r, m.g, m.b, (unsigned char)(90 * k) });
+        Glow(cam, (Vector3){ p.x, 0.1f, p.z }, 1.6f, (Color){ m.r, m.g, m.b, (unsigned char)(120 * k) });
+    }
+
+    // dust, sparks and confetti
+    for (int i = 0; i < MAX_PARTICLES; i++)
+    {
+        const Particle *q = &particles[i];
+        if (q->life <= 0) continue;
+        float k = q->life / q->maxLife;
+        Glow(cam, q->pos, q->size * (0.6f + 0.4f * k), (Color){ q->col.r, q->col.g, q->col.b, (unsigned char)(q->col.a * k) });
+    }
+
     // memory motes drifting through the dark
     float spanX = w->cols / 2.0f + 0.5f, spanZ = w->rows / 2.0f + 0.5f;
     for (int i = 0; i < MOTE_COUNT; i++)
@@ -1039,7 +1591,7 @@ static void DrawGlows(const World *w, Camera3D cam, float t)
         float z = cosf(i * 78.233f) * spanZ + cosf(t * 0.25f + i * 2) * 0.3f;
         float y = 0.1f + k * 2.2f;
         unsigned char a = (unsigned char)(sinf(k * PI_F) * (120 + 60 * sinf(t * 3 + i)));
-        Color col = (i % 3) ? (Color){ 140, 220, 255, a } : (Color){ 255, 220, 170, a };
+        Color col = Alpha((i % 3) ? ThemeOf(w)->a : (Color){ 255, 220, 170, 255 }, a);
         Glow(cam, (Vector3){ x, y, z }, 0.12f + (i % 4) * 0.03f, col);
     }
 
@@ -1084,6 +1636,20 @@ static void DrawLabels(const World *w, Camera3D cam, int vw, int vh, float t)
                 DrawLabel((Vector3){ p.x, 1.1f, p.z }, cam, vw, vh, "EXIT", 14, (Color){ 210, 255, 225, 230 });
         }
     }
+
+    // Loose bits of data drifting up out of the abyss around the island: 0s and 1s
+    const Theme *th = ThemeOf(w);
+    float R = BoardRadius(w);
+    for (int i = 0; i < 18; i++)
+    {
+        float k = fmodf(t * (0.03f + (i % 4) * 0.008f) + (Hash(i, 61) % 100) / 100.0f, 1.0f);
+        float a = (Hash(i, 63) % 628) / 100.0f;
+        float d = R + 1.2f + (Hash(i, 65) % 100) / 40.0f;
+        Vector3 p = { cosf(a) * d * 1.25f, -3.5f + k * 7.0f, sinf(a) * d * 0.8f - 1.0f };
+        float fade = sinf(k * PI_F);
+        DrawLabel(p, cam, vw, vh, ((Hash(i, 67) + (int)(t * 0.7f + i)) % 2) ? "1" : "0", 12,
+                  Alpha((i % 2) ? th->a : th->b, 120 * fade));
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1107,6 +1673,7 @@ static Camera3D MakeCamera(const World *w, float aspect)
     static float focusCur = 0;
     focusCur += (w->focus - focusCur) * (1 - expf(-GetFrameTime() * 3.0f));
     dist *= 1.0f - 0.3f * focusCur;
+    dist *= 1.0f - 0.36f * w->closeUp;      // Bitty is talking: come in close
 
     // Ease the camera a little towards Bitty, with a slow sway, so the world feels alive
     Vector3 b = TilePos(w, w->drawX, w->drawY, 0);
@@ -1117,6 +1684,8 @@ static Camera3D MakeCamera(const World *w, float aspect)
         want.x = want.x + (a.x - want.x) * focusCur;
         want.z = want.z + (a.z - 0.4f - want.z) * focusCur;
     }
+    want.x += (b.x - want.x) * w->closeUp;
+    want.z += (b.z + 0.5f - want.z) * w->closeUp;
     if (!camFollowSet) { camFollow = want; camFollowSet = true; }
     float ease = 1 - expf(-GetFrameTime() * 2.5f);
     camFollow.x += (want.x - camFollow.x) * ease;
@@ -1124,6 +1693,9 @@ static Camera3D MakeCamera(const World *w, float aspect)
 
     float t = (float)GetTime();
     float swayX = sinf(t * 0.23f) * 0.25f, swayY = sinf(t * 0.31f) * 0.12f;
+
+    // a small jolt when Bitty bonks into something
+    if (w->shake > 0) swayX += sinf(t * 55) * 0.05f * (w->shake / 0.35f);
 
     Camera3D cam = { 0 };
     cam.target     = (Vector3){ camFollow.x, 0.95f * focusCur, camFollow.z + 0.25f };
@@ -1327,14 +1899,21 @@ void World_Draw(const World *w)
     float t = (float)GetTime();
     Camera3D cam = MakeCamera(w, (float)vw / vh);
 
+    // remember where Bitty's head is on screen (his speech bubbles point at it)
+    Vector3 head = TilePos(w, w->drawX, w->drawY, 1.05f + BittyHop(w, t) - BittyFall(w));
+    Vector2 onScreen = GetWorldToScreenEx(head, cam, vw, vh);
+    bittyScreen = (Vector2){ w->viewX + onScreen.x, w->viewY + onScreen.y };
+    bittyScreenKnown = true;
+
     BeginTextureMode(target);
-    ClearBackground((Color){ 7, 8, 18, 255 });
+    const Theme *th = ThemeOf(w);
+    ClearBackground(th->fog);
     // soft blue glow in the middle of the background (uses the glow texture,
     // which works the same on every raylib version)
-    float glowR = vw * 0.6f;
+    float glowR = vw * 0.75f;
     DrawTexturePro(glowTex, (Rectangle){ 0, 0, (float)glowTex.width, (float)glowTex.height },
                    (Rectangle){ vw / 2.0f - glowR, vh / 2.0f - glowR, glowR * 2, glowR * 2 },
-                   (Vector2){ 0, 0 }, 0, (Color){ 22, 24, 52, 255 });
+                   (Vector2){ 0, 0 }, 0, th->sky);
 
     BeginMode3D(cam);
 

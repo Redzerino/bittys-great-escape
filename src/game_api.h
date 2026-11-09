@@ -65,6 +65,14 @@ typedef enum {
     WORLD_SEGFAULT    // Bitty stepped into the void
 } WorldState;
 
+// Things that just happened to Bitty, so the game can make him react (see World_TakeEvent)
+typedef enum {
+    EVENT_NONE = 0,
+    EVENT_BONK,       // walked into a wall or a gate
+    EVENT_FALL,       // stepped into the void
+    EVENT_WIN         // reached the exit
+} WorldEvent;
+
 typedef enum {
     MOOD_IDLE = 0,    // blue eye
     MOOD_RUNNING,     // green eye: code is running
@@ -140,6 +148,26 @@ typedef struct {
 
     WorldState state;
 
+    // ---- animation only (none of this changes what the code does) ----
+    float  facingShown;       // facing, eased so Bitty turns smoothly instead of snapping
+    float  land;              // just landed: squash-and-spring countdown
+    float  landLength;
+    float  spawn;             // dropping in at the start of a level, counts down
+    float  winTime;           // seconds since reaching the exit
+    float  idleTime;          // seconds since Bitty last did something (drives the idle fidgets)
+    bool   impactDone;        // the bonk sparks for this bump have been thrown
+    float  tilePress[WORLD_MAX_ROWS][WORLD_MAX_COLS];   // a tile dips when Bitty lands on it
+    float  tileTrail[WORLD_MAX_ROWS][WORLD_MAX_COLS];   // tiles Bitty has stepped on keep a soft glow
+
+    // ---- talking and scenery ----
+    bool   hasIntroStart;     // the map has a 'b': where Bitty arrives before walking to his start
+    int    introX, introY;
+    bool   talking;           // Bitty is giving a talk: the camera comes closer
+    bool   speaking;          // letters are appearing right now: his mouth moves
+    float  closeUp;           // 0 = normal camera, 1 = close on Bitty (eases towards 'talking')
+    int    theme;             // which area of memory this is (the level's world number): sets the colours
+    WorldEvent event;         // the latest thing that happened (cleared by World_TakeEvent)
+
     TestDisplay test;         // repair levels: what the current test is doing
     float  focus;             // 0 = normal camera, 1 = zoomed in on a test
 
@@ -152,6 +180,9 @@ void World_Init(World *w, int cols, int rows);
 void World_LoadMap(World *w, const char *const *rows, int rowCount);   // see levels.c for the map letters
 void World_Update(World *w, float dt);   // advances animations
 void World_Draw(const World *w);
+void World_PlayIntro(World *w);          // Bitty drops into the level (call after loading a new level)
+WorldEvent World_TakeEvent(World *w);    // what just happened to Bitty (EVENT_NONE if nothing new)
+bool World_BittyOnScreen(float *x, float *y);   // where Bitty's head was drawn last frame, in window pixels
 // Draw the existing customised character inside an active 3D camera.
 void World_DrawBittyPreview(const World *w, float time);
 
