@@ -1,5 +1,6 @@
 title: 1.3  Mind the Gap
 type: escape
+buttons: TILE_WALL | TILE_EMPTY | EAST | SOUTH
 
 [story]
 Bitty: "Careful! That glowing purple memory isn't allocated. If I step in, I'm gone."
@@ -8,11 +9,9 @@ Goal: go east until the wall, then south to the EXIT.
 
 [talk]
 @walk EAST 2
-Stop! See that purple glow below? That memory isn't allocated. If I step in, I vanish. Bzzt.
-This time I don't know how long the corridor is, so we can't count the steps.
-A `while` loop keeps going for as long as something is true.
-`scan(EAST)` lets me peek at the next tile. So: while the next tile is not a wall, keep moving.
-`!=` means "is not equal to". Careful: `==` compares two things, but `=` changes a value. Easy to mix up!
+Careful! That purple glow is unallocated memory. If I step in, I vanish.
+I don't know how far the wall is, so I can't count. A `while` loop keeps going for as long as its question is true.
+`scan(EAST)` peeks at the next tile. Keep moving while it's NOT (`!=`) a wall, then go down to the exit.
 
 [lesson]
 A while loop repeats AS LONG AS its
@@ -28,6 +27,11 @@ scan(EAST) looks at the next tile east.
 
 Watch out: == compares, = assigns.
 while (x = 5) is a classic bug!
+
+[hint]
+You don't know how far it is, so use a while loop and scan() ahead.
+Keep moving EAST while scan(EAST) != TILE_WALL. Then go down to the exit.
+while (scan(EAST) != TILE_WALL) { move(EAST); } then move(SOUTH); twice.
 
 [map]
 ###########
@@ -48,6 +52,13 @@ while (x = 5) is a classic bug!
 //   {
 //       ...
 //   }
+// Fill in the gold gaps!
+
+while (scan(EAST) != ___) {
+    move(EAST);
+}
+move(___);
+move(___);
 
 [solution]
 while (scan(EAST) != TILE_WALL) {

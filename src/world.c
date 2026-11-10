@@ -9,6 +9,7 @@
 // The camera looks from the south (+z) and above, so Bitty's face (+z) faces us.
 
 #include "game_api.h"
+#include "world_internal.h"
 #include "raylib.h"
 #include "rlgl.h"
 #include "customisation.h"
@@ -18,11 +19,11 @@
 
 #define MOVE_SECONDS  0.40f
 #define WRITE_SECONDS 0.35f
-#define FALL_SECONDS  1.6f
+#define SCAN_SECONDS  0.42f
+#define READ_SECONDS  0.36f
 #define TEETER_SECONDS 0.35f   // Bitty wobbles on the edge before falling
 #define SPAWN_SECONDS 0.75f
 #define LAND_SECONDS  0.32f
-#define PI_F          3.14159265f
 
 // ===========================================================================
 // Particles: dust, sparks and confetti. Purely decoration.
@@ -76,7 +77,6 @@ static void Particles_Update(float dt)
 }
 
 // World position of a tile (defined further down with the drawing code)
-static Vector3 TilePos(const World *w, float col, float row, float y);
 
 // A ring of dust puffing outwards along the floor
 static void Burst_Dust(const World *w, float col, float row, int count, float power)
@@ -93,7 +93,7 @@ static void Burst_Dust(const World *w, float col, float row, int count, float po
 }
 
 // Sparks flying off a point (bonks, gates, glitches)
-static void Burst_Sparks(Vector3 at, int count, float power, Color col)
+void Burst_Sparks(Vector3 at, int count, float power, Color col)
 {
     for (int i = 0; i < count; i++)
     {
@@ -311,6 +311,33 @@ bool World_StartAction(World *w, Action a)
         }
     }
 
+    else if (a.type == ACT_SCAN || a.type == ACT_READ)
+    {
+        // scan() and read() answer straight away, but Bitty takes a moment to look,
+        // so you can see what he checked and what he found
+        if (a.type == ACT_SCAN)
+        {
+            int dx, dy;
+            Step(a.dir, &dx, &dy);
+            w->lastResult = World_Scan(w, a.dir);
+            w->scanX = w->bittyX + dx;
+            w->scanY = w->bittyY + dy;
+            if (a.dir == EAST) w->facing = 35;
+            if (a.dir == WEST) w->facing = -35;
+        }
+        else
+        {
+            w->lastResult = World_Read(w);
+            w->scanX = w->bittyX;
+            w->scanY = w->bittyY;
+        }
+        w->scanResult = w->lastResult;
+        w->scanWasRead = (a.type == ACT_READ);
+        w->scanShow = 1.1f / (speed > 2 ? 2 : speed);
+        w->idleTime = 0;
+        w->actionLength = (a.type == ACT_SCAN ? SCAN_SECONDS : READ_SECONDS) / speed;
+    }
+
     w->actionTimer = w->actionLength;
     return true;
 }
@@ -350,8 +377,8 @@ bool World_ActionDone(const World *w)
     return w->current.type == ACT_NONE;
 }
 
-static float Clamp01(float v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
-static float Smooth(float v)  { v = Clamp01(v); return v * v * (3 - 2 * v); }
+float Clamp01(float v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+float Smooth(float v)  { v = Clamp01(v); return v * v * (3 - 2 * v); }
 
 // How far through the current action we are, 0..1
 static float ActionProgress(const World *w)
@@ -374,6 +401,7 @@ void World_Update(World *w, float dt)
     if (w->flash  > 0) w->flash  -= dt;
     if (w->glitch > 0) w->glitch -= dt;
     if (w->gateFlash > 0) w->gateFlash -= dt;
+    if (w->scanShow > 0) w->scanShow -= dt;
     if (w->land > 0) w->land -= dt;
     if (w->state == WORLD_WON) w->winTime += dt;
     w->idleTime += dt;
@@ -407,15 +435,7 @@ void World_Update(World *w, float dt)
         }
     }
 
-    // fade the flashes on the test's memory blocks and registers
-    for (int r = 0; r < w->test.rowCount; r++)
-        for (int i = 0; i < w->test.rows[r].count; i++)
-        {
-            if (w->test.rows[r].readFlash[i]  > 0) w->test.rows[r].readFlash[i]  -= dt;
-            if (w->test.rows[r].writeFlash[i] > 0) w->test.rows[r].writeFlash[i] -= dt;
-        }
-    for (int i = 0; i < w->test.regCount; i++)
-        if (w->test.regs[i].flash > 0) w->test.regs[i].flash -= dt;
+    Room_Update(w, dt);
 
     if (w->current.type == ACT_NONE) return;
 
@@ -509,14 +529,6 @@ void World_Update(World *w, float dt)
 // portal and a few memory crystals give off their own light.
 // ===========================================================================
 
-// Each area of memory has its own colours, so moving on feels like travelling somewhere new
-typedef struct {
-    Color fog;        // what the distance fades into
-    Color sky;        // the glow behind everything
-    Color a, b;       // the two accent colours (lights, streams, windows)
-    float ambient[3]; // colour of the shadows
-} Theme;
-
 // Indexed by the chip the level sits on in the Escape Circuit map (0 = bootcamp),
 // so the colours match the map: the accent colour is the chip's colour.
 static const Theme THEMES[] = {
@@ -532,14 +544,14 @@ static const Theme THEMES[] = {
     /* 9 USB Gateway      */ { {  8,  9, 14, 255 }, { 34, 38, 54, 255 }, { 235, 242, 255, 255 }, { 120, 220, 255, 255 }, { 0.20f, 0.21f, 0.27f } },
 };
 
-static const Theme *ThemeOf(const World *w)
+const Theme *ThemeOf(const World *w)
 {
     int i = w->theme;
     if (i < 0 || i > 9) i = 1;
     return &THEMES[i];
 }
 
-static Color Alpha(Color c, float a)
+Color Alpha(Color c, float a)
 {
     if (a < 0) a = 0;
     if (a > 255) a = 255;
@@ -547,7 +559,6 @@ static Color Alpha(Color c, float a)
     return c;
 }
 
-#define MAX_LIGHTS 8
 #define MOTE_COUNT 26
 
 static RenderTexture2D target;
@@ -654,7 +665,7 @@ static void InitGraphics(void)
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-static Vector3 TilePos(const World *w, float col, float row, float y)
+Vector3 TilePos(const World *w, float col, float row, float y)
 {
     return (Vector3){ col - (w->cols - 1) / 2.0f, y, row - (w->rows - 1) / 2.0f };
 }
@@ -673,14 +684,14 @@ static unsigned Hash(int a, int b)
     return h ^ (h >> 15);
 }
 
-static Color Mix(Color a, Color b, float t)
+Color Mix(Color a, Color b, float t)
 {
     return (Color){ (unsigned char)(a.r + (b.r - a.r) * t), (unsigned char)(a.g + (b.g - a.g) * t),
                     (unsigned char)(a.b + (b.b - a.b) * t), (unsigned char)(a.a + (b.a - a.a) * t) };
 }
 
 // A squashed sphere
-static void DrawBlob(Vector3 pos, Vector3 scale, Color col)
+void DrawBlob(Vector3 pos, Vector3 scale, Color col)
 {
     rlPushMatrix();
     rlTranslatef(pos.x, pos.y, pos.z);
@@ -690,7 +701,7 @@ static void DrawBlob(Vector3 pos, Vector3 scale, Color col)
 }
 
 // A box with rounded edges and corners (Bitty's chunky stone body)
-static void DrawRoundedBox(Vector3 c, Vector3 size, float r, Color col)
+void DrawRoundedBox(Vector3 c, Vector3 size, float r, Color col)
 {
     float hx = size.x / 2 - r, hy = size.y / 2 - r, hz = size.z / 2 - r;
 
@@ -722,6 +733,16 @@ static void DrawBar(Vector3 pos, float length, float thick, float angle, Color c
     rlPopMatrix();
 }
 
+// Fog (levels like 4.2, where you mustn't know how long the corridor is):
+// how much of this tile Bitty can see, 0..1
+static float TileSeen(const World *w, int c, int r)
+{
+    if (w->fogRadius <= 0) return 1;
+    float dx = c - w->drawX, dz = r - w->drawY;
+    float d = sqrtf(dx * dx + dz * dz);
+    return Clamp01(1 - (d - w->fogRadius) / 0.8f);
+}
+
 static bool IsWalkable(const World *w, int c, int r)
 {
     if (c < 0 || r < 0 || c >= w->cols || r >= w->rows) return false;
@@ -743,7 +764,7 @@ static Color CrystalColor(int c, int r)
     return (Hash(r, c) % 2) ? (Color){ 120, 230, 255, 255 } : (Color){ 190, 140, 255, 255 };
 }
 
-static Color MoodColor(const World *w)
+Color MoodColor(const World *w)
 {
     switch (w->mood)
     {
@@ -799,12 +820,6 @@ static float TileDip(const World *w, int c, int r)
 // ---------------------------------------------------------------------------
 // Lights
 // ---------------------------------------------------------------------------
-typedef struct {
-    Vector3 pos;
-    Color   color;
-    float   strength;
-    float   radius;
-} Light;
 
 static int GatherLights(const World *w, float t, Light *lights)
 {
@@ -820,21 +835,21 @@ static int GatherLights(const World *w, float t, Light *lights)
     // Exit portals
     for (int r = 0; r < w->rows && n < MAX_LIGHTS; r++)
         for (int c = 0; c < w->cols && n < MAX_LIGHTS; c++)
-            if (w->tiles[r][c].type == TILE_EXIT)
+            if (w->tiles[r][c].type == TILE_EXIT && TileSeen(w, c, r) > 0.3f)
                 lights[n++] = (Light){ TilePos(w, (float)c, (float)r, 0.6f), (Color){ 110, 255, 170, 255 },
                                        1.2f + sinf(t * 3) * 0.2f, 2.6f };
 
     // Gates
     for (int r = 0; r < w->rows && n < MAX_LIGHTS; r++)
         for (int c = 0; c < w->cols && n < MAX_LIGHTS; c++)
-            if (w->tiles[r][c].type == TILE_GATE)
+            if (w->tiles[r][c].type == TILE_GATE && TileSeen(w, c, r) > 0.3f)
                 lights[n++] = (Light){ TilePos(w, (float)c, (float)r, 0.5f), (Color){ 255, 140, 60, 255 },
                                        0.8f + sinf(t * 9 + c) * 0.08f, 1.6f };
 
     // Crystals
     for (int r = 0; r < w->rows && n < MAX_LIGHTS; r++)
         for (int c = 0; c < w->cols && n < MAX_LIGHTS; c++)
-            if (HasCrystal(w, c, r))
+            if (HasCrystal(w, c, r) && TileSeen(w, c, r) > 0.3f)
                 lights[n++] = (Light){ TilePos(w, (float)c, (float)r, 0.8f), CrystalColor(c, r),
                                        0.7f + sinf(t * 1.5f + c) * 0.1f, 2.0f };
     return n;
@@ -851,7 +866,7 @@ static bool ExitPosition(const World *w, Vector3 *out)
     return false;
 }
 
-static void ApplyLights(const World *w, const Light *lights, int count, Camera3D cam, float t)
+static void ApplyLights(const World *w, const Light *lights, int count, Camera3D cam, float t, bool exitPulse)
 {
     float pos[MAX_LIGHTS * 3], col[MAX_LIGHTS * 3], rad[MAX_LIGHTS];
     for (int i = 0; i < count; i++)
@@ -883,7 +898,7 @@ static void ApplyLights(const World *w, const Light *lights, int count, Camera3D
 
     Vector3 exitPos = { 0, 0, 0 };
     float strength = 0, radius = 0;
-    if (ExitPosition(w, &exitPos))
+    if (exitPulse && ExitPosition(w, &exitPos))
     {
         float k = fmodf(t, PULSE_PERIOD) / PULSE_PERIOD;     // 0 -> 1
         radius = k * 14.0f;
@@ -905,7 +920,7 @@ static const Color COL_DATA   = { 80, 140, 230, 255 };
 static const Color COL_EXIT   = { 90, 230, 150, 255 };
 
 // A soft-edged block: a body plus a slightly smaller cap, so the top edge looks rounded
-static void DrawStone(Vector3 pos, Vector3 size, Color col)
+void DrawStone(Vector3 pos, Vector3 size, Color col)
 {
     DrawCubeV(pos, size, col);
     Vector3 cap = { pos.x, pos.y + size.y / 2 + 0.025f, pos.z };
@@ -919,6 +934,7 @@ static void DrawTiles(const World *w)
         for (int c = 0; c < w->cols; c++)
         {
             const Tile *tile = &w->tiles[r][c];
+            if (TileSeen(w, c, r) < 0.3f) continue;         // hidden in the fog
             Vector3 p = TilePos(w, (float)c, (float)r, 0);
             unsigned h = Hash(c, r);
             float jitter = (h % 7) * 0.008f;   // tiny height differences feel hand-made
@@ -990,8 +1006,97 @@ static void DrawTiles(const World *w)
     }
 }
 
+// ---------------------------------------------------------------------------
+// Signs: a board on top of a wall tile (e.g. "EXIT 11 TILES >>")
+// ---------------------------------------------------------------------------
+static int SignLines(const char *text, char lines[3][64])
+{
+    int n = 0, k = 0;
+    for (const char *c = text; ; c++)
+    {
+        if (*c == '|' || *c == '\0')
+        {
+            lines[n][k] = '\0';
+            n++;
+            k = 0;
+            if (*c == '\0' || n == 3) break;
+        }
+        else if (k < 63) lines[n][k++] = *c;
+    }
+    return n;
+}
+
+
+static void DrawSigns(const World *w)
+{
+    for (int i = 0; i < w->signCount; i++)
+    {
+        const WorldSign *sg = &w->signs[i];
+        if (TileSeen(w, sg->col, sg->row) < 0.3f) continue;
+        Vector3 p = TilePos(w, (float)sg->col, (float)sg->row, 0);
+        Color post = { 70, 64, 104, 255 };
+        DrawCubeV((Vector3){ p.x, 0.9f, p.z }, (Vector3){ 0.08f, 0.7f, 0.08f }, post);
+        DrawCubeV((Vector3){ p.x, 1.28f, p.z }, (Vector3){ 0.5f, 0.12f, 0.08f }, ThemeOf(w)->a);
+    }
+}
+
+// The writing on a sign: a panel on screen, pinned to the top of its post
+static void DrawSignLabels(const World *w, Camera3D cam, int vw, int vh)
+{
+    for (int i = 0; i < w->signCount; i++)
+    {
+        const WorldSign *sg = &w->signs[i];
+        if (TileSeen(w, sg->col, sg->row) < 0.5f) continue;
+        char lines[3][64];
+        int n = SignLines(sg->text, lines);
+        Vector2 top = GetWorldToScreenEx(TilePos(w, (float)sg->col, (float)sg->row, 1.34f), cam, vw, vh);
+        int size = 16, wide = 0;
+        for (int k = 0; k < n; k++) if (MeasureText(lines[k], size) > wide) wide = MeasureText(lines[k], size);
+        float bw = wide + 20.0f, bh = n * (size + 4) + 12.0f;
+        Rectangle box = { top.x - bw / 2, top.y - bh, bw, bh };
+        if (box.y < 4) box.y = 4;
+        DrawRectangleRounded(box, 0.18f, 6, (Color){ 14, 18, 36, 235 });
+        DrawRectangleRoundedLinesEx(box, 0.18f, 6, 2, ThemeOf(w)->a);
+        for (int k = 0; k < n; k++)
+        {
+            int tw = MeasureText(lines[k], size);
+            DrawText(lines[k], (int)(top.x - tw / 2.0f), (int)(box.y + 7 + k * (size + 4)), size,
+                     k == 0 ? (Color){ 255, 236, 170, 255 } : WHITE);
+        }
+    }
+}
+
+// Fog: everything further than a couple of tiles from Bitty fades to black,
+// like a torch in the dark
+static void DrawFog(const World *w, Camera3D cam, int vw, int vh)
+{
+    if (w->fogRadius <= 0) return;
+    Vector3 b = TilePos(w, w->drawX, w->drawY, 0.3f);
+    Vector3 edge = TilePos(w, w->drawX + w->fogRadius + 1.0f, w->drawY, 0.3f);
+    Vector2 c = GetWorldToScreenEx(b, cam, vw, vh), e = GetWorldToScreenEx(edge, cam, vw, vh);
+    float R = fabsf(e.x - c.x);
+    Color dark = ThemeOf(w)->fog;
+    dark.a = 250;
+    Color clear = dark;
+    clear.a = 0;
+    (void)clear;
+    // a soft edge: rings getting darker towards the outside
+    for (int k = 0; k < 10; k++)
+    {
+        float r0 = R * (0.55f + k * 0.045f), r1 = R * (0.55f + (k + 1) * 0.045f);
+        Color ring = dark;
+        ring.a = (unsigned char)(250 * (k + 1) / 11.0f);
+        DrawRing(c, r0, r1, 0, 360, 64, ring);
+    }
+    DrawRing(c, R - 0.5f, (float)(vw + vh) * 2, 0, 360, 64, dark);
+    const char *note = "It's dark: Bitty can only see the tiles next to him";
+    int nw = MeasureText(note, 14);
+    DrawRectangleRounded((Rectangle){ (vw - nw) / 2.0f - 10, vh - 64.0f, nw + 20.0f, 24 }, 0.4f, 6, (Color){ 20, 26, 48, 230 });
+    DrawText(note, (vw - nw) / 2, vh - 59, 14, (Color){ 190, 205, 240, 255 });
+}
+
 // A soft glowing dot that always faces the camera
-static void Glow(Camera3D cam, Vector3 pos, float size, Color col)
+void Glow(Camera3D cam, Vector3 pos, float size, Color col)
 {
     DrawBillboard(cam, glowTex, pos, size, col);
 }
@@ -1212,7 +1317,7 @@ static void DrawEnvironmentGlow(const World *w, Camera3D cam, float t)
 // ---------------------------------------------------------------------------
 // Bitty (self-lit: Bitty IS the light)
 // ---------------------------------------------------------------------------
-static void DrawBitty(const World *w, float t)
+void DrawBitty(const World *w, float t)
 {
     float squashY = 1;          // >1 = stretched tall, <1 = squashed flat
     float roll = 0;             // lean left / right (degrees)
@@ -1262,6 +1367,21 @@ static void DrawBitty(const World *w, float t)
         squashY = 1 - 0.2f * sinf(p * PI_F);                            // stamps the value down
         armLift = -0.05f * sinf(p * PI_F);
     }
+    else if (w->current.type == ACT_SCAN)
+    {
+        // leans towards the tile and sweeps his head across it
+        float lean = sinf(p * PI_F);
+        float dirX = (w->current.dir == EAST) ? 1.0f : (w->current.dir == WEST) ? -1.0f : 0.0f;
+        float dirZ = (w->current.dir == SOUTH) ? 1.0f : (w->current.dir == NORTH) ? -1.0f : 0.0f;
+        roll  = -dirX * lean * 9;
+        pitch =  dirZ * lean * 10;
+        yaw   = sinf(p * PI_F * 2) * 10 * lean;
+    }
+    else if (w->current.type == ACT_READ)
+    {
+        pitch = 16 * sinf(p * PI_F);                                    // looks down at the tile
+        squashY = 1 - 0.06f * sinf(p * PI_F);
+    }
     else if (w->land > 0 && w->landLength > 0)
     {
         float u = 1 - w->land / w->landLength;                          // landed: squash, then spring back
@@ -1310,7 +1430,7 @@ static void DrawBitty(const World *w, float t)
     // soft shadow (smaller the higher he is)
     if (fall == 0)
     {
-        float sh = 0.32f - hop * 0.09f;
+        float sh = (0.32f - hop * 0.09f) * (w->bittyScale > 0 ? w->bittyScale : 1.0f);
         if (sh < 0.06f) sh = 0.06f;
         DrawCylinderEx((Vector3){ base.x, 0.0f - dip, base.z }, (Vector3){ base.x, 0.005f - dip, base.z },
                        sh, sh, 18, (Color){ 0, 0, 10, 110 });
@@ -1321,7 +1441,14 @@ static void DrawBitty(const World *w, float t)
     rlRotatef(w->facingShown * 0.6f + spin + yaw, 0, 1, 0);
     rlRotatef(-24 + pitch, 1, 0, 0);    // lean back a little so the camera sees Bitty's face
     rlRotatef(roll, 0, 0, 1);
-    rlScalef(1.5f / sqrtf(squashY), 1.5f * squashY, 1.5f / sqrtf(squashY));
+    float size = 1.5f * (w->bittyScale > 0 ? w->bittyScale : 1.0f);
+    rlScalef(size / sqrtf(squashY), size * squashY, size / sqrtf(squashY));
+    if (w->teleport > 0)
+    {
+        // beaming: he stretches into a thin line of light
+        float k = Smooth(w->teleport);
+        rlScalef(1 - 0.9f * k, 1 + 1.8f * k, 1 - 0.9f * k);
+    }
 
     // Slate-grey stone, like Bulder from Pode: matte, darker underneath, no shine
     const Color BODY = Customisation_Body();
@@ -1456,6 +1583,18 @@ void World_DrawBittyPreview(const World *w, float time)
     DrawBitty(w, time);
 }
 
+// dust, sparks and confetti
+void DrawParticles(Camera3D cam)
+{
+    for (int i = 0; i < MAX_PARTICLES; i++)
+    {
+        const Particle *q = &particles[i];
+        if (q->life <= 0) continue;
+        float k = q->life / q->maxLife;
+        Glow(cam, q->pos, q->size * (0.6f + 0.4f * k), (Color){ q->col.r, q->col.g, q->col.b, (unsigned char)(q->col.a * k) });
+    }
+}
+
 static void DrawGlows(const World *w, Camera3D cam, float t)
 {
     rlDrawRenderBatchActive();
@@ -1481,6 +1620,7 @@ static void DrawGlows(const World *w, Camera3D cam, float t)
     {
         for (int c = 0; c < w->cols; c++)
         {
+            if (TileSeen(w, c, r) < 0.3f) continue;
             Vector3 p = TilePos(w, (float)c, (float)r, 0);
             TileType type = w->tiles[r][c].type;
 
@@ -1602,14 +1742,49 @@ static void DrawGlows(const World *w, Camera3D cam, float t)
         Glow(cam, (Vector3){ p.x, 0.1f, p.z }, 1.6f, (Color){ m.r, m.g, m.b, (unsigned char)(120 * k) });
     }
 
-    // dust, sparks and confetti
-    for (int i = 0; i < MAX_PARTICLES; i++)
+    // the beam Bitty is teleported in (to and from the memory room)
+    if (w->teleport > 0)
     {
-        const Particle *q = &particles[i];
-        if (q->life <= 0) continue;
-        float k = q->life / q->maxLife;
-        Glow(cam, q->pos, q->size * (0.6f + 0.4f * k), (Color){ q->col.r, q->col.g, q->col.b, (unsigned char)(q->col.a * k) });
+        float k = Smooth(w->teleport);
+        Vector3 p = TilePos(w, w->drawX, w->drawY, 0);
+        Color m = Customisation_Glow();
+        DrawCylinderEx((Vector3){ p.x, 0, p.z }, (Vector3){ p.x, 6.0f, p.z }, 0.12f + 0.3f * k, 0.12f + 0.3f * k, 14,
+                       (Color){ m.r, m.g, m.b, (unsigned char)(150 * k) });
+        Glow(cam, (Vector3){ p.x, 0.5f, p.z }, 2.6f * k, (Color){ 255, 255, 255, (unsigned char)(160 * k) });
     }
+
+    // scan() / read(): a beam from Bitty's eye sweeping the tile he is checking
+    if (w->current.type == ACT_SCAN || w->current.type == ACT_READ || w->scanShow > 0)
+    {
+        bool active = (w->current.type == ACT_SCAN || w->current.type == ACT_READ);
+        float p = active ? 1 - w->actionTimer / w->actionLength : 1;
+        float fade = active ? 1.0f : Clamp01(w->scanShow / 0.4f);
+        Vector3 eye = TilePos(w, w->drawX, w->drawY, 0.55f);
+        Vector3 to = TilePos(w, (float)w->scanX, (float)w->scanY, 0.06f);
+        Color c = { 120, 235, 255, 255 };
+        if (active)
+            for (int i = 0; i <= 10; i++)
+            {
+                float u = i / 10.0f;
+                Vector3 q = { eye.x + (to.x - eye.x) * u, eye.y + (to.y - eye.y) * u, eye.z + (to.z - eye.z) * u };
+                Glow(cam, q, 0.14f + u * 0.25f, Alpha(c, 150 * sinf(Clamp01(p * 1.2f) * PI_F) + 20));
+            }
+        // a bar of light sweeping across the tile, then the whole tile glows
+        float sweep = (p * 2 - 0.5f);
+        if (active && sweep > -0.5f && sweep < 0.5f)
+            DrawCubeV((Vector3){ to.x + sweep * 0.9f, 0.05f, to.z }, (Vector3){ 0.05f, 0.04f, 0.9f }, Alpha(c, 220));
+        DrawCubeWiresV((Vector3){ to.x, 0.04f, to.z }, (Vector3){ 0.96f, 0.06f, 0.96f }, Alpha(c, 200 * fade));
+        Glow(cam, to, 1.3f, Alpha(c, 90 * fade));
+    }
+
+    // signs on the walls glow softly
+    for (int i = 0; i < w->signCount; i++)
+    {
+        Vector3 p = TilePos(w, (float)w->signs[i].col, (float)w->signs[i].row, 1.2f);
+        Glow(cam, (Vector3){ p.x, p.y, p.z + 0.1f }, 2.2f, Alpha(ThemeOf(w)->a, 45));
+    }
+
+    DrawParticles(cam);
 
     // memory motes drifting through the dark
     float spanX = w->cols / 2.0f + 0.5f, spanZ = w->rows / 2.0f + 0.5f;
@@ -1632,7 +1807,7 @@ static void DrawGlows(const World *w, Camera3D cam, float t)
 // ---------------------------------------------------------------------------
 // Labels: addresses are revealed by Bitty's light
 // ---------------------------------------------------------------------------
-static void DrawLabel(Vector3 at, Camera3D cam, int w, int h, const char *text, int size, Color col)
+void DrawLabel(Vector3 at, Camera3D cam, int w, int h, const char *text, int size, Color col)
 {
     Vector2 s = GetWorldToScreenEx(at, cam, w, h);
     int tw = MeasureText(text, size);
@@ -1646,6 +1821,7 @@ static void DrawLabels(const World *w, Camera3D cam, int vw, int vh, float t)
         for (int c = 0; c < w->cols; c++)
         {
             const Tile *tile = &w->tiles[r][c];
+            if (TileSeen(w, c, r) < 0.5f) continue;
             Vector3 p = TilePos(w, (float)c, (float)r, 0.01f);
             bool underBitty = (c == w->bittyX && r == w->bittyY) ||
                               (fabsf(c - w->drawX) < 0.9f && fabsf(r - w->drawY) < 0.9f);
@@ -1666,6 +1842,29 @@ static void DrawLabels(const World *w, Camera3D cam, int vw, int vh, float t)
             else if (tile->type == TILE_EXIT && !underBitty)
                 DrawLabel((Vector3){ p.x, 1.1f, p.z }, cam, vw, vh, "EXIT", 14, (Color){ 210, 255, 225, 230 });
         }
+    }
+
+    DrawSignLabels(w, cam, vw, vh);
+
+    // what scan() / read() found
+    if (w->scanShow > 0 || w->current.type == ACT_SCAN || w->current.type == ACT_READ)
+    {
+        static const char *NAMES[] = { "EMPTY", "WALL", "DATA", "GATE", "EXIT", "VOID!" };
+        const char *text;
+        if (w->scanWasRead) text = TextFormat("read() = %d", w->scanResult);
+        else text = (w->scanResult >= 0 && w->scanResult <= 5) ? TextFormat("TILE_%s", NAMES[w->scanResult]) : "?";
+        if (!w->scanWasRead && w->scanResult == TILE_VOID) text = "TILE_VOID!";
+        float a = Clamp01(w->scanShow / 0.3f);
+        if (w->current.type == ACT_SCAN || w->current.type == ACT_READ) a = 1;
+        // read(): under Bitty's feet (towards the camera); scan(): above the tile he checked
+        Vector3 at = w->scanWasRead ? TilePos(w, (float)w->scanX, w->scanY + 0.62f, 0.05f)
+                                    : TilePos(w, (float)w->scanX, (float)w->scanY, 1.0f);
+        Color col = (!w->scanWasRead && w->scanResult == TILE_VOID) ? (Color){ 255, 120, 150, 255 } :
+                    (!w->scanWasRead && w->scanResult == TILE_WALL) ? (Color){ 255, 200, 120, 255 } : (Color){ 150, 240, 255, 255 };
+        Vector2 sp = GetWorldToScreenEx(at, cam, vw, vh);
+        int tw = MeasureText(text, 16);
+        DrawRectangleRounded((Rectangle){ sp.x - tw / 2.0f - 6, sp.y - 11, tw + 12.0f, 22 }, 0.4f, 6, (Color){ 8, 12, 26, (unsigned char)(210 * a) });
+        DrawLabel(at, cam, vw, vh, text, 16, Alpha(col, 255 * a));
     }
 
     // Loose bits of data drifting up out of the abyss around the island: 0s and 1s
@@ -1705,10 +1904,12 @@ static Camera3D MakeCamera(const World *w, float aspect)
     focusCur += (w->focus - focusCur) * (1 - expf(-GetFrameTime() * 3.0f));
     dist *= 1.0f - 0.3f * focusCur;
     dist *= 1.0f - 0.36f * w->closeUp;      // Bitty is talking: come in close
+    if (w->fogRadius > 0) dist *= 0.62f;     // fog: stay close to Bitty (the map's size would give it away)
 
     // Ease the camera a little towards Bitty, with a slow sway, so the world feels alive
     Vector3 b = TilePos(w, w->drawX, w->drawY, 0);
     Vector3 want = { b.x * (wide ? 0.85f : 0.3f), 0, b.z * 0.25f };
+    if (w->fogRadius > 0) want = (Vector3){ b.x, 0, b.z };
     if (w->test.active)
     {
         Vector3 a = TilePos(w, w->test.gateX - 0.5f, (float)w->test.gateY, 0);
@@ -1739,137 +1940,8 @@ static Camera3D MakeCamera(const World *w, float aspect)
 }
 
 // ===========================================================================
-// Repair tests: floating variables and memory blocks above the corridor
+// Repair tests: the gate terminal (the test itself is acted out in the memory room, room.c)
 // ===========================================================================
-#define DATA_SPACING 0.56f
-#define REG_SPACING  1.4f
-
-static Vector3 RegisterPos(const World *w, int i)
-{
-    Vector3 a = TilePos(w, w->test.gateX - 0.5f, (float)w->test.gateY, 0);
-    float x0 = a.x - (w->test.regCount - 1) * REG_SPACING / 2;
-    return (Vector3){ x0 + i * REG_SPACING, 1.05f, a.z - 0.95f };
-}
-
-// Short rows (like two &values) sit side by side; long ones (arrays, strings) stack
-#define ROW_GAP 1.0f
-
-static bool RowsSideBySide(const World *w)
-{
-    float total = 0;
-    for (int r = 0; r < w->test.rowCount; r++) total += w->test.rows[r].count * DATA_SPACING;
-    total += (w->test.rowCount - 1) * ROW_GAP;
-    return w->test.rowCount > 1 && total <= 7.0f;
-}
-
-static Vector3 DataPos(const World *w, int row, int i)
-{
-    const TestDisplay *td = &w->test;
-    Vector3 a = TilePos(w, td->gateX - 0.5f, (float)td->gateY, 0);
-    float baseY = 1.05f + (td->regCount > 0 ? 0.95f : 0);
-
-    if (RowsSideBySide(w))
-    {
-        float total = (td->rowCount - 1) * ROW_GAP;
-        for (int r = 0; r < td->rowCount; r++) total += td->rows[r].count * DATA_SPACING;
-        float x = a.x - total / 2 + DATA_SPACING / 2;
-        for (int r = 0; r < row; r++) x += td->rows[r].count * DATA_SPACING + ROW_GAP;
-        return (Vector3){ x + i * DATA_SPACING, baseY, a.z - 0.95f };
-    }
-
-    const TestDataRow *d = &td->rows[row];
-    float x0 = a.x - (d->count - 1) * DATA_SPACING / 2;
-    return (Vector3){ x0 + i * DATA_SPACING, baseY + row * 0.85f, a.z - 0.95f };
-}
-
-static Color Lerp(Color a, Color b, float t)
-{
-    if (t < 0) t = 0;
-    if (t > 1) t = 1;
-    return Mix(a, b, t);
-}
-
-static void DrawTestBlocks(const World *w)
-{
-    const TestDisplay *td = &w->test;
-    if (!td->active) return;
-
-    for (int i = 0; i < td->regCount; i++)
-    {
-        Vector3 p = RegisterPos(w, i);
-        Color c = Lerp((Color){ 44, 52, 92, 255 }, (Color){ 255, 214, 100, 255 }, td->regs[i].flash / 0.6f);
-        DrawCubeV(p, (Vector3){ 1.2f, 0.58f, 0.08f }, c);
-        DrawCubeWiresV(p, (Vector3){ 1.21f, 0.59f, 0.09f }, (Color){ 120, 170, 255, 255 });
-    }
-
-    for (int r = 0; r < td->rowCount; r++)
-    {
-        const TestDataRow *d = &td->rows[r];
-        for (int i = 0; i < d->count; i++)
-        {
-            Vector3 p = DataPos(w, r, i);
-            Color c = (Color){ 30, 44, 84, 255 };
-            c = Lerp(c, (Color){ 90, 220, 255, 255 }, d->readFlash[i] / 0.5f);
-            c = Lerp(c, (Color){ 255, 150, 60, 255 }, d->writeFlash[i] / 0.5f);
-            DrawCubeV(p, (Vector3){ 0.5f, 0.42f, 0.08f }, c);
-            DrawCubeWiresV(p, (Vector3){ 0.51f, 0.43f, 0.09f }, (Color){ 90, 130, 220, 255 });
-        }
-        // pointer markers: little orange arrows above the block they point at
-        for (int m = 0; m < d->markerCount; m++)
-        {
-            Vector3 p = (d->markerIndex[m] < d->count) ? DataPos(w, r, d->markerIndex[m])
-                                                       : DataPos(w, r, d->count - 1);
-            if (d->markerIndex[m] >= d->count) p.x += DATA_SPACING;   // one past the end
-            float top = p.y + 0.21f + 0.06f + m * 0.0f;
-            DrawCylinderEx((Vector3){ p.x, top + 0.3f, p.z + 0.06f }, (Vector3){ p.x, top, p.z + 0.06f },
-                           0.09f, 0.0f, 8, (Color){ 255, 170, 70, 255 });
-        }
-    }
-}
-
-static void DrawTestLabels(const World *w, Camera3D cam, int vw, int vh)
-{
-    const TestDisplay *td = &w->test;
-    if (!td->active) return;
-
-    for (int i = 0; i < td->regCount; i++)
-    {
-        const TestRegister *g = &td->regs[i];
-        Vector3 p = RegisterPos(w, i);
-        DrawLabel((Vector3){ p.x, p.y + 0.45f, p.z }, cam, vw, vh, g->name, 16, (Color){ 170, 190, 230, 255 });
-        const char *v = !g->known ? "?" :
-                        g->isBool ? (g->value ? "true" : "false") :
-                        (g->isChar && g->value >= 32 && g->value < 127) ? TextFormat("'%c'", g->value) :
-                        TextFormat("%d", g->value);
-        DrawLabel(p, cam, vw, vh, v, 24, g->known ? WHITE : (Color){ 255, 120, 120, 255 });
-    }
-
-    for (int r = 0; r < td->rowCount; r++)
-    {
-        const TestDataRow *d = &td->rows[r];
-        if (d->count == 0) continue;
-        Vector3 first = DataPos(w, r, 0);
-        DrawLabel((Vector3){ first.x - 0.55f, first.y, first.z }, cam, vw, vh, d->name, 14, (Color){ 170, 190, 230, 255 });
-
-        for (int i = 0; i < d->count; i++)
-        {
-            Vector3 p = DataPos(w, r, i);
-            int v = d->values[i];
-            const char *text = !d->isChar ? TextFormat("%d", v) :
-                               v == 0 ? "\\0" : (v >= 32 && v < 127) ? TextFormat("%c", v) : "?";
-            DrawLabel(p, cam, vw, vh, text, d->isChar ? 18 : 16, WHITE);
-            DrawLabel((Vector3){ p.x, p.y - 0.3f, p.z }, cam, vw, vh, TextFormat("%d", i), 10, (Color){ 110, 130, 175, 255 });
-        }
-        for (int m = 0; m < d->markerCount; m++)
-        {
-            Vector3 p = (d->markerIndex[m] < d->count) ? DataPos(w, r, d->markerIndex[m]) : DataPos(w, r, d->count - 1);
-            if (d->markerIndex[m] >= d->count) p.x += DATA_SPACING;
-            DrawLabel((Vector3){ p.x + 0.17f, p.y + 0.48f + m * 0.2f, p.z }, cam, vw, vh, d->markerName[m], 16,
-                      (Color){ 255, 190, 110, 255 });
-        }
-    }
-}
-
 // The gate terminal: the question this gate asks, and how the code is doing
 static void DrawTestHud(const World *w, int vw)
 {
@@ -1913,6 +1985,46 @@ static void DrawVignette(int vw, int vh)
     DrawRectangleGradientH(vw - ex, 0, ex, vh, clear, dark);
 }
 
+void World_DrawBackground(const World *w, int vw, int vh)
+{
+    const Theme *th = ThemeOf(w);
+    ClearBackground(th->fog);
+    // soft glow in the middle of the background (uses the glow texture,
+    // which works the same on every raylib version)
+    float glowR = vw * 0.75f;
+    DrawTexturePro(glowTex, (Rectangle){ 0, 0, (float)glowTex.width, (float)glowTex.height },
+                   (Rectangle){ vw / 2.0f - glowR, vh / 2.0f - glowR, glowR * 2, glowR * 2 },
+                   (Vector2){ 0, 0 }, 0, th->sky);
+}
+
+void World_BeginLit(const World *w, const Light *lights, int count, Camera3D cam, float t, bool exitPulse)
+{
+    if (!shaderOk) return;
+    ApplyLights(w, lights, count, cam, t, exitPulse);
+    BeginShaderMode(lightShader);
+}
+
+void World_EndLit(void)
+{
+    if (shaderOk) EndShaderMode();
+}
+
+void World_SetBittyScreen(const World *w, Vector3 head, Camera3D cam, int vw, int vh)
+{
+    Vector2 onScreen = GetWorldToScreenEx(head, cam, vw, vh);
+    bittyScreen = (Vector2){ w->viewX + onScreen.x, w->viewY + onScreen.y };
+    bittyScreenKnown = true;
+}
+
+// Is the memory room on screen (rather than the corridor)? Half way through
+// beaming in, the picture switches over.
+static bool RoomOnScreen(const World *w)
+{
+    const RoomState *rm = &w->room;
+    return rm->mode == ROOM_INSIDE || (rm->mode == ROOM_BEAM_IN && rm->beam >= 0.5f) ||
+           (rm->mode == ROOM_BEAM_OUT && rm->beam < 0.5f);
+}
+
 void World_Draw(const World *w)
 {
     int vw = (int)w->viewW, vh = (int)w->viewH;
@@ -1928,51 +2040,53 @@ void World_Draw(const World *w)
     }
 
     float t = (float)GetTime();
-    Camera3D cam = MakeCamera(w, (float)vw / vh);
-
-    // remember where Bitty's head is on screen (his speech bubbles point at it)
-    Vector3 head = TilePos(w, w->drawX, w->drawY, 1.05f + BittyHop(w, t) - BittyFall(w));
-    Vector2 onScreen = GetWorldToScreenEx(head, cam, vw, vh);
-    bittyScreen = (Vector2){ w->viewX + onScreen.x, w->viewY + onScreen.y };
-    bittyScreenKnown = true;
-
     BeginTextureMode(target);
-    const Theme *th = ThemeOf(w);
-    ClearBackground(th->fog);
-    // soft blue glow in the middle of the background (uses the glow texture,
-    // which works the same on every raylib version)
-    float glowR = vw * 0.75f;
-    DrawTexturePro(glowTex, (Rectangle){ 0, 0, (float)glowTex.width, (float)glowTex.height },
-                   (Rectangle){ vw / 2.0f - glowR, vh / 2.0f - glowR, glowR * 2, glowR * 2 },
-                   (Vector2){ 0, 0 }, 0, th->sky);
 
-    BeginMode3D(cam);
-
-    if (shaderOk)
+    if (RoomOnScreen(w))
     {
-        Light lights[MAX_LIGHTS];
-        int count = GatherLights(w, t, lights);
-        ApplyLights(w, lights, count, cam, t);
-        BeginShaderMode(lightShader);
-        DrawTiles(w);
-        DrawEnvironment(w, t);
-        EndShaderMode();
+        Room_Draw(w, vw, vh);
     }
     else
     {
-        DrawTiles(w);   // no shader support: still playable, just flat
+        Camera3D cam = MakeCamera(w, (float)vw / vh);
+
+        // remember where Bitty's head is on screen (his speech bubbles point at it)
+        World_SetBittyScreen(w, TilePos(w, w->drawX, w->drawY, 1.05f + BittyHop(w, t) - BittyFall(w)), cam, vw, vh);
+
+        World_DrawBackground(w, vw, vh);
+        BeginMode3D(cam);
+
+        Light lights[MAX_LIGHTS];
+        int count = GatherLights(w, t, lights);
+        World_BeginLit(w, lights, count, cam, t, w->fogRadius <= 0);   // in fog the exit's ripple would give it away
+        DrawTiles(w);
         DrawEnvironment(w, t);
+        DrawSigns(w);
+        World_EndLit();
+
+        DrawBitty(w, t);
+        DrawGlows(w, cam, t);
+        EndMode3D();
+
+        DrawLabels(w, cam, vw, vh, t);
+        DrawFog(w, cam, vw, vh);
     }
 
-    DrawBitty(w, t);
-    DrawTestBlocks(w);
-    DrawGlows(w, cam, t);
-    EndMode3D();
-
-    DrawLabels(w, cam, vw, vh, t);
-    DrawTestLabels(w, cam, vw, vh);
     DrawVignette(vw, vh);
     DrawTestHud(w, vw);
+
+    // beaming in or out: a flash of light as the picture switches over
+    const RoomState *rm = &w->room;
+    if (rm->mode == ROOM_BEAM_IN || rm->mode == ROOM_BEAM_OUT)
+    {
+        float k = 1 - fabsf(rm->beam - 0.5f) / 0.14f;
+        if (k > 0)
+        {
+            Color m = Customisation_Glow();
+            DrawRectangle(0, 0, vw, vh, (Color){ (unsigned char)((m.r + 255) / 2), (unsigned char)((m.g + 255) / 2),
+                                                 (unsigned char)((m.b + 255) / 2), (unsigned char)(235 * Clamp01(k)) });
+        }
+    }
     EndTextureMode();
 
     // Render textures are stored upside down, hence the negative height

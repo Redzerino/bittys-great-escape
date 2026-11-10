@@ -1,5 +1,7 @@
 title: 1.5  Fork in the Road
 type: escape
+buttons: > | < | == | NORTH | SOUTH
+sign: 5 2 BIGGER THAN 5?|YES: go NORTH|NO: go SOUTH
 
 [story]
 Bitty: "Two paths. One is the exit. The other is unallocated memory. No pressure."
@@ -8,11 +10,9 @@ Goal: use if / else to pick the right path.
 
 [talk]
 @walk EAST 2
-A fork in the road. One way is the exit, the other way is... nothing. Bzzt.
-The sign says: if the number is bigger than 5, go NORTH. Otherwise, go SOUTH.
-In C that's an `if`. `if (read() > 5) { ... }` runs the code in the `{ }` only when that's true.
-Add `else { ... }` for what to do when it is NOT true.
-`>` is bigger than, `<` is smaller than, and `==` is "exactly equal to". Choose wisely, please!
+A fork in the road. One way is the exit, the other is the void. Read the sign!
+`if (read() > 5) { ... } else { ... }` goes the first way when the number is bigger than 5, and the other way when it isn't.
+`>` bigger than, `<` smaller than, `==` the same as. Choose wisely, please!
 
 [lesson]
 if runs code only when a condition is true.
@@ -34,6 +34,8 @@ Watch out: = puts a value in a variable.
 if (x = 5) is a bug. You meant if (x == 5).
 
 [hint]
+Step onto the data tile, then read the sign on the wall.
+Use if (read() > 5) to go NORTH, and else to go SOUTH.
 Move EAST onto the data tile first. Then if (read() > 5) move NORTH, else move SOUTH.
 
 [map]
@@ -53,8 +55,14 @@ Move EAST onto the data tile first. Then if (read() > 5) move NORTH, else move S
 //   } else {
 //       ...
 //   }
+// Fill in the gold gaps!
 
 move(EAST);
+if (read() ___ 5) {
+    move(___);
+} else {
+    move(___);
+}
 
 [solution]
 move(EAST);

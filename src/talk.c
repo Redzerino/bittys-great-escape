@@ -30,7 +30,7 @@ static int      walkLeft = 0;       // steps still to walk in the current @walk
 static bool     walkStarted = false;
 static float    arrowTime = 0;
 
-static char     bark[120] = "";
+static char     bark[240] = "";
 static float    barkTime = 0;       // seconds left
 static float    barkShown = 0;
 

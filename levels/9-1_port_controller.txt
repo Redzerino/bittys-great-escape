@@ -8,11 +8,9 @@ Write find_max() without [ ].
 
 [talk]
 @walk EAST 1
-We made it to the USB Gateway. The way out! But the security here is tough. Exam 2 rules: no `[ ]` anywhere.
-First port: find the biggest number in an array, using only a pointer.
-Same idea as the Power Audit. Start `max` at the first value, `*arr`, NOT at 0. Some of these arrays are all negative.
-Then walk the pointer along with `arr++`, and keep the biggest value you see.
-You've done each part of this before. Now it's all together.
+The USB Gateway, the way out! Exam 2 rules: no `[ ]` anywhere.
+Find the biggest number using only a pointer. Start `max` at `*arr`, not 0.
+Slide along with `arr++`, keeping the biggest. You've done every part of this before!
 
 [lesson]
 find_max with a pointer:
@@ -32,6 +30,8 @@ never at 0.
 Exam 2: find_max.
 
 [hint]
+Start max at *arr, the first value. Not at 0!
+Move along with arr++ and keep the biggest *arr you see.
 int max = *arr; then loop: arr++; if (*arr > max) max = *arr;
 
 [code]

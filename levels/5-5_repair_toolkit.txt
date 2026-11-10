@@ -7,11 +7,9 @@ Fix factorial() so it stops calling itself.
 
 [talk]
 @walk EAST 1
-A function can call itself. That's called `recursion`, and it's a neat way to solve problems that contain smaller copies of themselves.
-5 factorial is 5 * 4 * 3 * 2 * 1. Or put another way: 5 * (4 factorial). The function does a bit of work, then asks itself for the rest.
-But there's a bug. Press RUN and watch what happens. It never stops calling itself until the stack of calls runs out of room. Stack overflow!
-Every recursive function needs a `base case`: a point where it stops and just returns an answer.
-For factorial, when n is 0 or 1, just return 1.
+A function can call itself! That's `recursion`. 5 factorial is 5 * (4 factorial).
+But this one never stops calling itself, until the memory runs out. Press RUN and see!
+It needs a `base case`: when `n` is 1 or less, just return 1.
 
 [lesson]
 RECURSION: a function calling itself.
@@ -32,6 +30,8 @@ Without a base case it never stops,
 and you get a STACK OVERFLOW.
 
 [hint]
+The function calls itself forever. It needs a place to stop.
+When n is 0 or 1 the answer is just 1. Check for that first.
 Add if (n <= 1) return 1; at the top of the function.
 
 [code]

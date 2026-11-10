@@ -7,11 +7,9 @@ Write findMax() to return the biggest number in an array.
 
 [talk]
 @walk EAST 1
-Power audit. I need the biggest number in each bank.
-Keep a variable called `max`. Visit every box, and whenever you find a bigger number, that becomes the new `max`.
-But where should `max` start? Lots of people start it at 0. Press RUN and watch what happens with an array full of negative numbers...
-0 is bigger than all of them, so it never changes. Wrong answer!
-The safe trick is to start `max` at the FIRST box, `arr[0]`. It's definitely in the array, so it's a fair starting point.
+I need the biggest number. Keep a box called `max`, and replace it whenever you find something bigger.
+Where should `max` start? Press RUN and watch the gate full of negative numbers...
+Start `max` at the first box, `arr[0]`, not at 0!
 
 [lesson]
 Finding the biggest:
@@ -32,6 +30,8 @@ max would stay 0.
 Exam 2: find_max.
 
 [hint]
+Run it and look at the gate full of negative numbers. Why is max = 0 wrong?
+Start max at the first box instead of 0.
 Start with int max = arr[0]; not int max = 0;
 
 [code]

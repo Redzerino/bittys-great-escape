@@ -8,11 +8,9 @@ Write compare_strings() without [ ].
 
 [talk]
 @walk EAST 1
-The final firewall doesn't just check if two strings match. It needs to know which comes first in the alphabet.
-Return 0 if they're the same. Return a negative number if `a` comes first, and a positive number if `b` comes first.
-Walk both pointers along while the letters match and neither string has ended.
-Then just return the difference between the two letters you stopped on: `*a - *b`. 'c' - 'r' is negative, so "cat" comes before "rat".
-If both ended together, that difference is '\0' - '\0' = 0. They match!
+The firewall wants to know which string comes first in the alphabet.
+Walk both pointers along while the letters match and the string hasn't ended.
+Then return `*a - *b`: negative if a comes first, positive if b does, 0 if they match.
 
 [lesson]
 compare_strings, like C's strcmp:
@@ -33,6 +31,8 @@ them tells you which comes first.
 Exam 2: compare_strings.
 
 [hint]
+Move both pointers along while the letters match.
+Stop when they're different or a string ends, then return *a - *b.
 while (*a != '\0' && *a == *b) { a++; b++; } return *a - *b;
 
 [code]

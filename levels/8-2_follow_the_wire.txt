@@ -8,11 +8,9 @@ Write sum_array() using only a pointer.
 
 [talk]
 @walk EAST 1
-In the Address Network, `[ ]` is banned. Just like Exam 2! You have to use pointers.
-Here's the secret: an array's name is really the address of its first box. So `arr` points at the first number.
-`*arr` is the first number. `arr + 1` is the address of the next box, so `*(arr + 1)` is the second number.
-Even neater, `arr++` slides the pointer along to the next box. Do that `size` times and you've visited them all.
-Watch the pointer marker walk along the boxes above my head.
+In the Address Network, `[ ]` is banned (just like Exam 2). Use pointers!
+`*arr` is the box the pointer is on. `arr++` slides it to the next box.
+Do that `size` times and add them up. Watch the `arr` cable slide along!
 
 [lesson]
 Walking an array with a pointer:
@@ -32,16 +30,22 @@ In Exam 2, [ ] is not allowed.
 Exam 2: sum_array.
 
 [hint]
+*arr is the box the pointer is on. arr++ moves it to the next box.
+Loop size times: add *arr to total, then do arr++.
 total += *arr; arr++; inside a loop that runs size times.
 
 [code]
 // STAGE 8.2: FOLLOW THE WIRE
 // Add up the array WITHOUT [ ].
 // sum_array({1, 2, 3, 4}, 4) -> 10
+// Fill in the gold gaps!
 
 int sum_array(int *arr, int size) {
     int total = 0;
-
+    for (int i = 0; i < size; i++) {
+        total += ___;
+        ___;
+    }
     return total;
 }
 

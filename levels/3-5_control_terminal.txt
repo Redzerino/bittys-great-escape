@@ -7,11 +7,9 @@ Write daysInMonth() using a switch.
 
 [talk]
 @walk EAST 1
-When you're checking one variable against lots of exact values, a long `else if` chain gets messy. C has `switch` for that.
-`switch (month)` jumps straight to the matching `case`. `case 2:` runs when month is 2.
-You can stack cases: `case 4: case 6: case 9: case 11:` all share the code underneath. Thirty days hath September!
-`default:` catches anything that didn't match, like month 13. Return 0 for those.
-If you `return` inside a case, you don't need `break`. Otherwise, always end a case with `break;` or it falls into the next one!
+Checking one number against lots of exact values? `switch (month)` jumps straight to the matching `case`.
+Stack cases that share an answer: `case 4: case 6: case 9: case 11: return 30;`
+`default:` catches anything else, like month 13. Return 0 for those.
 
 [lesson]
 switch picks a case by exact value:
@@ -33,6 +31,8 @@ into the NEXT case ("fall-through").
 That's a very common bug!
 
 [hint]
+Add a case for the months with 30 days, and one for the months with 31.
+Stack cases: case 4: case 6: case 9: case 11: return 30; and end with default: return 0;
 switch (month) { case 2: return 28; case 4: case 6: case 9: case 11: return 30; ... default: return 0; }
 
 [code]

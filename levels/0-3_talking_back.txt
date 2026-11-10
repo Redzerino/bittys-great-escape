@@ -1,5 +1,6 @@
 title: B.3  Talking Back
 type: escape
+buttons: move(EAST);
 
 [story]
 Bitty: "I can talk to you through the console. Let's say hello!"
@@ -7,11 +8,9 @@ Goal: print a message, then walk Bitty to the EXIT.
 
 [talk]
 @walk EAST 1
-So far your code has only moved me. But code can also show messages to the person using the program.
-`printf` means "print formatted". It writes text into the CONSOLE, the panel underneath me.
-Text goes inside double quotes: `printf("Hello!");` The quotes tell C "this is words, not instructions".
-The `\n` at the end of the text means "new line", like pressing Enter. Without it, the next message squashes onto the same line.
-Try changing the message to anything you like. Then add moves so I reach the exit. It's 4 steps east.
+Code can talk too! `printf("Hello!");` shows a message in the console under me.
+Words go inside "quotes". `\n` at the end starts a new line.
+Change the message to anything you like, then get me to the exit: 4 steps east.
 
 [lesson]
 printf shows text in the console:
@@ -34,6 +33,8 @@ The computer skips them completely:
     // this is a comment
 
 [hint]
+Keep the printf line. Now Bitty still needs to walk to the exit.
+The exit is 4 steps EAST. Add one move(EAST); for each step.
 Keep the printf line, then add move(EAST); until there are four of them.
 
 [map]

@@ -7,11 +7,9 @@ Goal: use a loop instead of writing every step.
 
 [talk]
 @walk EAST 1
-The exit is 9 steps away. You could write `move(EAST);` nine times... but what if it was 900?
-Computers are brilliant at doing the same thing over and over without getting bored. That's called a `loop`.
-`for (int i = 0; i < 9; i++)` says: make a counter called `i`, start it at 0, keep going while it's less than 9, and add 1 each time.
-Whatever is inside the `{ }` after it runs once for every count. 0, 1, 2... up to 8. That's 9 times!
-The loop at the moment only counts to 3. Change the 3 to 9 and watch `i` count up in the Inspector on the right.
+The exit is 9 steps away. Typing 9 moves is boring. A `loop` repeats code for us!
+`for (int i = 0; i < 9; i++)` runs the code in the `{ }` 9 times, counting with `i`.
+The loop only counts to 3 at the moment. Change it to 9!
 
 [lesson]
 A LOOP repeats code for you.
@@ -33,6 +31,8 @@ The code inside { } is the BODY of the
 loop. It can be as long as you like.
 
 [hint]
+The loop runs while i < 3. How many steps does Bitty need?
+Change the 3 so the loop runs 9 times.
 Change i < 3 to i < 9.
 
 [map]

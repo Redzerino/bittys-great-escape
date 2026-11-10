@@ -1321,6 +1321,7 @@ static void CompileStatement(Compiler *c, const Node *n)
         {
             EmitLine(c, n->line);
             CompileCondition(c, n->a);
+            Emit(c, OP_NOTE_CONDITION);
             int toElse = EmitJump(c, OP_JUMP_IF_FALSE);
             CompileStatement(c, n->b);
             if (n->c)
@@ -1342,6 +1343,7 @@ static void CompileStatement(Compiler *c, const Node *n)
             int start = Here(c);
             EmitLine(c, n->line);
             CompileCondition(c, n->a);
+            Emit(c, OP_NOTE_CONDITION);
             int exit = EmitJump(c, OP_JUMP_IF_FALSE);
 
             PushBreakable(c, true);
@@ -1361,6 +1363,7 @@ static void CompileStatement(Compiler *c, const Node *n)
             PatchContinues(c, Here(c));
             EmitLine(c, n->b->line);
             CompileCondition(c, n->b);
+            Emit(c, OP_NOTE_CONDITION);
             EmitJumpTo(c, OP_JUMP_IF_TRUE, start);
             PopBreakable(c, Here(c));
             break;
@@ -1377,6 +1380,7 @@ static void CompileStatement(Compiler *c, const Node *n)
             if (n->b)
             {
                 CompileCondition(c, n->b);
+                Emit(c, OP_NOTE_CONDITION);
                 exit = EmitJump(c, OP_JUMP_IF_FALSE);
             }
 
@@ -1385,6 +1389,7 @@ static void CompileStatement(Compiler *c, const Node *n)
             PatchContinues(c, Here(c));
             if (n->c)
             {
+                EmitLine(c, n->line);       // the i++ is its own step (on the for line)
                 CompileValueRaw(c, n->c);
                 Emit(c, OP_POP);
             }

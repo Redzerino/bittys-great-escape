@@ -7,11 +7,9 @@ Write myStrlen() to count the characters in a string.
 
 [talk]
 @walk EAST 1
-C has a built-in `strlen` that tells you how long a string is. But how does it work? Let's build our own.
-Start at position 0 and keep moving along until you find the `'\0'` at the end. The position you stop at IS the length.
-The `'\0'` itself doesn't count. "Hi" has 2 letters, even though it uses 3 boxes in memory.
-An empty string "" is just a `'\0'` on its own, so its length is 0.
-Spaces and punctuation count as characters too!
+Let's build our own string length counter!
+Start at 0 and move along until you find the `'\0'`. Where you stop IS the length.
+The `'\0'` itself doesn't count, and an empty string is just a `'\0'`.
 
 [lesson]
 The length is how many chars come
@@ -32,6 +30,8 @@ Next: Measure the String does the same
 with pointers instead of [ ].
 
 [hint]
+Start at 0 and move along until you find the '\0'.
+Use a while loop: while (s[i] != '\0') add 1 to i.
 int i = 0; while (s[i] != '\0') i++; return i;
 
 [code]
@@ -39,9 +39,14 @@ int i = 0; while (s[i] != '\0') i++; return i;
 // How many chars are in s?
 // (not counting the hidden '\0')
 // myStrlen("Hello") -> 5
+// Fill in the gold gaps!
 
 int myStrlen(char s[]) {
-    return 0;
+    int i = 0;
+    while (___) {
+        i++;
+    }
+    return i;
 }
 
 [solution]

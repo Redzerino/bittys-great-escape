@@ -59,6 +59,20 @@ const char *Editor_GetText(const Editor *e);
 void        Editor_Update(Editor *e);          // keyboard + mouse
 void        Editor_Draw(const Editor *e);
 
+// Fill-in-the-blank: gaps in the starter code are written ___ . They're drawn
+// in gold; clicking one selects it, so typing replaces it; Tab jumps to the next.
+bool        Editor_SelectNextBlank(Editor *e);     // false if there are no gaps left
+bool        Editor_InGap(const Editor *e);              // is a gap selected right now?
+
+// Type some text at the cursor, replacing the selection (the code buttons). Can be undone.
+void        Editor_InsertText(Editor *e, const char *text);
+
+// Which line (1-based) is under a point on screen, or 0
+int         Editor_LineAt(const Editor *e, Vector2 point);
+
+// Where a character is drawn on screen (line and col are 1-based). False if it's scrolled out of view.
+bool        Editor_CharPos(const Editor *e, int line, int col, Vector2 *pos);
+
 // Returns true (once) if the text was changed since the last call
 bool        Editor_TakeChanged(Editor *e);
 

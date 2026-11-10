@@ -1,5 +1,6 @@
 title: 4.1  Counted Loops
 type: repair
+buttons: 0 | 1 | exp | base
 
 [story]
 Bitty: "The core needs powers. 2 to the power of 3 is 2 times 2 times 2."
@@ -7,11 +8,9 @@ Write power() using a for loop.
 
 [talk]
 @walk EAST 1
-The Processing Core does the heavy lifting, and that means loops.
-`power(2, 3)` means 2 times itself 3 times: 2 * 2 * 2 = 8.
-Start a `result` at 1, then use a `for` loop to multiply it by `base`, `exp` times.
-Why start at 1 and not 0? Because 0 times anything is 0! And anything to the power of 0 is 1, which this handles for free.
-Watch `i` and `result` change together in the Inspector.
+`power(2, 3)` means 2 * 2 * 2 = 8: multiply by `base`, `exp` times.
+Start `result` at 1, not 0. 0 times anything is 0!
+Fill the gaps, and watch `i` and `result` change together.
 
 [lesson]
 A for loop runs a set number of times:
@@ -30,16 +29,21 @@ If exp is 0, the loop never runs and
 result stays 1. Correct!
 
 [hint]
+Start result at 1, then multiply it by base, exp times.
+Use for (int i = 0; i < exp; i++) and inside it result = result * base;
 int result = 1; for (int i = 0; i < exp; i++) result = result * base; return result;
 
 [code]
 // STAGE 4.1: COUNTED LOOPS
 // power(2, 3) -> 8   (2 * 2 * 2)
 // power(5, 0) -> 1
+// Fill in the gold gaps!
 
 int power(int base, int exp) {
-    int result = 0;
-
+    int result = ___;
+    for (int i = 0; i < ___; i++) {
+        result = result * ___;
+    }
     return result;
 }
 

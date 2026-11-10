@@ -7,9 +7,9 @@ Write find(): return the INDEX where toFind is, or -1 if it isn't there.
 
 [talk]
 @walk EAST 1
-Back to the shelves. This time I'm looking for one particular number, and I need to know which box it's in.
-I need to find a number in there. Check each box in a loop, and `return` its position when you find it.
-If you reach the end without finding it, return -1. And never read past the last box. That memory isn't ours!
+Find one number in the array, and give back which box it's in.
+Check each box. When you find it, `return i`. If it's not there at all, return -1.
+Never read past the last box. That memory isn't ours!
 
 [lesson]
 An array is boxes side by side, all the
@@ -28,6 +28,8 @@ so you pass the size in as well:
 Exam 1, Q8.
 
 [hint]
+Check every box. When you find toFind, give back WHERE it is: i.
+Inside the loop: if (arr[i] == toFind) return i; and after the loop, return -1.
 for (int i = 0; i < size; i++) { if (arr[i] == toFind) return i; } and after the loop, return -1.
 
 [code]

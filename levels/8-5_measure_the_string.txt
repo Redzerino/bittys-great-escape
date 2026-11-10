@@ -8,10 +8,9 @@ Write strlen_ptr() with pointer arithmetic only.
 
 [talk]
 @walk EAST 1
-A string is just an array of letters, and it always ends with a hidden `'\0'`. That's how C knows where it stops.
-I need to know how long this message is, without using `[ ]`.
-Point at the first letter. `p++` slides the pointer along to the next one.
-Keep sliding while `*p` isn't `'\0'`, and count your steps. Watch the marker walk along the letters!
+How long is this message? No `[ ]` allowed.
+Point `p` at the first letter, and slide it along with `p++` while `*p` isn't `'\0'`.
+At the end, `p - str` is how many boxes apart they are. That's the length!
 
 [lesson]
 A string is a char array ending in '\0'.
@@ -29,6 +28,8 @@ elements apart they are:   p - str
 Exam 2, Q5.
 
 [hint]
+Slide a pointer along until it reaches the '\0'.
+char *p = str; while (*p != '\0') p++; then give back how far it moved: p - str.
 char *p = str; while (*p != '\0') p++; return p - str;
 
 [code]

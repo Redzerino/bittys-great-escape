@@ -1,0 +1,67 @@
+title: 5.1  Helper Functions
+type: repair
+
+[story]
+Bitty: "Big jobs are easier when you split them into little ones."
+Write square(), then sumOfSquares() can use it.
+
+[talk]
+@walk EAST 1
+Welcome to the System Library! A function can CALL another function, just like your code calls `move()`.
+`square(n)` gives back n times n. `sumOfSquares` already uses it twice.
+Write `square` once, use it as often as you like. Watch the boxes wait while the call runs!
+
+[lesson]
+Functions can use other functions.
+
+    int square(int n) {
+        return n * n;
+    }
+
+    int sumOfSquares(int a, int b) {
+        return square(a) + square(b);
+    }
+
+sumOfSquares(2, 3)
+  square(2) gives back 4
+  square(3) gives back 9
+  so the answer is 4 + 9 = 13
+
+Write a function ABOVE the code
+that uses it.
+
+[hint]
+Start with square. What do you multiply n by to square it?
+square should give back n * n. sumOfSquares already calls it, so once square works, so does sumOfSquares.
+In square: return n * n;
+
+[code]
+// STAGE 5.1: HELPER FUNCTIONS
+// square(n) should give back n * n.
+// sumOfSquares(a, b) uses it twice.
+// sumOfSquares(2, 3) -> 4 + 9 = 13
+// Fill in the gold gaps!
+
+int square(int n) {
+    return ___;
+}
+
+int sumOfSquares(int a, int b) {
+    return square(a) + square(b);
+}
+
+[solution]
+int square(int n) {
+    return n * n;
+}
+
+int sumOfSquares(int a, int b) {
+    return square(a) + square(b);
+}
+
+[tests]
+square(3) == 9
+square(0) == 0
+sumOfSquares(2, 3) == 13
+sumOfSquares(1, 1) == 2
+sumOfSquares(4, -2) == 20

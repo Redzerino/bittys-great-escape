@@ -1,17 +1,15 @@
 title: B.1  What Is Code?
 type: escape
+buttons: move(EAST);
 
 [story]
 Bitty: "Never written code before? Perfect. Neither had I, until about five minutes ago."
 Goal: add instructions until Bitty reaches the EXIT.
 
 [talk]
-Hi! I'm Bitty. Before we escape, let's start right at the very beginning. No experience needed. Promise.
-A computer is super fast, but it can't think for itself. It only does exactly what it's told. Nothing more, nothing less.
-`Code` is just a list of instructions for a computer, written in a language it understands. The language here is called `C`.
-Each instruction goes on its own line. `move(EAST);` means "Bitty, take one step east". East is to the right.
-The panel on the left is where you type. When you're ready, press RUN (or F5) and I'll follow your instructions from top to bottom.
-The exit is 3 steps away, but there's only 1 step written so far. Copy that line until there are 3 of them. Then press RUN!
+Hi! I'm Bitty. I can't think for myself: I only do exactly what your `code` tells me.
+`move(EAST);` means "take one step east" (to the right). The exit is 3 steps away.
+Tap the `move(EAST);` button until there are 3 of them, then press RUN!
 
 [lesson]
 CODE is a list of instructions.
@@ -36,6 +34,8 @@ Every instruction ends with a ;
 it tells C the instruction is finished.
 
 [hint]
+The exit is 3 steps to the right. Each move(EAST); is one step.
+Copy the move(EAST); line so there are 3 of them, one under the other.
 You need three lines that each say move(EAST);
 
 [map]

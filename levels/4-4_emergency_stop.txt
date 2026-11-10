@@ -7,11 +7,9 @@ Write smallestDivisor() and use break to stop the loop early.
 
 [talk]
 @walk EAST 1
-The core needs the smallest number, bigger than 1, that divides a number exactly. For 15 that's 3. For 49 it's 7.
-Try every number from 2 upwards. When `n % d == 0`, d divides n exactly. That's our answer!
-Once we've found it there's no point carrying on. `break;` jumps straight out of the loop, like an emergency stop.
-Any code after the loop then runs as normal.
-If nothing smaller works, the number itself is the answer. That means it's prime!
+Find the smallest number bigger than 1 that divides `n` exactly. For 15 that's 3.
+Try `d` = 2, 3, 4... When `n % d == 0`, you've found it.
+`break;` jumps straight out of the loop, like an emergency stop.
 
 [lesson]
 break jumps out of a loop straight away:
@@ -32,6 +30,8 @@ continue is the opposite: it skips to
 the next time round the loop.
 
 [hint]
+Try d = 2, then 3, then 4... When n % d == 0, you've found it.
+Use break; to jump out of the loop as soon as n % d == 0. Then return d.
 Loop d from 2; if (n % d == 0) break; then return d after the loop.
 
 [code]
@@ -40,9 +40,17 @@ Loop d from 2; if (n % d == 0) break; then return d after the loop.
 // that divides n exactly.
 // smallestDivisor(15) -> 3
 // smallestDivisor(97) -> 97
+// Fill in the gold gaps!
 
 int smallestDivisor(int n) {
-    return n;
+    int d = 2;
+    while (d < n) {
+        if (___) {
+            break;
+        }
+        d++;
+    }
+    return d;
 }
 
 [solution]

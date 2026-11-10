@@ -1,5 +1,6 @@
 title: B.6  Making Choices
 type: escape
+buttons: NORTH | SOUTH | == | read()
 
 [story]
 Bitty: "Two ways to go. The number on the floor tells me which one is safe."
@@ -7,11 +8,9 @@ Goal: use if / else to choose the safe path.
 
 [talk]
 @walk EAST 1
-Up to now your code always did the same thing every time. But real programs make choices.
-Step onto that data tile and I can `read()` the number on it. If the number is 5, the safe way is NORTH. Otherwise it's SOUTH.
-In C that's `if (read() == 5)`. The bit in brackets is a question. It's either true or false.
-If it's true, C runs the code in the first `{ }`. If it's false, it runs the code after `else` instead. Never both.
-Notice the double `==`. One `=` puts a value in a box. Two `==` ASKS whether two things are equal. Even experts mix them up!
+Real programs make choices. On the data tile, `read()` tells me its number.
+`if (read() == 5) { ... } else { ... }`: if the number is 5, do the first part. Otherwise, do the part after `else`.
+Two `==` ASKS "are these the same?". One `=` puts a value in a box!
 
 [lesson]
 if lets your code make a choice.
@@ -35,6 +34,8 @@ Watch out:
     x == 5     ASK if x is 5
 
 [hint]
+Step onto the data tile first. read() tells you its number.
+Use if (read() == 5) to go NORTH, and else to go SOUTH.
 After move(EAST); write: if (read() == 5) { move(NORTH); } else { move(SOUTH); }
 
 [map]

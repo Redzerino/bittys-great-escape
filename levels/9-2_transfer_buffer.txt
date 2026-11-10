@@ -8,11 +8,9 @@ Write copy_string() without [ ].
 
 [talk]
 @walk EAST 1
-Time to send the escape plan through the transfer buffer. Copy one string into another, pointers only.
-`*dest = *src;` copies one letter. Then move both pointers along with `dest++` and `src++`.
-Keep going until `*src` is the `'\0'`.
-And remember the lesson from Message Repair: after the loop, put a `'\0'` on the end of `dest`. Otherwise junk.
-Same job as before, just with pointers instead of `[ ]`.
+Copy one string into another, pointers only.
+`*dest = *src;` copies one letter. Then move both along with `dest++` and `src++`.
+Stop at `src`'s `'\0'`, and remember to put a `'\0'` on the end of `dest`!
 
 [lesson]
 copy_string with pointers:
@@ -30,6 +28,8 @@ The '\0' at the end is NOT optional.
 Exam 2: copy_string.
 
 [hint]
+Copy one letter with *dest = *src; then move both pointers along.
+Loop while *src != '\0'. After the loop, put a '\0' on the end of dest.
 while (*src != '\0') { *dest = *src; dest++; src++; } then *dest = '\0';
 
 [code]

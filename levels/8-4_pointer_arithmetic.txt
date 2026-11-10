@@ -8,11 +8,9 @@ Write reverse_array() using pointers only.
 
 [talk]
 @walk EAST 1
-Remember Mirror Mirror? Same job: reverse an array. But this time, no `[ ]`.
-Use two pointers. `left` starts at the first box. `right` starts at the LAST box: `arr + size - 1`.
-Swap the values they point at, then move `left` forward and `right` back.
-Keep going while `left < right`. Yes, you can compare pointers! When they meet in the middle, you're done.
-This two-pointer trick turns up everywhere. Learn it once and use it forever.
+Reverse the array again, but with no `[ ]`. Use two pointers: `left` at the start, `right` at the end.
+Swap what they point at, then move `left` forward and `right` back.
+Keep going while `left < right`. When they meet in the middle, you're done!
 
 [lesson]
 Two pointers, one from each end:
@@ -34,6 +32,8 @@ LAST box.
 Exam 2: reverse_array.
 
 [hint]
+left and right are already set up. Swap the values they point at.
+While left < right: swap *left and *right, then left++ and right--.
 int *left = arr; int *right = arr + size - 1; swap *left and *right while left < right.
 
 [code]

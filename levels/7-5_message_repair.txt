@@ -7,10 +7,8 @@ Fix copyString() so the copy ends in the right place.
 
 [talk]
 @walk EAST 1
-This function copies a message into a buffer, letter by letter. Press RUN and look at the result.
-The letters are there... but so is a load of junk after them! The `#` signs were already in the buffer.
-The loop stops at the `'\0'`, but it never COPIES the `'\0'`. So the copy doesn't know where to stop.
-Without its `'\0'`, a string just runs on into whatever happens to be next in memory. That's one of the most common bugs in C.
+This copies a message letter by letter... but look at the junk on the end after you RUN!
+The loop stops at the `'\0'`, but never COPIES it. So the copy doesn't know where to stop.
 Add one line after the loop to put a `'\0'` on the end of `dest`.
 
 [lesson]
@@ -32,6 +30,8 @@ whatever is in memory after it:
 Exam 2: copy_string.
 
 [hint]
+The copy never gets its end marker.
+After the loop, put a '\0' into dest at position i.
 After the loop, add dest[i] = '\0';
 
 [code]

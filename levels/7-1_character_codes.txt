@@ -7,11 +7,9 @@ Write toUpper() to turn a lowercase letter into a capital.
 
 [talk]
 @walk EAST 1
-Secret time: a `char` is really just a number. Every letter has a code. 'A' is 65, 'B' is 66... and 'a' is 97.
-That means you can do maths with letters! 'a' + 1 is 'b'.
-Every small letter is exactly 32 more than its capital. So to make a capital, take away 32. Or more readably: `c - 'a' + 'A'`.
-But ONLY do that for small letters. Check first: `if (c >= 'a' && c <= 'z')`. Anything else, like 'Q' or '7', comes back unchanged.
-`&&` means "and": both sides must be true.
+Secret: a `char` is really a number. 'A' is 65, 'a' is 97. So you can do maths with letters!
+A small letter is 32 more than its capital. `c - 'a' + 'A'` turns 'b' into 'B'.
+Only change small letters: check `c >= 'a' && c <= 'z'` first.
 
 [lesson]
 A char is stored as a number (ASCII):
@@ -31,6 +29,8 @@ small letter - 32 = capital letter
 || means OR: at least one is true.
 
 [hint]
+Only small letters change. Check c is between 'a' and 'z'.
+To turn a small letter into a capital, take away 32 (or do c - 'a' + 'A').
 if (c >= 'a' && c <= 'z') return c - 32; otherwise return c;
 
 [code]
