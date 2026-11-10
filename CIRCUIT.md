@@ -36,6 +36,4 @@ file to an occupied slot; Circuit_Init logs a warning on collisions.
 Implementation: src/circuit.h, src/circuit.c, and the integration in src/main.c.
 
 Validation: all C sources pass GCC -fsyntax-only -Wall -Wextra; all 14 files
-listed in levels/levels.txt exist and have distinct map positions. Full linking
-is still blocked by Windows Application Control rejecting collect2.exe.
-Visual verification remains necessary on a working build setup.
+listed in levels/levels.txt exist and have distinct map positions. The user subsequently built and ran the map locally and confirmed that it works and looks correct.
