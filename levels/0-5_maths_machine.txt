@@ -8,11 +8,9 @@ Goal: work out the door code with maths in your code.
 
 [talk]
 @walk EAST 1
-Another door. The sign says: "The code is 6 times 8". Hmm. Let's make the computer do the maths for us.
-In C you can use `+` to add, `-` to subtract, `*` to multiply and `/` to divide.
-So `int code = 6 * 8;` works out 6 times 8 and puts the answer in the box. You never have to do the sum yourself.
-You can also change a variable after you make it: `code = code + 1;` means "take what's in code, add 1, and put it back".
-The code at the moment does 6 PLUS 8. Fix the sign so it multiplies instead.
+The sign says the code is 6 times 8. Let's make the computer do the maths!
+In C: `+` add, `-` take away, `*` times, `/` divide. So `6 * 8` works out 48 for us.
+The code adds instead of multiplying. Fix the sign!
 
 [lesson]
 C can do maths for you:
@@ -36,6 +34,8 @@ Watch out: dividing whole numbers drops
 the leftover. 7 / 2 is 3, not 3.5!
 
 [hint]
+The sign says 6 TIMES 8, but the code adds them.
+In C, times is the * sign.
 The door wants 6 times 8. In C, times is written *, so: int code = 6 * 8;
 
 [map]

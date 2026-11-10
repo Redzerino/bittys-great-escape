@@ -7,11 +7,9 @@ Write countAbove() to count the numbers bigger than a limit.
 
 [talk]
 @walk EAST 1
-Walking through every box in an array is called `traversing` it. You'll do this all the time.
-This time we're not adding things up, we're COUNTING how many boxes pass a test.
-Start a `count` at 0. Visit every box, and if `arr[i] > limit`, add 1 to the count.
-Notice it's "bigger than", not "bigger or equal". A cell exactly at the limit doesn't count.
-Loops and ifs together: you've got everything you need.
+Walking through every box is called `traversing` the array.
+This time, COUNT how many boxes are bigger than `limit`.
+Loops and ifs together: you've got everything you need!
 
 [lesson]
 Counting with a loop and an if:
@@ -29,6 +27,8 @@ test each one, and a counter for the
 ones that pass.
 
 [hint]
+Visit every box, but only count the ones bigger than limit.
+Inside the loop: if (arr[i] > limit) add 1 to count.
 Inside the loop: if (arr[i] > limit) count++;
 
 [code]
@@ -36,10 +36,15 @@ Inside the loop: if (arr[i] > limit) count++;
 // How many numbers are bigger
 // than limit?
 // countAbove({5, 12, 8, 20}, 4, 10) -> 2
+// Fill in the gold gaps!
 
 int countAbove(int arr[], int size, int limit) {
     int count = 0;
-
+    for (int i = 0; i < size; i++) {
+        if (___) {
+            count++;
+        }
+    }
     return count;
 }
 

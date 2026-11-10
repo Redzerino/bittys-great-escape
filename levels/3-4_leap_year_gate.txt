@@ -7,10 +7,9 @@ Write isLeapYear(). Every gate checks a different year.
 
 [talk]
 @walk EAST 1
-The clock chip is broken. It can't tell which years are leap years.
-The rule: a leap year divides by 4... but not by 100... unless it also divides by 400. Humans, honestly.
-`year % 4 == 0` asks "does 4 go into it with nothing left over?"
-Join questions with `&&` (and) and `||` (or). `!=` means "is not". Each gate will test a different year.
+The clock is broken. A leap year divides by 4... but not by 100... unless it also divides by 400.
+`year % 4 == 0` asks "does 4 go in exactly?" `!=` means "is not".
+Join questions with `&&` (and) and `||` (or).
 
 [lesson]
 A leap year is divisible by 4,
@@ -29,15 +28,18 @@ Watch out: == compares, = assigns.
 Exam 1, Q1.
 
 [hint]
+Split the rule into questions: does 4 go into it? Does 100? Does 400?
+year % 4 == 0 means 4 goes into it. Join the questions with && (and) and || (or).
 Try: return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
 
 [code]
 // STAGE 3.4: LEAP YEAR GATE
 // Divisible by 4, but not by 100,
 // unless also divisible by 400.
+// Fill in the gold gaps!
 
 bool isLeapYear(int year) {
-    return true;
+    return (year % 4 == 0 && ___) || ___;
 }
 
 [solution]

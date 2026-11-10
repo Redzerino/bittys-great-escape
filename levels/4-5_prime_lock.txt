@@ -8,10 +8,9 @@ Write isAPrimeNumber(). A prime is only divisible by itself and 1.
 
 [talk]
 @walk EAST 1
-Prime locks. They only open for prime numbers.
-A prime can only be divided by 1 and itself. 7 is prime. 8 isn't, because 2 goes into it.
-So try dividing by every number from 2 upwards. If any of them fits exactly, it's not prime.
-Tip: you can stop once `i * i` is bigger than the number. One of these gates has a HUGE number, so it matters!
+Prime locks only open for prime numbers: numbers only 1 and themselves divide into.
+Try dividing by 2, 3, 4... If any of them goes in exactly, it's not prime.
+Tip: stop once `i * i` is bigger than the number. One gate has a HUGE number!
 
 [lesson]
 Loop through possible divisors and check:
@@ -31,6 +30,8 @@ Use  i <= n / i  instead.
 Exam 1, Q3.
 
 [hint]
+Numbers below 2 aren't prime. For the rest, try dividing by 2, 3, 4...
+If any i makes n % i == 0, return false straight away. If none do, return true.
 if (n < 2) return false; then for (int i = 2; i <= n / i; i++) check n % i == 0. Using i * i <= n overflows on the last gate.
 
 [code]

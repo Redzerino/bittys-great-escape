@@ -7,10 +7,9 @@ Write reverse(): reverse the array IN PLACE (no second array).
 
 [talk]
 @walk EAST 1
-This bridge was built back to front. Flip the array and I can cross.
-The trick: swap the first box with the last, the second with the second-last, and stop in the middle.
-To swap two boxes you need a spare: put one in `temp`, copy the other across, then put `temp` back.
-Watch the boxes above my head. They flash blue when they're read and orange when they're written.
+This bridge was built back to front. Flip the array!
+Swap the first box with the last, the second with the second-last... and stop in the middle.
+A swap needs a spare box, `temp`. Watch me carry each value across!
 
 [lesson]
 Swap the first and last, then the second
@@ -31,6 +30,8 @@ inside the function stick.
 Exam 1, Q15.
 
 [hint]
+Swap the first box with the last, the second with the second-last, and so on.
+A swap needs a spare: int temp = arr[i]; then copy across, then put temp back.
 for (int i = 0; i < size / 2; i++) swap arr[i] with arr[size - 1 - i].
 
 [code]

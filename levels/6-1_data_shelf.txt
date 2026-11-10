@@ -7,11 +7,9 @@ Write sumArray() to add up every number in an array.
 
 [talk]
 @walk EAST 1
-Welcome to the RAM Banks. Here memory is stored on shelves called `arrays`.
-An array is a row of boxes with ONE name. You pick a box by its position: `arr[0]` is the first, `arr[1]` the second.
-Counting starts at 0, so the last box in an array of 5 is `arr[4]`. There is no `arr[5]`. Reading it is a classic bug!
-A `for` loop is the perfect way to visit every box: `for (int i = 0; i < size; i++)`.
-Watch the boxes above my head flash as each one is read.
+Welcome to the RAM Banks! An `array` is a row of boxes with ONE name. `arr[0]` is the first box, `arr[1]` the second.
+An array doesn't know how long it is, so the gate gives you `size` too. The last box is `arr[size - 1]`.
+Visit every box with a `for` loop and add them up. In the memory room, I'll walk along the crates!
 
 [lesson]
 An ARRAY is a row of boxes, one name:
@@ -33,16 +31,21 @@ Visit every box with a loop:
 Exam 2: sum_array.
 
 [hint]
+Visit every box with for (int i = 0; i < size; i++).
+Inside the loop, add the box you're on to total. The box is arr[i].
 for (int i = 0; i < size; i++) total += arr[i];
 
 [code]
 // STAGE 6.1: DATA SHELF
 // Add up every number in arr.
 // sumArray({1, 2, 3, 4}, 4) -> 10
+// Fill in the gold gaps!
 
 int sumArray(int arr[], int size) {
     int total = 0;
-
+    for (int i = 0; i < ___; i++) {
+        total += ___;
+    }
     return total;
 }
 

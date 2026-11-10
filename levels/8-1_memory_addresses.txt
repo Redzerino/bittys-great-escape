@@ -7,11 +7,9 @@ Fix doubleValue() so it changes the real value through a pointer.
 
 [talk]
 @walk EAST 1
-The Address Network. Every box in memory has an `address`, like a house number. `&x` means "the address of x".
-A `pointer` is a variable that holds an address. `int *p` means "p holds the address of an int".
-To get to the value at that address, put a star in front: `*p`. That's called dereferencing. Follow the wire to the box.
-The starter code copies the value into `x`, doubles `x`... and then `x` disappears when the function ends. The real value never changes.
-Change the value AT the address instead: `*p = *p * 2;`
+Every box has an `address`, like a house number. A `pointer` holds an address: `int *p`.
+`*p` means "the box p points at". Follow the cable!
+This code doubles a copy, which vanishes. Double `*p` itself: `*p = *p * 2;`
 
 [lesson]
 POINTERS hold addresses.
@@ -31,6 +29,8 @@ change the caller's variable:
     doubleValue(&score);
 
 [hint]
+x is just a copy. Change the value that p points at instead.
+*p means 'the value at that address'. Double *p itself.
 *p = *p * 2;
 
 [code]

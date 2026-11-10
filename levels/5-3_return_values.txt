@@ -7,11 +7,9 @@ Write toFahrenheit() and return the answer.
 
 [talk]
 @walk EAST 1
-A function can take values in, but it can only hand ONE value back. That's what `return` is for.
-`return` does two things: it gives back the answer, and it ends the function straight away.
-To turn Celsius into Fahrenheit: multiply by 9, divide by 5, then add 32.
-Do the multiply BEFORE the divide. With whole numbers, `c / 5 * 9` loses the leftover too early and gets the wrong answer.
-Nice check: -40 is the same in both. Spooky.
+This function works out the answer... and then never gives it back!
+`return` hands the answer back AND ends the function.
+Do the multiply before the divide, or whole numbers lose the remainder too early.
 
 [lesson]
 return hands a value back to whoever
@@ -31,6 +29,8 @@ order of * and / changes the answer:
     37 / 5 * 9   is 63
 
 [hint]
+The maths is already there, but the function never hands the answer back.
+Use return to give the answer back instead of keeping it in f.
 return c * 9 / 5 + 32;
 
 [code]

@@ -137,6 +137,7 @@ int main(void)
 
         ok = RunAllTests(lv, lv->starterCode, fail, sizeof fail, &compiled);
         snprintf(name, sizeof name, "%s: starter code compiles but doesn't pass yet", lv->title);
+        if (strstr(lv->starterCode, "___")) { compiled = true; ok = 0; }   // fill-in-the-blank: the gaps don't compile on purpose
         Report(compiled && ok < lv->testCount, name, compiled ? "the starter code already passes every test" : fail);
     }
 

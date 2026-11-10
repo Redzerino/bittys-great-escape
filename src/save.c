@@ -3,9 +3,9 @@
 // File format (plain text, so it's easy to look at):
 //
 //   BITTY SAVE 1
-//   current 2-1_digit_peeler.txt
+//   current 2-5_digit_peeler.txt
 //   done 1-1_wake_up.txt
-//   code 2-1_digit_peeler.txt 57        <- the next 57 bytes are the code
+//   code 2-5_digit_peeler.txt 57        <- the next 57 bytes are the code
 //   int Reversed(int number) { ... }
 
 #include "save.h"
@@ -27,6 +27,29 @@ static SaveEntry entries[SAVE_MAX_LEVELS];
 static int       entryCount = 0;
 static char      current[SAVE_NAME_MAX] = "";
 static char      savePath[512] = "bitty_save.txt";
+
+// Level files that were renamed when the levels were put in teaching order.
+// Old saves still use the old names, so they're translated when loaded.
+static const char *RENAMED[][2] = {
+    { "2-0_first_function.txt",     "2-1_first_function.txt" },
+    { "2-1_data_types.txt",         "2-2_data_types.txt" },
+    { "2-4_register_updates.txt",   "2-3_register_updates.txt" },
+    { "2-5_access_code.txt",        "2-4_access_code.txt" },
+    { "2-1_digit_peeler.txt",       "2-5_digit_peeler.txt" },
+    { "2-2_binary_decoder.txt",     "2-6_binary_decoder.txt" },
+    { "3-1_leap_year_gate.txt",     "3-4_leap_year_gate.txt" },
+    { "4-1_prime_lock.txt",         "4-5_prime_lock.txt" },
+    { "5-1_search_the_bay.txt",     "6-4_search_the_bay.txt" },
+    { "5-2_mirror_mirror.txt",      "6-5_mirror_mirror.txt" },
+    { "8-1_swap_wires.txt",         "8-3_swap_wires.txt" },
+    { "8-2_measure_the_string.txt", "8-5_measure_the_string.txt" },
+};
+
+static void NewName(char *name, size_t size)
+{
+    for (size_t i = 0; i < sizeof RENAMED / sizeof RENAMED[0]; i++)
+        if (strcmp(name, RENAMED[i][0]) == 0) { snprintf(name, size, "%s", RENAMED[i][1]); return; }
+}
 
 static SaveEntry *Find(const char *file, bool create)
 {
@@ -83,16 +106,19 @@ void Save_Load(const char *path)
         long bytes;
         if (sscanf(line, "current %63s", name) == 1)
         {
+            NewName(name, sizeof name);
             snprintf(current, sizeof current, "%s", name);
         }
         else if (sscanf(line, "done %63s", name) == 1)
         {
+            NewName(name, sizeof name);
             SaveEntry *e = Find(name, true);
             if (e) e->done = true;
         }
         else if (sscanf(line, "code %63s %ld", name, &bytes) == 2)
         {
             if (bytes < 0 || bytes > end - p) break;   // damaged file: keep what we have
+            NewName(name, sizeof name);
             SaveEntry *e = Find(name, true);
             if (e)
             {

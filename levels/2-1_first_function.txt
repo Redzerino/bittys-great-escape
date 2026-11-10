@@ -1,17 +1,16 @@
-title: 5.1  First Function
+title: 2.1  First Function
 type: repair
+buttons: * | + | - | /
 
 [story]
-Bitty: "Gates. They don't open for walking. They open for answers."
+Bitty: "Gates! They don't open for walking. They open for answers."
 Write doubleIt() so it gives back twice the number it is given.
 
 [talk]
 @walk EAST 1
-Welcome to the System Library. Remember the gates? They don't open for walking. They open for answers.
-Each gate asks a question, and your `function` has to give back the right answer.
-A function is a little machine: something goes in, something comes out. `int doubleIt(int n)` takes in a number called `n`.
-`return` is how it hands the answer back. `return n + 1;` would give back one more than it got.
-This one should give back double the number. Press RUN and watch each gate test it!
+Welcome to the Register Bank! These glowing gates don't open for walking. They open for ANSWERS. Now you write a `function`, and each gate tests it.
+A function is a little machine: a number goes in (`n`), and `return` hands the answer back out.
+This gate wants double the number. Fill the gold gap so it gives back `n * 2`. When you press RUN, I'll be beamed inside to act it out!
 
 [lesson]
 A function is a named piece of code that
@@ -33,16 +32,19 @@ Each gate calls your function with a
 different number and checks the answer.
 
 [hint]
-The answer is n multiplied by 2. In C, multiply is the * sign: return n * 2;
+The gate gives you a number called n. What do you do to a number to double it?
+Double means times 2. In C, times is the * sign.
+return n * 2;
 
 [code]
-// STAGE 5.1: FIRST FUNCTION
+// STAGE 2.1: FIRST FUNCTION
 // Make doubleIt() give back twice
 // the number it is given.
 // doubleIt(5) should give 10.
+// Fill in the gold gaps!
 
 int doubleIt(int n) {
-    return 0;
+    return n ___ 2;
 }
 
 [solution]

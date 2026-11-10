@@ -1,4 +1,4 @@
-title: 2.3  Binary Decoder
+title: 2.6  Binary Decoder
 type: repair
 
 [story]
@@ -7,10 +7,9 @@ Write convertBinarytoDecimal() without using the shift operator.
 
 [talk]
 @walk EAST 1
-The machine down here talks in binary: only 1s and 0s. To it, 110 means 6.
-Each place is worth double the one to its right: 1, 2, 4, 8, 16...
-Peel the digits off from the right with `% 10` and `/ 10`, just like last time.
-Every time you see a 1, add what that place is worth. Then double the place value for the next digit.
+This machine talks in binary, just 1s and 0s. 110 means 6, because each place is worth double the one to its right: 1, 2, 4, 8...
+Peel the digits off from the right with `% 10` and `/ 10`, like the last two gates.
+When a digit is 1, add what its place is worth. Then double the place for the next digit.
 
 [lesson]
 In binary each place is worth double the
@@ -27,10 +26,12 @@ and keep a "place" that doubles: 1, 2, 4, 8...
 Exam 1, Q4.
 
 [hint]
+Peel the binary digits off from the right with % 10 and / 10, like the last two gates.
+Keep a place value that starts at 1 and doubles each time. When the digit is 1, add the place value to result.
 Start with result = 0 and place = 1. While the number is > 0: result += (number % 10) * place; place *= 2; number /= 10;
 
 [code]
-// STAGE 2.3: BINARY DECODER
+// STAGE 2.6: BINARY DECODER
 // 110 -> 6     111 -> 7
 // No shift operator (<< >>) allowed!
 

@@ -78,6 +78,7 @@ typedef enum {
     OP_PRINT_INT,       //                  : cout << int
     OP_PRINT_CHAR,      //                  : cout << char
     OP_PRINT_STR,       //                  : cout << char*
+    OP_NOTE_CONDITION,  //                  : [cond] -> [cond]  remembers the answer of an if/while/for question (for the game)
 
     OP_COUNT
 } OpCode;

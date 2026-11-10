@@ -1,4 +1,4 @@
-title: 2.2  Digit Peeler
+title: 2.5  Digit Peeler
 type: repair
 
 [story]
@@ -7,10 +7,9 @@ Write Reversed() so it returns the digits of a number in reverse.
 
 [talk]
 @walk EAST 1
-Welcome to the Register Bank, where numbers get taken apart. This gate reads numbers backwards. It wants 123 turned into 321.
-Two tools peel a number apart. `%` gives the remainder: `123 % 10` is 3, the last digit.
-And `/` divides: `123 / 10` is 12. With whole numbers C throws the decimals away, which chops off that last digit.
-So: grab the last digit, stick it on the end of `result`, chop it off, and repeat while there are digits left.
+This gate reads numbers backwards: it wants 123 turned into 321.
+Same tools as the Access Code: `% 10` takes the last digit, `/ 10` chops it off.
+The new trick: `result * 10 + digit` sticks the digit on the end. 3, then 32, then 321!
 
 [lesson]
 Two operators peel digits off a number:
@@ -27,15 +26,21 @@ Build the answer one digit at a time:
 Exam 1, Q2 (helper for the palindrome).
 
 [hint]
-Loop while number > 0. Each time: take number % 10, add it onto result * 10, then do number /= 10.
+It's like the Access Code: loop while number > 0 and use the last digit each time.
+Instead of adding the digit to a total, stick it on the end of result: result = result * 10 + digit.
+Loop while number > 0. Each time: result = result * 10 + number % 10; then number = number / 10;
 
 [code]
-// STAGE 2.2: DIGIT PEELER
+// STAGE 2.5: DIGIT PEELER
 // Write Reversed(): turn 123 into 321.
+// Fill in the gold gaps!
 
 int Reversed(int number) {
     int result = 0;
-
+    while (___) {
+        result = ___;
+        number = ___;
+    }
     return result;
 }
 

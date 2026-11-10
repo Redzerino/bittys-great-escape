@@ -55,6 +55,8 @@ static int StartOfLine(const Editor *e, int line)
     return i;
 }
 
+static bool BlankAt(const Editor *e, int i, int *start, int *end);
+
 static float GutterWidth(const Editor *e) { return e->fontSize * 2.3f; }
 static float TextLeft(const Editor *e)    { return e->bounds.x + GutterWidth(e) + PADDING; }
 static float TextTop(const Editor *e)     { return e->bounds.y + TITLE_HEIGHT; }
@@ -385,6 +387,14 @@ void Editor_Update(Editor *e)
             e->cursor = at;
             e->dragging = true;
             e->blink = 0;
+            int s, t;
+            if (!shift && !e->readOnly && BlankAt(e, at, &s, &t))
+            {
+                // clicked a gap: select all of it, so typing replaces it
+                e->anchor = s;
+                e->cursor = t;
+                e->dragging = false;
+            }
         }
     }
     if (e->dragging)
@@ -475,7 +485,11 @@ void Editor_Update(Editor *e)
         }
 
         if (KeyRepeat(KEY_ENTER) || KeyRepeat(KEY_KP_ENTER)) TypeNewline(e);
-        if (KeyRepeat(KEY_TAB)) { BeginEdit(e, EDIT_OTHER); DeleteSelection(e); Insert(e, "    ", 4); }
+        if (KeyRepeat(KEY_TAB))
+        {
+            // Tab jumps to the next gap while there are any; otherwise it indents
+            if (!Editor_SelectNextBlank(e)) { BeginEdit(e, EDIT_OTHER); DeleteSelection(e); Insert(e, "    ", 4); }
+        }
         if (KeyRepeat(KEY_BACKSPACE)) Backspace(e);
         if (KeyRepeat(KEY_DELETE))    DeleteForward(e);
     }
@@ -582,6 +596,79 @@ static void DrawCodeLine(const Editor *e, int start, int end, float x, float y)
     }
 }
 
+// ---------------------------------------------------------------------------
+// Blanks: ___ in the code is a gap for the player to fill in
+// ---------------------------------------------------------------------------
+static bool BlankAt(const Editor *e, int i, int *start, int *end)
+{
+    if (i < 0 || i > e->len) return false;
+    int s = i, t = i;
+    while (s > 0 && e->text[s - 1] == '_') s--;
+    while (t < e->len && e->text[t] == '_') t++;
+    if (t - s < 3) return false;
+    *start = s;
+    *end = t;
+    return true;
+}
+
+bool Editor_SelectNextBlank(Editor *e)
+{
+    for (int pass = 0; pass < 2; pass++)
+    {
+        int from = pass == 0 ? e->cursor : 0;
+        for (int i = from; i + 2 < e->len; i++)
+        {
+            int s, t;
+            if (e->text[i] == '_' && BlankAt(e, i, &s, &t) && s >= from)
+            {
+                e->anchor = s;
+                e->cursor = t;
+                e->blink = 0;
+                KeepCursorVisible(e);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool Editor_InGap(const Editor *e)
+{
+    int s, t;
+    return e->anchor >= 0 && e->anchor != e->cursor && BlankAt(e, e->cursor - 1, &s, &t) &&
+           ((s == e->anchor && t == e->cursor) || (s == e->cursor && t == e->anchor));
+}
+
+void Editor_InsertText(Editor *e, const char *text)
+{
+    if (e->readOnly) return;
+    BeginEdit(e, EDIT_OTHER);
+    DeleteSelection(e);
+    Insert(e, text, (int)strlen(text));
+    e->focused = true;
+}
+
+int Editor_LineAt(const Editor *e, Vector2 point)
+{
+    if (!CheckCollisionPointRec(point, e->bounds) || point.y < TextTop(e)) return 0;
+    int line = (int)floorf((point.y - TextTop(e)) / e->lineHeight) + e->scrollLine;
+    if (line >= LineCount(e)) return 0;
+    return line + 1;
+}
+
+bool Editor_CharPos(const Editor *e, int line, int col, Vector2 *pos)
+{
+    int L = line - 1;
+    if (L < e->scrollLine || L >= e->scrollLine + VisibleLines(e)) return false;
+    int start = StartOfLine(e, L);
+    int end = LineEnd(e, start);
+    int at = start + (col > 0 ? col - 1 : 0);
+    if (at > end) at = end;
+    pos->x = TextLeft(e) + Width(e, start, at);
+    pos->y = TextTop(e) + (L - e->scrollLine) * e->lineHeight;
+    return true;
+}
+
 void Editor_Draw(const Editor *e)
 {
     Rectangle b = e->bounds;
@@ -635,6 +722,19 @@ void Editor_Draw(const Editor *e)
                        (lineNo == e->errorLine) ? (Color){ 255, 120, 120, 255 } : (Color){ 80, 90, 115, 255 };
         DrawTextEx(e->font, num, (Vector2){ b.x + gutter - 6 - MeasureTextEx(e->font, num, e->fontSize - 2, 0).x, y + 1 },
                    e->fontSize - 2, 0, numCol);
+
+        // gaps to fill in: a pulsing gold box behind each ___
+        for (int i = start; i + 2 < end; i++)
+        {
+            int s, t;
+            if (e->text[i] != '_' || !BlankAt(e, i, &s, &t) || s != i) continue;
+            float x0 = TextLeft(e) + Width(e, start, s), x1 = TextLeft(e) + Width(e, start, t);
+            float pulse = 0.55f + 0.45f * sinf((float)GetTime() * 4);
+            Rectangle gap = { x0 - 3, y - 2, x1 - x0 + 4, e->lineHeight };
+            DrawRectangleRounded(gap, 0.3f, 4, (Color){ 120, 90, 20, (unsigned char)(150 + 60 * pulse) });
+            DrawRectangleRoundedLinesEx(gap, 0.3f, 4, 2, (Color){ 255, 205, 80, (unsigned char)(160 + 95 * pulse) });
+            i = t;
+        }
 
         DrawCodeLine(e, start, end, TextLeft(e), y);
     }

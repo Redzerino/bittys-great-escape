@@ -1,5 +1,6 @@
 title: 1.4  Memory Boxes
 type: escape
+buttons: read() | steps | 3
 
 [story]
 Bitty: "That tile has a number on it. I think it's telling me how far the exit is."
@@ -8,11 +9,9 @@ Goal: reach the EXIT using a variable.
 
 [talk]
 @walk EAST 2
-Ooh, a data tile. See the number on it? Memory is full of these.
-A `variable` is a box with a name that holds a value. `int steps = 3;` makes a box called `steps` with 3 inside.
-`int` means the box holds a whole number, like 4 or -12. No decimals allowed.
-When I stand on a data tile, `read()` gives me its number. So `int steps = read();` saves that number in a box.
-That number is how far the exit is. Use the variable in your loop instead of typing a number!
+A data tile! Its number tells me how far the exit is.
+`int steps = read();` makes a box called `steps` and puts the number from the tile in it.
+Then loop that many times: use `steps` instead of typing a number.
 
 [lesson]
 A variable is a named box in memory.
@@ -37,6 +36,8 @@ Watch out: a variable with no value yet
 holds garbage. Always give it a value!
 
 [hint]
+Stand on the data tile and read() its number. That's how far the exit is.
+Save it in a box with int steps = read(); then loop that many times.
 First move(EAST) onto the data tile. Then int steps = read(); and loop while i < steps.
 
 [map]
@@ -51,8 +52,13 @@ First move(EAST) onto the data tile. Then int steps = read(); and loop while i <
 //      int steps = read();
 // 3. Use a for loop to move EAST
 //    that many times.
+// Fill in the gold gaps!
 
 move(EAST);
+int steps = ___;
+for (int i = 0; i < ___; i++) {
+    move(EAST);
+}
 
 [solution]
 move(EAST);

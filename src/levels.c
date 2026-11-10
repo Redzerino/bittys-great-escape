@@ -391,6 +391,21 @@ bool Level_Parse(const char *text, const char *fileName, Level *lv, char *error,
                 else if (strcmp(key, "ban_indexing") == 0) lv->banIndexing = (strcmp(value, "yes") == 0 || strcmp(value, "true") == 0);
                 else if (strcmp(key, "max_steps") == 0)    lv->maxSteps = atoi(value);
                 else if (strcmp(key, "door_code") == 0)    lv->doorCode = atoi(value);
+                else if (strcmp(key, "fog") == 0)          lv->fog = (float)atof(value);
+                else if (strcmp(key, "buttons") == 0)      snprintf(lv->buttons, sizeof lv->buttons, "%s", value);
+                else if (strcmp(key, "sign") == 0)
+                {
+                    // sign: col row text
+                    LevelSign *sg = &lv->signs[lv->signCount];
+                    int used = 0;
+                    if (lv->signCount >= LEVEL_MAX_SIGNS || sscanf(value, "%d %d %n", &sg->col, &sg->row, &used) < 2 || used == 0)
+                    {
+                        SetError(error, errorSize, "bad sign (write  sign: column row text): %s%s", value, NULL);
+                        return false;
+                    }
+                    snprintf(sg->text, sizeof sg->text, "%s", value + used);
+                    lv->signCount++;
+                }
                 break;
             }
             case SEC_STORY:    AppendLine(lv->story, sizeof lv->story, line); break;

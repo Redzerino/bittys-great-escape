@@ -67,6 +67,7 @@ typedef struct {
     bool ok;
     char message[VM_MSG_MAX];   // e.g. "Line 4: you used 'total' but it hasn't been declared..."
     int  line;
+    int  col;                   // the column it points at (0 = not known, just the line)
 
     int  warningCount;          // e.g. "Line 2: = inside an if assigns a value..."
     char warnings[VM_MAX_WARNINGS][VM_MSG_MAX];
@@ -155,5 +156,17 @@ int Vm_GetVariables(const Vm *vm, VmVariable *out, int max);
 // The game uses these to flash the blocks the code is touching.
 #define VM_MAX_ACCESSES 16
 void Vm_TakeAccesses(Vm *vm, int *reads, int *readCount, int *writes, int *writeCount);
+
+// The same reads and writes, but in the order they happened (oldest first).
+// The memory room uses this so Bitty acts out each line step by step.
+// Taking the log also clears the lists above, and the other way round.
+#define VM_MAX_LOG 48
+typedef struct {
+    int  address;
+    bool write;
+    bool condition;     // not a memory access: an if / while / for question was answered
+    int  answer;        // ...and this was the answer (0 = false)
+} VmAccess;
+int Vm_TakeAccessLog(Vm *vm, VmAccess *out, int max);
 
 #endif

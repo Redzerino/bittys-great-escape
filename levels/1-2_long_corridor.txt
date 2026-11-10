@@ -1,5 +1,6 @@
 title: 1.2  The Long Corridor
 type: escape
+sign: 4 0 EXIT|11 TILES >>
 
 [story]
 Bitty: "That's a LONG way. My battery won't last if you type every step."
@@ -7,11 +8,9 @@ Goal: reach the EXIT using a loop.
 
 [talk]
 @walk EAST 2
-Whoa. Look how far the exit is. Eleven steps!
-You could type `move(EAST);` eleven times... but my battery would die of boredom.
-Programmers are lazy in a smart way. We use a `loop` to repeat things.
-`for (int i = 0; i < 11; i++)` means: count from 0 up to 10, and run the code inside the `{ }` each time.
-`i` is just a counter. Watch it tick up in the Inspector while I walk!
+Look at the sign: the exit is 11 tiles away! Typing 11 moves would drain my battery.
+A `for` loop repeats the code in its `{ }`. Put the number of times in the gold gap.
+Watch `i` count up in the Inspector while I walk!
 
 [lesson]
 A for loop repeats code a set number of times.
@@ -28,6 +27,11 @@ It has three parts, split by ;
 i goes 0, 1, 2 so the body runs 3 times.
 Watch the Inspector: you'll see i count up.
 
+[hint]
+Don't type eleven moves! Use a for loop that runs 11 times.
+for (int i = 0; i < 11; i++) runs the code inside the { } 11 times.
+for (int i = 0; i < 11; i++) { move(EAST); }
+
 [map]
 ################
 #b.B..........E#
@@ -42,6 +46,11 @@ Watch the Inspector: you'll see i count up.
 //   for (int i = 0; i < 3; i++) {
 //       move(EAST);  // 3 times
 //   }
+// Fill in the gold gaps!
+
+for (int i = 0; i < ___; i++) {
+    move(EAST);
+}
 
 [solution]
 for (int i = 0; i < 11; i++) {

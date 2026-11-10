@@ -7,11 +7,9 @@ Write countDigits() so it works for every number, including 0.
 
 [talk]
 @walk EAST 1
-This function counts the digits in a number by chopping them off one by one. Looks fine... but try 0.
-The `while (n > 0)` check happens BEFORE the first loop. 0 isn't bigger than 0, so the loop never runs, and it says 0 has 0 digits!
-C has a loop for exactly this: `do { ... } while (n > 0);` It runs the body FIRST, then checks.
-A `do` / `while` always runs at least once. Perfect, because every number has at least one digit.
-Swap the `while` loop for a `do` / `while` and watch the 0 gate open. Don't forget the `;` at the very end!
+This counts the digits in a number. Looks fine... but try 0. The `while` checks BEFORE the first go, so it never runs!
+A `do { ... } while (n > 0);` loop runs FIRST, then checks. So it always runs at least once.
+Swap the loop for a `do` / `while`. Don't forget the `;` at the very end!
 
 [lesson]
 A do/while loop checks AFTER the body,
@@ -29,6 +27,8 @@ Note the ; after the while( ) at the end.
 It's easy to forget!
 
 [hint]
+The while loop never runs for 0. Which kind of loop always runs at least once?
+Turn it into do { ... } while (n > 0); and remember the ; at the end.
 Use do { count++; n = n / 10; } while (n > 0);
 
 [code]

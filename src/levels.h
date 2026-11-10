@@ -6,12 +6,15 @@
 //   title: 3-1  Leap Year Gate
 //   type: repair                 (escape = move Bitty, repair = write a function)
 //   ban_indexing: no             (yes = arr[i] not allowed, for Pointer Wires)
+//   fog: 1.5                     (escape: Bitty can only see this many tiles around him)
+//   sign: 4 0 EXIT|11 TILES >>   (escape: a sign on the wall tile at column 4, row 0; | = new line)
+//   buttons: EAST | NORTH | ==   (code buttons under the editor: tap one to type it)
 //
 //   [story]     shown in the console when the level loads
 //   [talk]      what Bitty says when the level starts, one speech bubble per line.
 //               "@walk EAST 3" makes him walk by himself; `code` is shown in gold.
 //   [lesson]    the "memory dump": the C concept this level teaches
-//   [hint]      shown after the first failed attempt
+//   [hint]      one line per HINT press: a nudge, a bigger nudge, then the answer
 //   [map]       escape levels: the grid (repair levels get a corridor of gates)
 //   [code]      starter code in the editor
 //   [solution]  a working answer (hidden; used by the automatic level tests)
@@ -76,6 +79,12 @@ typedef struct {
 
 typedef enum { LEVEL_ESCAPE = 0, LEVEL_REPAIR } LevelType;
 
+#define LEVEL_MAX_SIGNS 6
+typedef struct {
+    int  col, row;
+    char text[64];
+} LevelSign;
+
 typedef struct {
     char      file[64];
     char      title[64];
@@ -83,11 +92,15 @@ typedef struct {
     bool      banIndexing;
     int       maxSteps;     // repair levels: instruction limit per test (catches infinite loops)
     int       doorCode;     // escape levels: gates open when Bitty write()s this next to them (-1 = no door)
+    float     fog;          // escape levels: how far Bitty can see (0 = no fog)
+    LevelSign signs[LEVEL_MAX_SIGNS];
+    int       signCount;
+    char      buttons[160];             // code buttons, split by |  (empty = none)
 
     char      story[LEVEL_TEXT_MAX];
     char      lesson[LEVEL_TEXT_MAX];
     char      talk[LEVEL_TEXT_MAX];     // what Bitty says (and where he walks) when the level starts
-    char      hint[512];
+    char      hint[1024];               // up to 3 lines: a nudge, a bigger nudge, then the answer
 
     char      map[LEVEL_MAX_ROWS][LEVEL_MAX_COLS + 1];
     int       mapRows;
