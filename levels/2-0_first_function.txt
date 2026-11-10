@@ -1,4 +1,4 @@
-title: 2-0  First Function
+title: 5.1  First Function
 type: repair
 
 [story]
@@ -7,7 +7,7 @@ Write doubleIt() so it gives back twice the number it is given.
 
 [talk]
 @walk EAST 1
-A gate! These don't open for walking. They open for answers.
+Welcome to the System Library. Remember the gates? They don't open for walking. They open for answers.
 Each gate asks a question, and your `function` has to give back the right answer.
 A function is a little machine: something goes in, something comes out. `int doubleIt(int n)` takes in a number called `n`.
 `return` is how it hands the answer back. `return n + 1;` would give back one more than it got.
@@ -36,7 +36,7 @@ different number and checks the answer.
 The answer is n multiplied by 2. In C, multiply is the * sign: return n * 2;
 
 [code]
-// LEVEL 2-0: FIRST FUNCTION
+// STAGE 5.1: FIRST FUNCTION
 // Make doubleIt() give back twice
 // the number it is given.
 // doubleIt(5) should give 10.

@@ -1,0 +1,68 @@
+title: B.6  Making Choices
+type: escape
+
+[story]
+Bitty: "Two ways to go. The number on the floor tells me which one is safe."
+Goal: use if / else to choose the safe path.
+
+[talk]
+@walk EAST 1
+Up to now your code always did the same thing every time. But real programs make choices.
+Step onto that data tile and I can `read()` the number on it. If the number is 5, the safe way is NORTH. Otherwise it's SOUTH.
+In C that's `if (read() == 5)`. The bit in brackets is a question. It's either true or false.
+If it's true, C runs the code in the first `{ }`. If it's false, it runs the code after `else` instead. Never both.
+Notice the double `==`. One `=` puts a value in a box. Two `==` ASKS whether two things are equal. Even experts mix them up!
+
+[lesson]
+if lets your code make a choice.
+
+    if (read() == 5) {
+        move(NORTH);    // only if true
+    } else {
+        move(SOUTH);    // only if false
+    }
+
+The ( ) holds a QUESTION. The answer is
+always true or false.
+
+    ==   is equal to
+    !=   is not equal to
+    >    is bigger than
+    <    is smaller than
+
+Watch out:
+    x = 5      PUT 5 in x
+    x == 5     ASK if x is 5
+
+[hint]
+After move(EAST); write: if (read() == 5) { move(NORTH); } else { move(SOUTH); }
+
+[map]
+######
+###E##
+#bB5##
+###x##
+######
+
+[code]
+// BOOTCAMP 6: MAKING CHOICES
+// Step onto the data tile, then:
+//   if the number is 5, go NORTH
+//   otherwise, go SOUTH
+//
+//   if (read() == 5) {
+//       ...
+//   } else {
+//       ...
+//   }
+
+move(EAST);
+move(SOUTH);
+
+[solution]
+move(EAST);
+if (read() == 5) {
+    move(NORTH);
+} else {
+    move(SOUTH);
+}

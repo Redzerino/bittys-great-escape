@@ -1,0 +1,75 @@
+title: 3.5  Control Terminal
+type: repair
+
+[story]
+Bitty: "The terminal needs to know how many days are in each month. No leap years, thankfully."
+Write daysInMonth() using a switch.
+
+[talk]
+@walk EAST 1
+When you're checking one variable against lots of exact values, a long `else if` chain gets messy. C has `switch` for that.
+`switch (month)` jumps straight to the matching `case`. `case 2:` runs when month is 2.
+You can stack cases: `case 4: case 6: case 9: case 11:` all share the code underneath. Thirty days hath September!
+`default:` catches anything that didn't match, like month 13. Return 0 for those.
+If you `return` inside a case, you don't need `break`. Otherwise, always end a case with `break;` or it falls into the next one!
+
+[lesson]
+switch picks a case by exact value:
+
+    switch (month) {
+        case 2:
+            return 28;
+        case 4: case 6: case 9: case 11:
+            return 30;
+        default:
+            return 0;
+    }
+
+Cases stacked together share the code
+below them.
+
+Without return or break, C keeps going
+into the NEXT case ("fall-through").
+That's a very common bug!
+
+[hint]
+switch (month) { case 2: return 28; case 4: case 6: case 9: case 11: return 30; ... default: return 0; }
+
+[code]
+// STAGE 3.5: CONTROL TERMINAL
+// Days in each month (not a leap year)
+//   2 -> 28
+//   4, 6, 9, 11 -> 30
+//   the others -> 31
+//   not a month (0, 13...) -> 0
+
+int daysInMonth(int month) {
+    switch (month) {
+        case 2:
+            return 28;
+        default:
+            return 31;
+    }
+}
+
+[solution]
+int daysInMonth(int month) {
+    switch (month) {
+        case 2:
+            return 28;
+        case 4: case 6: case 9: case 11:
+            return 30;
+        case 1: case 3: case 5: case 7: case 8: case 10: case 12:
+            return 31;
+        default:
+            return 0;
+    }
+}
+
+[tests]
+daysInMonth(1) == 31
+daysInMonth(2) == 28
+daysInMonth(4) == 30
+daysInMonth(9) == 30
+daysInMonth(12) == 31
+daysInMonth(13) == 0

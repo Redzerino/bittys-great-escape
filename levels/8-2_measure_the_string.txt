@@ -1,4 +1,4 @@
-title: 8-2  Measure the String
+title: 8.5  Measure the String
 type: repair
 ban_indexing: yes
 
@@ -32,7 +32,7 @@ Exam 2, Q5.
 char *p = str; while (*p != '\0') p++; return p - str;
 
 [code]
-// LEVEL 8-2: MEASURE THE STRING
+// STAGE 8.5: MEASURE THE STRING
 // "Hello" -> 5
 // No [ ] allowed: walk a pointer.
 

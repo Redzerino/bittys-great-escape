@@ -1,4 +1,4 @@
-title: 1-1  Wake Up
+title: 1.1  Wake Up
 type: escape
 
 [story]
@@ -13,6 +13,7 @@ One problem: I can't move by myself. I only do what your code tells me.
 A line of code is called a `statement`. Each one is one instruction, like `move(EAST);`
 See the `;` at the end? That's how C knows the instruction is finished. Like a full stop.
 C runs your statements from top to bottom, one at a time. Get me to the green EXIT!
+Never written any code before? No problem. The optional BOOTCAMP at the top of the map explains everything from zero.
 
 [lesson]
 A C program is a list of STATEMENTS.
@@ -35,7 +36,7 @@ Watch out: forget the ; and C won't compile.
 #######
 
 [code]
-// LEVEL 1-1: WAKE UP
+// STAGE 1.1: WAKE UP
 // Bitty can't move by itself.
 // Your code is the only way out!
 // Get Bitty to the green EXIT tile.
@@ -43,4 +44,11 @@ Watch out: forget the ; and C won't compile.
 //   move(NORTH);   move(EAST);
 //   move(SOUTH);   move(WEST);
 
+move(EAST);
+
+[solution]
+move(EAST);
+move(EAST);
+move(SOUTH);
+move(EAST);
 move(EAST);

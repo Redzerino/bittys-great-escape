@@ -1,0 +1,64 @@
+title: 4.3  Try Again
+type: repair
+
+[story]
+Bitty: "This counter says 0 has no digits. That can't be right..."
+Write countDigits() so it works for every number, including 0.
+
+[talk]
+@walk EAST 1
+This function counts the digits in a number by chopping them off one by one. Looks fine... but try 0.
+The `while (n > 0)` check happens BEFORE the first loop. 0 isn't bigger than 0, so the loop never runs, and it says 0 has 0 digits!
+C has a loop for exactly this: `do { ... } while (n > 0);` It runs the body FIRST, then checks.
+A `do` / `while` always runs at least once. Perfect, because every number has at least one digit.
+Swap the `while` loop for a `do` / `while` and watch the 0 gate open. Don't forget the `;` at the very end!
+
+[lesson]
+A do/while loop checks AFTER the body,
+so it always runs at least once:
+
+    do {
+        count++;
+        n = n / 10;
+    } while (n > 0);
+
+  while (...) { }     might run 0 times
+  do { } while (...); runs 1 or more times
+
+Note the ; after the while( ) at the end.
+It's easy to forget!
+
+[hint]
+Use do { count++; n = n / 10; } while (n > 0);
+
+[code]
+// STAGE 4.3: TRY AGAIN
+// Count the digits in n.
+// countDigits(12345) -> 5
+// countDigits(0) -> 1   <- broken!
+
+int countDigits(int n) {
+    int count = 0;
+    while (n > 0) {
+        count++;
+        n = n / 10;
+    }
+    return count;
+}
+
+[solution]
+int countDigits(int n) {
+    int count = 0;
+    do {
+        count++;
+        n = n / 10;
+    } while (n > 0);
+    return count;
+}
+
+[tests]
+countDigits(12345) == 5
+countDigits(7) == 1
+countDigits(0) == 1
+countDigits(42) == 2
+countDigits(1000) == 4

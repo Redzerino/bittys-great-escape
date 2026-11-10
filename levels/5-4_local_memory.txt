@@ -1,0 +1,53 @@
+title: 5.4  Local Memory
+type: repair
+
+[story]
+Bitty: "I add the points... and the score doesn't change. Where did they go?"
+Fix addPoints() so it changes the real score.
+
+[talk]
+@walk EAST 1
+Here's a sneaky one. When you call a function, the parameters are COPIES of the values you passed in.
+The function gets its own little local box. Changing that box doesn't touch the original. The points vanish when the function ends!
+This is called "pass by value". It's the default in C.
+In C++ you can add `&` to a parameter: `int &score`. Now it's a `reference`, another name for the caller's actual variable, not a copy.
+Add the `&` and the score will really change. Look at the Inspector to see the difference.
+
+[lesson]
+PASS BY VALUE (the default): the
+function gets a copy.
+
+    void addPoints(int score, int points)
+    -> changing score changes the COPY
+
+PASS BY REFERENCE (C++): the function
+uses the real variable.
+
+    void addPoints(int &score, int points)
+    -> changing score changes the ORIGINAL
+
+Variables made inside a function are
+LOCAL: they only exist until it ends.
+
+[hint]
+Change int score to int &score.
+
+[code]
+// STAGE 5.4: LOCAL MEMORY
+// Add points to the caller's score.
+// Right now it changes a copy, so
+// the real score never changes!
+
+void addPoints(int score, int points) {
+    score = score + points;
+}
+
+[solution]
+void addPoints(int &score, int points) {
+    score = score + points;
+}
+
+[tests]
+addPoints(&10, 5) then #1 == 15
+addPoints(&0, 7) then #1 == 7
+addPoints(&-5, 10) then #1 == 5

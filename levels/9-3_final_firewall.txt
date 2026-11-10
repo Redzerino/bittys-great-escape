@@ -1,0 +1,63 @@
+title: 9.3  Final Firewall
+type: repair
+ban_indexing: yes
+
+[story]
+Bitty: "The firewall sorts passwords alphabetically. Which one comes first?"
+Write compare_strings() without [ ].
+
+[talk]
+@walk EAST 1
+The final firewall doesn't just check if two strings match. It needs to know which comes first in the alphabet.
+Return 0 if they're the same. Return a negative number if `a` comes first, and a positive number if `b` comes first.
+Walk both pointers along while the letters match and neither string has ended.
+Then just return the difference between the two letters you stopped on: `*a - *b`. 'c' - 'r' is negative, so "cat" comes before "rat".
+If both ended together, that difference is '\0' - '\0' = 0. They match!
+
+[lesson]
+compare_strings, like C's strcmp:
+
+    0          a and b are the same
+    negative   a comes first
+    positive   b comes first
+
+    while (*a != '\0' && *a == *b) {
+        a++;
+        b++;
+    }
+    return *a - *b;
+
+Characters are numbers, so subtracting
+them tells you which comes first.
+
+Exam 2: compare_strings.
+
+[hint]
+while (*a != '\0' && *a == *b) { a++; b++; } return *a - *b;
+
+[code]
+// STAGE 9.3: FINAL FIREWALL
+// 0 if a and b are the same,
+// negative if a comes first,
+// positive if b comes first.
+// No [ ] allowed!
+
+int compare_strings(char *a, char *b) {
+    return 0;
+}
+
+[solution]
+int compare_strings(char *a, char *b) {
+    while (*a != '\0' && *a == *b) {
+        a++;
+        b++;
+    }
+    return *a - *b;
+}
+
+[tests]
+compare_strings("apple", "apple") == 0
+compare_strings("apple", "banana") < 0
+compare_strings("cat", "car") > 0
+compare_strings("abc", "abcd") < 0
+compare_strings("", "") == 0

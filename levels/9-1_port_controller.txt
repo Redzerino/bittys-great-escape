@@ -1,0 +1,63 @@
+title: 9.1  Port Controller
+type: repair
+ban_indexing: yes
+
+[story]
+Bitty: "The USB Gateway! Exam 2 rules from here on: pointers only."
+Write find_max() without [ ].
+
+[talk]
+@walk EAST 1
+We made it to the USB Gateway. The way out! But the security here is tough. Exam 2 rules: no `[ ]` anywhere.
+First port: find the biggest number in an array, using only a pointer.
+Same idea as the Power Audit. Start `max` at the first value, `*arr`, NOT at 0. Some of these arrays are all negative.
+Then walk the pointer along with `arr++`, and keep the biggest value you see.
+You've done each part of this before. Now it's all together.
+
+[lesson]
+find_max with a pointer:
+
+    int max = *arr;
+    for (int i = 1; i < size; i++) {
+        arr++;
+        if (*arr > max) {
+            max = *arr;
+        }
+    }
+    return max;
+
+Remember: start at the first value,
+never at 0.
+
+Exam 2: find_max.
+
+[hint]
+int max = *arr; then loop: arr++; if (*arr > max) max = *arr;
+
+[code]
+// STAGE 9.1: PORT CONTROLLER
+// Biggest number in the array,
+// WITHOUT [ ].
+// find_max({3, 9, 4}, 3) -> 9
+
+int find_max(int *arr, int size) {
+    return 0;
+}
+
+[solution]
+int find_max(int *arr, int size) {
+    int max = *arr;
+    for (int i = 1; i < size; i++) {
+        arr++;
+        if (*arr > max) {
+            max = *arr;
+        }
+    }
+    return max;
+}
+
+[tests]
+find_max({3, 9, 4}, 3) == 9
+find_max({-5, -2, -9}, 3) == -2
+find_max({8}, 1) == 8
+find_max({1, 5, 2, 5, 3}, 5) == 5

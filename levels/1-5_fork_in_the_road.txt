@@ -1,4 +1,4 @@
-title: 1-5  Fork in the Road
+title: 1.5  Fork in the Road
 type: escape
 
 [story]
@@ -44,7 +44,7 @@ Move EAST onto the data tile first. Then if (read() > 5) move NORTH, else move S
 #######
 
 [code]
-// LEVEL 1-5: FORK IN THE ROAD
+// STAGE 1.5: FORK IN THE ROAD
 // Step onto the data tile, then
 // decide which way to go:
 //

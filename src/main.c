@@ -83,7 +83,6 @@ typedef struct {
     int        speedIndex;
     int        level;
     bool       showCircuit;
-    bool       showLevels;      // the level menu
     bool       showHelp;        // the F1 shortcuts card
     float      saveTimer;       // autosave countdown
     bool       unsaved;
@@ -162,9 +161,10 @@ static void LoadWorld(Game *g)
     const Level *lv = Levels_Get(g->level);
     const char *rows[LEVEL_MAX_ROWS];
     for (int i = 0; i < lv->mapRows; i++) rows[i] = lv->map[i];
-    g->world.theme = (lv->title[0] >= '0' && lv->title[0] <= '9') ? lv->title[0] - '0' : 1;   // "3-1 ..." = area 3
+    g->world.theme = Circuit_WorldOf(g->level);     // colours of the chip this level is on
     World_LoadMap(&g->world, rows, lv->mapRows);
     g->world.speed = SPEEDS[g->speedIndex];
+    g->world.doorCode = lv->doorCode;
 }
 
 static void StopProgram(Game *g)
@@ -198,7 +198,6 @@ static void LoadLevel(Game *g, int index, bool keepOldCode)
     StopProgram(g);
     g->level = index;
     g->mode = MODE_EDITING;
-    g->showLevels = false;
     LoadWorld(g);
 
     const Level *lv = Levels_Get(index);
@@ -210,7 +209,7 @@ static void LoadLevel(Game *g, int index, bool keepOldCode)
     Save_Write();
 
     Console_Clear();
-    Console_PrintKind(CONSOLE_SUCCESS, TextFormat("LEVEL %s\n", lv->title));
+    Console_PrintKind(CONSOLE_SUCCESS, TextFormat("%s:  %s\n", Circuit_StageName(g->level), lv->title + strcspn(lv->title, " ") + strspn(lv->title + strcspn(lv->title, " "), " ")));
     Console_PrintKind(CONSOLE_STORY, TextFormat("%s\n", lv->story));
     if (lv->type == LEVEL_REPAIR)
         Console_PrintKind(CONSOLE_STORY, TextFormat("Each gate tests your code (%d tests). Press RUN to try.\n", lv->testCount));
@@ -757,57 +756,6 @@ static void DrawLessonCard(Game *g)
     }
 }
 
-// The level menu: every level, with a tick for the ones already cleared
-static void DrawLevelMenu(Game *g)
-{
-    if (!g->showLevels) return;
-    Rectangle b = WORLD_PANEL;
-    Rectangle card = { b.x + 16, b.y + 36, b.width - 32, b.height - 52 };
-    DrawRectangleRec(b, (Color){ 5, 6, 14, 190 });
-    DrawRectangleRounded(card, 0.03f, 8, (Color){ 16, 20, 36, 248 });
-    DrawRectangleRoundedLinesEx(card, 0.03f, 8, 2, (Color){ 90, 200, 220, 255 });
-    DrawText("LEVELS", (int)card.x + 16, (int)card.y + 12, 20, (Color){ 120, 255, 160, 255 });
-
-    int done = 0;
-    for (int i = 0; i < Levels_Count(); i++) if (Save_IsDone(Levels_Get(i)->file)) done++;
-    const char *count = TextFormat("%d / %d cleared", done, Levels_Count());
-    DrawTextEx(g->codeFont, count, (Vector2){ card.x + card.width - 16 - MeasureTextEx(g->codeFont, count, 15, 0).x, card.y + 14 },
-               15, 0, (Color){ 140, 160, 200, 255 });
-
-    float rowH = 30, x0 = card.x + 16, y0 = card.y + 46;
-    int perCol = (int)((card.height - 60) / rowH);
-    if (perCol < 1) perCol = 1;
-    int cols = (Levels_Count() + perCol - 1) / perCol;
-    float colW = (card.width - 32) / (cols > 0 ? cols : 1);
-
-    for (int i = 0; i < Levels_Count(); i++)
-    {
-        const Level *lv = Levels_Get(i);
-        Rectangle r = { x0 + (i / perCol) * colW, y0 + (i % perCol) * rowH, colW - 8, rowH - 4 };
-        bool hover = CheckCollisionPointRec(GetMousePosition(), r);
-        bool current = (i == g->level);
-        bool cleared = Save_IsDone(lv->file);
-
-        DrawRectangleRounded(r, 0.3f, 6, current ? (Color){ 40, 70, 110, 255 } : hover ? (Color){ 32, 40, 64, 255 } : (Color){ 22, 28, 46, 255 });
-        if (cleared)
-        {
-            // a small tick
-            DrawLineEx((Vector2){ r.x + 9, r.y + r.height / 2 }, (Vector2){ r.x + 13, r.y + r.height / 2 + 5 }, 2.5f, (Color){ 110, 240, 150, 255 });
-            DrawLineEx((Vector2){ r.x + 13, r.y + r.height / 2 + 5 }, (Vector2){ r.x + 21, r.y + r.height / 2 - 5 }, 2.5f, (Color){ 110, 240, 150, 255 });
-        }
-        DrawTextEx(g->codeFont, lv->title, (Vector2){ r.x + 28, r.y + 5 }, 16, 0,
-                   cleared ? (Color){ 170, 240, 190, 255 } : (Color){ 220, 228, 245, 255 });
-        if (lv->type == LEVEL_REPAIR)
-            DrawTextEx(g->codeFont, "repair", (Vector2){ r.x + r.width - 56, r.y + 7 }, 13, 0, (Color){ 255, 170, 90, 255 });
-
-        if (hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
-        {
-            if (i != g->level) LoadLevel(g, i, true);
-            g->showLevels = false;
-        }
-    }
-}
-
 // F1: every shortcut in one place
 static void DrawHelp(Game *g)
 {
@@ -869,7 +817,7 @@ static void DrawToolbar(Game *g)
                (Color){90, 65, 145, 255}, g->mode != MODE_RUNNING))
     {
         g->showWorkshop = !g->showWorkshop;
-        if (g->showWorkshop) { g->showLesson = false; g->showLevels = false; }
+        if (g->showWorkshop) g->showLesson = false;
     }
     if (g->showWorkshop) return;
 
@@ -948,7 +896,7 @@ static void DrawToolbar(Game *g)
         SaveNow(g);
         Talk_Skip();
         g->world.talking = false;
-        g->showHelp = g->showLevels = g->showWorkshop = false;
+        g->showHelp = g->showWorkshop = false;
         Circuit_SelectLevel(g->level);
         g->showCircuit = true;
     }
@@ -1012,15 +960,20 @@ int main(void)
 
     // Pick up where the player left off
     Save_Load(TextFormat("%sbitty_save.txt", GetApplicationDirectory()));
-    int start = 0;
+    Circuit_Init();
+    int start = -1;
     for (int i = 0; i < Levels_Count(); i++)
         if (strcmp(Levels_Get(i)->file, Save_GetCurrent()) == 0) start = i;
+    if (start < 0)          // first time: point at stage 1.1 (the bootcamp is there if they want it)
+    {
+        start = 0;
+        while (start < Levels_Count() - 1 && Circuit_IsBootcamp(start)) start++;
+    }
     g->level = start;
     LoadLevel(g, start, false);
     if (levelError[0])
         Console_PrintKind(loaded ? CONSOLE_WARNING : CONSOLE_ERROR, TextFormat("Level problem: %s\n", levelError));
 
-    Circuit_Init();
     Circuit_SelectLevel(start);
     g->showCircuit = true;
     Talk_Skip();
@@ -1066,12 +1019,11 @@ int main(void)
         if (IsKeyPressed(KEY_ESCAPE) && g->mode != MODE_RUNNING && !Talk_Active())
         {
             if (g->showHelp) g->showHelp = false;
-            else if (g->showLevels) g->showLevels = false;
             else if (g->showWorkshop) g->showWorkshop = false;
             else g->showLesson = false;
         }
 
-        bool overlay = g->showHelp || g->showLevels || g->showWorkshop || Talk_Active();
+        bool overlay = g->showHelp || g->showWorkshop || Talk_Active();
         if (!overlay) Editor_Update(&g->editor);
         if (Editor_TakeChanged(&g->editor))
         {
@@ -1089,7 +1041,7 @@ int main(void)
         if (g->showLesson && g->mode == MODE_EDITING && !g->introDone) World_PlayIntro(&g->world);
 
         // Bitty talks: the level's intro, and little reactions to what happens to him
-        if (!g->showWorkshop && !g->showLevels && !g->showHelp)
+        if (!g->showWorkshop && !g->showHelp)
         {
             const Level *lv = Levels_Get(g->level);
             if (Talk_Update(&g->world, dt, WORLD_PANEL))
@@ -1109,6 +1061,8 @@ int main(void)
                     Bark(g, "Bonk! That's a wall.", "Oof. Solid memory.", "Bzzt! Can't go that way.");
                 if (event == EVENT_FALL) Bark(g, "Aaaah! Unallocated memoryyy!", "Nooo, there's nothing here!", NULL);
                 if (event == EVENT_WIN)  Bark(g, "Yes! We did it!", "Sector cleared! Nice code!", "Beep boop! Freedom!");
+                if (event == EVENT_DOOR_OPEN)  Bark(g, "Beep! Code accepted.", "Click! The door's open!", NULL);
+                if (event == EVENT_WRONG_CODE) Bark(g, "Bzzt. Wrong code.", "The door says no. Check the number?", NULL);
             }
         }
 
@@ -1139,7 +1093,6 @@ int main(void)
             DrawWorldPanel(g);
             Talk_Draw(WORLD_PANEL, g->codeFont);
             DrawLessonCard(g);
-            DrawLevelMenu(g);
         }
         Console_Draw(CONSOLE_PANEL, g->codeFont);
         Inspector_Draw(g->vars, g->varCount, INSPECT_PANEL, g->codeFont,

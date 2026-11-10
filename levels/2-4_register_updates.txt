@@ -1,0 +1,64 @@
+title: 2.4  Register Updates
+type: repair
+
+[story]
+Bitty: "Three sensors, one average. Careful, these registers only hold whole numbers."
+Write average() to return the average of three numbers.
+
+[talk]
+@walk EAST 1
+These registers keep running totals. You can add to a variable with `total += a;` It's short for `total = total + a;`
+There's also `-=`, `*=` and `/=`, and `count++` which adds exactly 1. Programmers love shortcuts.
+I need the average of three numbers: add them up, then divide by 3.
+One catch. These are `int`s, so dividing throws away anything after the decimal point. 5 / 3 is 1, not 1.67.
+That's fine here, the gates expect whole numbers. Just don't be surprised when 1, 2 and 2 average to 1!
+
+[lesson]
+Shortcuts for changing a variable:
+
+    total += 5;    total = total + 5;
+    total -= 5;    total = total - 5;
+    total *= 2;    total = total * 2;
+    count++;       count = count + 1;
+
+INTEGER DIVISION drops the remainder:
+
+    10 / 3   is 3
+    5 / 3    is 1
+    2 / 3    is 0
+
+Average of a, b and c:
+
+    (a + b + c) / 3
+
+[hint]
+int total = a + b + c; then return total / 3;
+
+[code]
+// STAGE 2.4: REGISTER UPDATES
+// Return the average of a, b and c.
+// average(3, 4, 5) -> 4
+// (whole numbers only: 1, 2, 2 -> 1)
+
+int average(int a, int b, int c) {
+    int total = 0;
+    total += a;
+
+    return total;
+}
+
+[solution]
+int average(int a, int b, int c) {
+    int total = 0;
+    total += a;
+    total += b;
+    total += c;
+    return total / 3;
+}
+
+[tests]
+average(3, 4, 5) == 4
+average(10, 10, 10) == 10
+average(1, 2, 2) == 1
+average(0, 0, 1) == 0
+average(90, 80, 70) == 80

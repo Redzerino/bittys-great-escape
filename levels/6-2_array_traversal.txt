@@ -1,0 +1,61 @@
+title: 6.2  Array Traversal
+type: repair
+
+[story]
+Bitty: "The power cells are going flat. How many are still above the limit?"
+Write countAbove() to count the numbers bigger than a limit.
+
+[talk]
+@walk EAST 1
+Walking through every box in an array is called `traversing` it. You'll do this all the time.
+This time we're not adding things up, we're COUNTING how many boxes pass a test.
+Start a `count` at 0. Visit every box, and if `arr[i] > limit`, add 1 to the count.
+Notice it's "bigger than", not "bigger or equal". A cell exactly at the limit doesn't count.
+Loops and ifs together: you've got everything you need.
+
+[lesson]
+Counting with a loop and an if:
+
+    int count = 0;
+    for (int i = 0; i < size; i++) {
+        if (arr[i] > limit) {
+            count++;
+        }
+    }
+    return count;
+
+A loop to visit every box, an if to
+test each one, and a counter for the
+ones that pass.
+
+[hint]
+Inside the loop: if (arr[i] > limit) count++;
+
+[code]
+// STAGE 6.2: ARRAY TRAVERSAL
+// How many numbers are bigger
+// than limit?
+// countAbove({5, 12, 8, 20}, 4, 10) -> 2
+
+int countAbove(int arr[], int size, int limit) {
+    int count = 0;
+
+    return count;
+}
+
+[solution]
+int countAbove(int arr[], int size, int limit) {
+    int count = 0;
+    for (int i = 0; i < size; i++) {
+        if (arr[i] > limit) {
+            count++;
+        }
+    }
+    return count;
+}
+
+[tests]
+countAbove({5, 12, 8, 20}, 4, 10) == 2
+countAbove({1, 2, 3}, 3, 0) == 3
+countAbove({1, 2, 3}, 3, 3) == 0
+countAbove({10, 10, 11}, 3, 10) == 1

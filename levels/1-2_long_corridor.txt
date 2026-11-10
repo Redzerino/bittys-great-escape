@@ -1,4 +1,4 @@
-title: 1-2  The Long Corridor
+title: 1.2  The Long Corridor
 type: escape
 
 [story]
@@ -34,7 +34,7 @@ Watch the Inspector: you'll see i count up.
 ################
 
 [code]
-// LEVEL 1-2: THE LONG CORRIDOR
+// STAGE 1.2: THE LONG CORRIDOR
 // Typing move(EAST); eleven times
 // is painful. A for loop repeats
 // code for you:
@@ -43,3 +43,7 @@ Watch the Inspector: you'll see i count up.
 //       move(EAST);  // 3 times
 //   }
 
+[solution]
+for (int i = 0; i < 11; i++) {
+    move(EAST);
+}

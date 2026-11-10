@@ -82,6 +82,7 @@ typedef struct {
     LevelType type;
     bool      banIndexing;
     int       maxSteps;     // repair levels: instruction limit per test (catches infinite loops)
+    int       doorCode;     // escape levels: gates open when Bitty write()s this next to them (-1 = no door)
 
     char      story[LEVEL_TEXT_MAX];
     char      lesson[LEVEL_TEXT_MAX];

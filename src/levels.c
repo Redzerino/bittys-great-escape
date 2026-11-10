@@ -342,6 +342,7 @@ bool Level_Parse(const char *text, const char *fileName, Level *lv, char *error,
     memset(lv, 0, sizeof *lv);
     snprintf(lv->file, sizeof lv->file, "%s", fileName ? fileName : "(level)");
     lv->maxSteps = 2000000;
+    lv->doorCode = -1;
 
     Section sec = SEC_NONE;
     const char *p = text;
@@ -389,6 +390,7 @@ bool Level_Parse(const char *text, const char *fileName, Level *lv, char *error,
                 else if (strcmp(key, "type") == 0)         lv->type = (strcmp(value, "repair") == 0) ? LEVEL_REPAIR : LEVEL_ESCAPE;
                 else if (strcmp(key, "ban_indexing") == 0) lv->banIndexing = (strcmp(value, "yes") == 0 || strcmp(value, "true") == 0);
                 else if (strcmp(key, "max_steps") == 0)    lv->maxSteps = atoi(value);
+                else if (strcmp(key, "door_code") == 0)    lv->doorCode = atoi(value);
                 break;
             }
             case SEC_STORY:    AppendLine(lv->story, sizeof lv->story, line); break;

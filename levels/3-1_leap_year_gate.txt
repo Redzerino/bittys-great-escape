@@ -1,4 +1,4 @@
-title: 3-1  Leap Year Gate
+title: 3.4  Leap Year Gate
 type: repair
 
 [story]
@@ -32,7 +32,7 @@ Exam 1, Q1.
 Try: return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
 
 [code]
-// LEVEL 3-1: LEAP YEAR GATE
+// STAGE 3.4: LEAP YEAR GATE
 // Divisible by 4, but not by 100,
 // unless also divisible by 400.
 

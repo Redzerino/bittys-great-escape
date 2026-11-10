@@ -1,4 +1,4 @@
-title: 4-1  Prime Lock
+title: 4.5  Prime Lock
 type: repair
 max_steps: 5000000
 
@@ -34,7 +34,7 @@ Exam 1, Q3.
 if (n < 2) return false; then for (int i = 2; i <= n / i; i++) check n % i == 0. Using i * i <= n overflows on the last gate.
 
 [code]
-// LEVEL 4-1: PRIME LOCK
+// STAGE 4.5: PRIME LOCK
 // Prime: only divisible by itself and 1.
 // The last gate is 2147483647 (the
 // biggest int there is). Be careful!

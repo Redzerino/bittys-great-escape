@@ -1,4 +1,4 @@
-title: 5-1  Search the Bay
+title: 6.4  Search the Bay
 type: repair
 
 [story]
@@ -7,8 +7,7 @@ Write find(): return the INDEX where toFind is, or -1 if it isn't there.
 
 [talk]
 @walk EAST 1
-Welcome to the Array Bay. An `array` is a row of boxes, all with the same name.
-You pick a box by its position: `arr[0]` is the first, `arr[1]` the second. Yes, counting starts at 0. Robots love that.
+Back to the shelves. This time I'm looking for one particular number, and I need to know which box it's in.
 I need to find a number in there. Check each box in a loop, and `return` its position when you find it.
 If you reach the end without finding it, return -1. And never read past the last box. That memory isn't ours!
 
@@ -32,7 +31,7 @@ Exam 1, Q8.
 for (int i = 0; i < size; i++) { if (arr[i] == toFind) return i; } and after the loop, return -1.
 
 [code]
-// LEVEL 5-1: SEARCH THE BAY
+// STAGE 6.4: SEARCH THE BAY
 // Return the index of toFind,
 // or -1 if it isn't in the array.
 
