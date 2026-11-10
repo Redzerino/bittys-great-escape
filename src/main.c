@@ -11,6 +11,7 @@
 
 #include "raylib.h"
 
+#include "circuit.h"
 #include "startup.h"
 #include "talk.h"
 #include "customisation.h"
@@ -81,6 +82,7 @@ typedef struct {
     bool       stepping;
     int        speedIndex;
     int        level;
+    bool       showCircuit;
     bool       showLevels;      // the level menu
     bool       showHelp;        // the F1 shortcuts card
     float      saveTimer;       // autosave countdown
@@ -941,8 +943,15 @@ static void DrawToolbar(Game *g)
     bool hasLesson = Levels_Get(g->level)->lesson[0] != '\0';
     if (Button((Rectangle){ W - 100, y, 90, h }, "LESSON", (Color){ 120, 90, 170, 255 }, hasLesson && !running))
         g->showLesson = !g->showLesson;
-    if (Button((Rectangle){ W - 200, y, 90, h }, "LEVELS", (Color){ 60, 120, 140, 255 }, !running))
-        g->showLevels = !g->showLevels;
+    if (Button((Rectangle){ W - 200, y, 90, h }, "CIRCUIT", (Color){ 60, 120, 140, 255 }, !running))
+    {
+        SaveNow(g);
+        Talk_Skip();
+        g->world.talking = false;
+        g->showHelp = g->showLevels = g->showWorkshop = false;
+        Circuit_SelectLevel(g->level);
+        g->showCircuit = true;
+    }
     if (Button((Rectangle){ W - 240, y, 32, h }, "?", (Color){ 70, 70, 100, 255 }, true) || IsKeyPressed(KEY_F1))
         g->showHelp = !g->showHelp;
 }
@@ -1011,6 +1020,10 @@ int main(void)
     if (levelError[0])
         Console_PrintKind(loaded ? CONSOLE_WARNING : CONSOLE_ERROR, TextFormat("Level problem: %s\n", levelError));
 
+    Circuit_Init();
+    Circuit_SelectLevel(start);
+    g->showCircuit = true;
+    Talk_Skip();
     Startup_Init(g->codeFont);
     Talk_Init();
     bool startupActive = true;
@@ -1028,11 +1041,24 @@ int main(void)
             if (Startup_Update(dt))
             {
                 startupActive = false;
-                World_PlayIntro(&g->world);
+                g->showCircuit = true;
             }
             BeginDrawing();
             Startup_Draw();
             EndDrawing();
+            continue;
+        }
+
+        if (g->showCircuit)
+        {
+            BeginDrawing();
+            int stage = Circuit_Draw(g->codeFont, dt);
+            EndDrawing();
+            if (stage >= 0)
+            {
+                LoadLevel(g, stage, true);
+                g->showCircuit = false;
+            }
             continue;
         }
 
