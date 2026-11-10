@@ -1,0 +1,61 @@
+title: 4.2  Sensor Loop
+type: escape
+
+[story]
+Bitty: "The corridor winds around and I can't see how long each part is."
+Goal: use while loops and scan() to follow the corridor to the EXIT.
+
+[talk]
+@walk EAST 1
+A twisty corridor. I don't know how long each part is, so I can't use a counted `for` loop.
+A `while` loop is perfect for this. It keeps going for as long as its question is true, however long that takes.
+`while (scan(EAST) != TILE_WALL) { move(EAST); }` means: keep walking east until there's a wall in front of me.
+The corridor goes EAST, then SOUTH, then WEST to the exit. One loop for each part!
+The first loop is already written. Add the other two.
+
+[lesson]
+while repeats AS LONG AS its condition
+is true. Use it when you don't know
+how many times in advance.
+
+    while (scan(EAST) != TILE_WALL) {
+        move(EAST);
+    }
+
+  for     "do this 10 times"
+  while   "keep going until..."
+
+You can put several loops one after
+another. Each finishes before the
+next one starts.
+
+[hint]
+After the first loop, add while (scan(SOUTH) != TILE_WALL) { move(SOUTH); } and the same for WEST.
+
+[map]
+#########
+#bB.....#
+#######.#
+#E......#
+#########
+
+[code]
+// STAGE 4.2: SENSOR LOOP
+// The corridor goes EAST, then SOUTH,
+// then WEST to the exit.
+// Use one while loop for each part.
+
+while (scan(EAST) != TILE_WALL) {
+    move(EAST);
+}
+
+[solution]
+while (scan(EAST) != TILE_WALL) {
+    move(EAST);
+}
+while (scan(SOUTH) != TILE_WALL) {
+    move(SOUTH);
+}
+while (scan(WEST) != TILE_WALL) {
+    move(WEST);
+}

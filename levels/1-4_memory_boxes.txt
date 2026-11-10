@@ -1,4 +1,4 @@
-title: 1-4  Memory Boxes
+title: 1.4  Memory Boxes
 type: escape
 
 [story]
@@ -45,7 +45,7 @@ First move(EAST) onto the data tile. Then int steps = read(); and loop while i <
 ##########
 
 [code]
-// LEVEL 1-4: MEMORY BOXES
+// STAGE 1.4: MEMORY BOXES
 // 1. Step onto the data tile.
 // 2. Save its number in a variable:
 //      int steps = read();

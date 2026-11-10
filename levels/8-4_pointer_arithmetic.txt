@@ -1,0 +1,67 @@
+title: 8.4  Pointer Arithmetic
+type: repair
+ban_indexing: yes
+
+[story]
+Bitty: "Two pointers, one at each end, walking towards the middle."
+Write reverse_array() using pointers only.
+
+[talk]
+@walk EAST 1
+Remember Mirror Mirror? Same job: reverse an array. But this time, no `[ ]`.
+Use two pointers. `left` starts at the first box. `right` starts at the LAST box: `arr + size - 1`.
+Swap the values they point at, then move `left` forward and `right` back.
+Keep going while `left < right`. Yes, you can compare pointers! When they meet in the middle, you're done.
+This two-pointer trick turns up everywhere. Learn it once and use it forever.
+
+[lesson]
+Two pointers, one from each end:
+
+    int *left  = arr;
+    int *right = arr + size - 1;
+
+    while (left < right) {
+        int temp = *left;
+        *left = *right;
+        *right = temp;
+        left++;
+        right--;
+    }
+
+arr + size - 1 is the address of the
+LAST box.
+
+Exam 2: reverse_array.
+
+[hint]
+int *left = arr; int *right = arr + size - 1; swap *left and *right while left < right.
+
+[code]
+// STAGE 8.4: POINTER ARITHMETIC
+// Reverse the array WITHOUT [ ].
+// {1, 2, 3, 4, 5} -> {5, 4, 3, 2, 1}
+
+void reverse_array(int *arr, int size) {
+    int *left = arr;
+    int *right = arr + size - 1;
+
+}
+
+[solution]
+void reverse_array(int *arr, int size) {
+    int *left = arr;
+    int *right = arr + size - 1;
+    while (left < right) {
+        int temp = *left;
+        *left = *right;
+        *right = temp;
+        left++;
+        right--;
+    }
+}
+
+[tests]
+reverse_array({1, 2, 3, 4, 5}, 5) then #1 == {5, 4, 3, 2, 1}
+reverse_array({7, 8}, 2) then #1 == {8, 7}
+reverse_array({42}, 1) then #1 == {42}
+reverse_array({1, 2, 3, 4}, 4) then #1 == {4, 3, 2, 1}

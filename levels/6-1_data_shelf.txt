@@ -1,0 +1,62 @@
+title: 6.1  Data Shelf
+type: repair
+
+[story]
+Bitty: "Shelves and shelves of numbers. Let's add them all up."
+Write sumArray() to add up every number in an array.
+
+[talk]
+@walk EAST 1
+Welcome to the RAM Banks. Here memory is stored on shelves called `arrays`.
+An array is a row of boxes with ONE name. You pick a box by its position: `arr[0]` is the first, `arr[1]` the second.
+Counting starts at 0, so the last box in an array of 5 is `arr[4]`. There is no `arr[5]`. Reading it is a classic bug!
+A `for` loop is the perfect way to visit every box: `for (int i = 0; i < size; i++)`.
+Watch the boxes above my head flash as each one is read.
+
+[lesson]
+An ARRAY is a row of boxes, one name:
+
+    int arr[5] = { 4, 9, 2, 8, 5 };
+
+    arr[0]  arr[1]  arr[2]  arr[3]  arr[4]
+      4       9       2       8       5
+
+Positions start at 0. The last one is
+size - 1.
+
+Visit every box with a loop:
+
+    for (int i = 0; i < size; i++) {
+        total += arr[i];
+    }
+
+Exam 2: sum_array.
+
+[hint]
+for (int i = 0; i < size; i++) total += arr[i];
+
+[code]
+// STAGE 6.1: DATA SHELF
+// Add up every number in arr.
+// sumArray({1, 2, 3, 4}, 4) -> 10
+
+int sumArray(int arr[], int size) {
+    int total = 0;
+
+    return total;
+}
+
+[solution]
+int sumArray(int arr[], int size) {
+    int total = 0;
+    for (int i = 0; i < size; i++) {
+        total += arr[i];
+    }
+    return total;
+}
+
+[tests]
+sumArray({1, 2, 3, 4}, 4) == 10
+sumArray({5}, 1) == 5
+sumArray({-3, 3, -3, 3, 7}, 5) == 7
+sumArray({100, 200, 300}, 3) == 600

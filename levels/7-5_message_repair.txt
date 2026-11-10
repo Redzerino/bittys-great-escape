@@ -1,0 +1,64 @@
+title: 7.5  Message Repair
+type: repair
+
+[story]
+Bitty: "I copied the message, but there's junk on the end. What did I forget?"
+Fix copyString() so the copy ends in the right place.
+
+[talk]
+@walk EAST 1
+This function copies a message into a buffer, letter by letter. Press RUN and look at the result.
+The letters are there... but so is a load of junk after them! The `#` signs were already in the buffer.
+The loop stops at the `'\0'`, but it never COPIES the `'\0'`. So the copy doesn't know where to stop.
+Without its `'\0'`, a string just runs on into whatever happens to be next in memory. That's one of the most common bugs in C.
+Add one line after the loop to put a `'\0'` on the end of `dest`.
+
+[lesson]
+Copying a string:
+
+    int i = 0;
+    while (src[i] != '\0') {
+        dest[i] = src[i];
+        i++;
+    }
+    dest[i] = '\0';     // don't forget!
+
+Without the '\0', the copy runs on into
+whatever is in memory after it:
+
+    "Hi" copied into "##########"
+    gives "Hi########"
+
+Exam 2: copy_string.
+
+[hint]
+After the loop, add dest[i] = '\0';
+
+[code]
+// STAGE 7.5: MESSAGE REPAIR
+// Copy src into dest.
+// The copy has junk on the end...
+// What's missing?
+
+void copyString(char dest[], char src[]) {
+    int i = 0;
+    while (src[i] != '\0') {
+        dest[i] = src[i];
+        i++;
+    }
+}
+
+[solution]
+void copyString(char dest[], char src[]) {
+    int i = 0;
+    while (src[i] != '\0') {
+        dest[i] = src[i];
+        i++;
+    }
+    dest[i] = '\0';
+}
+
+[tests]
+copyString("##########"[20], "Hi") then #1 == "Hi"
+copyString("##########"[20], "Bitty") then #1 == "Bitty"
+copyString("##########"[20], "") then #1 == ""

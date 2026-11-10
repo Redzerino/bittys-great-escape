@@ -1,4 +1,4 @@
-title: 8-1  Swap Wires
+title: 8.3  Swap Wires
 type: repair
 ban_indexing: yes
 
@@ -8,10 +8,10 @@ Write swap_ints() using pointers. In this world [ ] is banned.
 
 [talk]
 @walk EAST 1
-Pointer Wires. Every box in memory has an address, like a house number.
-A `pointer` is a variable that holds an address. `int *a` means "a holds the address of an int".
-`*a` means "go to that address and use what's there". That's how a function can change a variable that lives somewhere else.
-Two wires are crossed. Swap what's at the ends. Oh, and `[ ]` is banned in this sector. Pointers only!
+Two wires are crossed. This is Exam 2, question 1, and it's a classic.
+The function gets two addresses, `int *a` and `int *b`. Remember, `*a` means "go to that address and use what's there".
+You can't just copy one into the other, or you'd lose it. Keep a spare in `temp` first, just like Mirror Mirror.
+Swap what's at the ends and the wires untangle. Oh, and `[ ]` is still banned in this sector. Pointers only!
 
 [lesson]
 A POINTER holds an ADDRESS: where a value
@@ -33,7 +33,7 @@ Exam 2, Q1.
 int temp = *a; *a = *b; *b = temp;
 
 [code]
-// LEVEL 8-1: SWAP WIRES
+// STAGE 8.3: SWAP WIRES
 // x = 5, y = 10  ->  swap_ints(&x, &y)
 //                ->  x = 10, y = 5
 

@@ -1,4 +1,4 @@
-title: 2-2  Binary Decoder
+title: 2.3  Binary Decoder
 type: repair
 
 [story]
@@ -30,7 +30,7 @@ Exam 1, Q4.
 Start with result = 0 and place = 1. While the number is > 0: result += (number % 10) * place; place *= 2; number /= 10;
 
 [code]
-// LEVEL 2-2: BINARY DECODER
+// STAGE 2.3: BINARY DECODER
 // 110 -> 6     111 -> 7
 // No shift operator (<< >>) allowed!
 

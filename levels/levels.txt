@@ -1,27 +1,75 @@
-# Play order. One level file per line. Lines starting with # are ignored.
+# Play order. This is the order NEXT > follows, so it matches the route on the
+# Escape Circuit map. One level file per line. Lines starting with # are ignored.
+# Where each file sits on the map is decided in circuit.c (Placement).
 
-# World 1: Boot Sector (statements, loops, variables, if / else)
+# BOOTCAMP (optional): for people who have never coded. Files 0-1 ... 0-7
+0-1_what_is_code.txt
+0-2_one_step_at_a_time.txt
+0-3_talking_back.txt
+0-4_boxes_with_names.txt
+0-5_maths_machine.txt
+0-6_making_choices.txt
+0-7_doing_it_again.txt
+
+# 1 Boot Sector: commands, variables
 1-1_wake_up.txt
 1-2_long_corridor.txt
 1-3_mind_the_gap.txt
 1-4_memory_boxes.txt
 1-5_fork_in_the_road.txt
 
-# World 2: The Registers (variables, operators)
-2-0_first_function.txt
+# 2 Register Bank: types, arithmetic
+2-1_data_types.txt
 2-1_digit_peeler.txt
 2-2_binary_decoder.txt
+2-4_register_updates.txt
+2-5_access_code.txt
 
-# World 3: Branch Junction (if / else, && ||)
+# 3 CPU Control Unit: decisions, logic
+3-1_comparisons.txt
+3-2_choose_a_path.txt
+3-3_multiple_routes.txt
 3-1_leap_year_gate.txt
+3-5_control_terminal.txt
 
-# World 4: Loop Corridors
+# 4 Processing Core: loops
+4-1_counted_loops.txt
+4-2_sensor_loop.txt
+4-3_try_again.txt
+4-4_emergency_stop.txt
 4-1_prime_lock.txt
 
-# World 5: Array Bay
+# 5 System Library: functions, scope
+2-0_first_function.txt
+5-2_parameters.txt
+5-3_return_values.txt
+5-4_local_memory.txt
+5-5_repair_toolkit.txt
+
+# 6 RAM Banks: arrays, searching
+6-1_data_shelf.txt
+6-2_array_traversal.txt
+6-3_power_audit.txt
 5-1_search_the_bay.txt
 5-2_mirror_mirror.txt
 
-# World 8: Pointer Wires ([ ] is banned here)
+# 7 Data Bus: characters, strings
+7-1_character_codes.txt
+7-2_end_of_message.txt
+7-3_string_length.txt
+7-4_password_terminal.txt
+7-5_message_repair.txt
+
+# 8 Address Network: pointers ([ ] banned)
+8-1_memory_addresses.txt
+8-2_follow_the_wire.txt
 8-1_swap_wires.txt
+8-4_pointer_arithmetic.txt
 8-2_measure_the_string.txt
+
+# 9 USB Gateway: final escape, Exam 2 revision ([ ] banned)
+9-1_port_controller.txt
+9-2_transfer_buffer.txt
+9-3_final_firewall.txt
+9-4_escape_protocol.txt
+9-5_bitty_breaks_free.txt

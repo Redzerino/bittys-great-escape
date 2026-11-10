@@ -1,4 +1,4 @@
-title: 1-3  Mind the Gap
+title: 1.3  Mind the Gap
 type: escape
 
 [story]
@@ -37,7 +37,7 @@ while (x = 5) is a classic bug!
 ###########
 
 [code]
-// LEVEL 1-3: MIND THE GAP
+// STAGE 1.3: MIND THE GAP
 // scan(EAST) tells you what's in
 // the next tile east: TILE_EMPTY,
 // TILE_WALL, TILE_EXIT, TILE_VOID...
@@ -49,3 +49,9 @@ while (x = 5) is a classic bug!
 //       ...
 //   }
 
+[solution]
+while (scan(EAST) != TILE_WALL) {
+    move(EAST);
+}
+move(SOUTH);
+move(SOUTH);

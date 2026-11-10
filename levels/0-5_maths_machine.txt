@@ -1,0 +1,69 @@
+title: B.5  Maths Machine
+type: escape
+door_code: 48
+
+[story]
+Bitty: "This door's code is a sum. I'm a robot, I should be good at this..."
+Goal: work out the door code with maths in your code.
+
+[talk]
+@walk EAST 1
+Another door. The sign says: "The code is 6 times 8". Hmm. Let's make the computer do the maths for us.
+In C you can use `+` to add, `-` to subtract, `*` to multiply and `/` to divide.
+So `int code = 6 * 8;` works out 6 times 8 and puts the answer in the box. You never have to do the sum yourself.
+You can also change a variable after you make it: `code = code + 1;` means "take what's in code, add 1, and put it back".
+The code at the moment does 6 PLUS 8. Fix the sign so it multiplies instead.
+
+[lesson]
+C can do maths for you:
+
+    +   add          5 + 2   is 7
+    -   subtract     5 - 2   is 3
+    *   multiply     5 * 2   is 10
+    /   divide       10 / 2  is 5
+
+    int code = 6 * 8;     code is 48
+
+You can change a variable later:
+
+    code = code + 1;      code is 49
+
+The right side is worked out FIRST,
+then the answer goes into the box on
+the left.
+
+Watch out: dividing whole numbers drops
+the leftover. 7 / 2 is 3, not 3.5!
+
+[hint]
+The door wants 6 times 8. In C, times is written *, so: int code = 6 * 8;
+
+[map]
+########
+#bB..GE#
+########
+
+[code]
+// BOOTCAMP 5: MATHS MACHINE
+// The door code is 6 times 8.
+// Times in C is the * symbol.
+// This code adds instead. Fix it!
+
+int code = 6 + 8;
+printf("Trying code %d\n", code);
+
+move(EAST);
+move(EAST);
+write(code);
+move(EAST);
+move(EAST);
+
+[solution]
+int code = 6 * 8;
+printf("Trying code %d\n", code);
+
+move(EAST);
+move(EAST);
+write(code);
+move(EAST);
+move(EAST);

@@ -1,0 +1,56 @@
+title: 5.3  Return Values
+type: repair
+
+[story]
+Bitty: "The weather module only speaks Fahrenheit. Let's translate."
+Write toFahrenheit() and return the answer.
+
+[talk]
+@walk EAST 1
+A function can take values in, but it can only hand ONE value back. That's what `return` is for.
+`return` does two things: it gives back the answer, and it ends the function straight away.
+To turn Celsius into Fahrenheit: multiply by 9, divide by 5, then add 32.
+Do the multiply BEFORE the divide. With whole numbers, `c / 5 * 9` loses the leftover too early and gets the wrong answer.
+Nice check: -40 is the same in both. Spooky.
+
+[lesson]
+return hands a value back to whoever
+called the function, and ends it.
+
+    int toFahrenheit(int c) {
+        return c * 9 / 5 + 32;
+    }
+
+    int f = toFahrenheit(100);   // 212
+
+C does * and / before + and -, from
+left to right. With whole numbers, the
+order of * and / changes the answer:
+
+    37 * 9 / 5   is 66
+    37 / 5 * 9   is 63
+
+[hint]
+return c * 9 / 5 + 32;
+
+[code]
+// STAGE 5.3: RETURN VALUES
+// Celsius -> Fahrenheit
+//   F = C * 9 / 5 + 32
+// toFahrenheit(100) -> 212
+
+int toFahrenheit(int c) {
+    int f = c * 9 / 5 + 32;
+}
+
+[solution]
+int toFahrenheit(int c) {
+    return c * 9 / 5 + 32;
+}
+
+[tests]
+toFahrenheit(0) == 32
+toFahrenheit(100) == 212
+toFahrenheit(-40) == -40
+toFahrenheit(37) == 98
+toFahrenheit(20) == 68

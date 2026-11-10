@@ -1,0 +1,68 @@
+title: 6.3  Power Audit
+type: repair
+
+[story]
+Bitty: "Which bank has the most power? And careful... some of them are negative."
+Write findMax() to return the biggest number in an array.
+
+[talk]
+@walk EAST 1
+Power audit. I need the biggest number in each bank.
+Keep a variable called `max`. Visit every box, and whenever you find a bigger number, that becomes the new `max`.
+But where should `max` start? Lots of people start it at 0. Press RUN and watch what happens with an array full of negative numbers...
+0 is bigger than all of them, so it never changes. Wrong answer!
+The safe trick is to start `max` at the FIRST box, `arr[0]`. It's definitely in the array, so it's a fair starting point.
+
+[lesson]
+Finding the biggest:
+
+    int max = arr[0];       // NOT 0!
+    for (int i = 1; i < size; i++) {
+        if (arr[i] > max) {
+            max = arr[i];
+        }
+    }
+    return max;
+
+Why not start at 0?
+    { -5, -2, -9 }   the answer is -2
+but 0 is bigger than all of them, so
+max would stay 0.
+
+Exam 2: find_max.
+
+[hint]
+Start with int max = arr[0]; not int max = 0;
+
+[code]
+// STAGE 6.3: POWER AUDIT
+// Return the biggest number in arr.
+// findMax({3, 9, 4}, 3) -> 9
+// findMax({-5, -2, -9}, 3) -> -2
+
+int findMax(int arr[], int size) {
+    int max = 0;
+    for (int i = 0; i < size; i++) {
+        if (arr[i] > max) {
+            max = arr[i];
+        }
+    }
+    return max;
+}
+
+[solution]
+int findMax(int arr[], int size) {
+    int max = arr[0];
+    for (int i = 1; i < size; i++) {
+        if (arr[i] > max) {
+            max = arr[i];
+        }
+    }
+    return max;
+}
+
+[tests]
+findMax({3, 9, 4}, 3) == 9
+findMax({7}, 1) == 7
+findMax({1, 2, 3, 4, 5}, 5) == 5
+findMax({-5, -2, -9}, 3) == -2

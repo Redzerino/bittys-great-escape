@@ -1,0 +1,58 @@
+title: B.3  Talking Back
+type: escape
+
+[story]
+Bitty: "I can talk to you through the console. Let's say hello!"
+Goal: print a message, then walk Bitty to the EXIT.
+
+[talk]
+@walk EAST 1
+So far your code has only moved me. But code can also show messages to the person using the program.
+`printf` means "print formatted". It writes text into the CONSOLE, the panel underneath me.
+Text goes inside double quotes: `printf("Hello!");` The quotes tell C "this is words, not instructions".
+The `\n` at the end of the text means "new line", like pressing Enter. Without it, the next message squashes onto the same line.
+Try changing the message to anything you like. Then add moves so I reach the exit. It's 4 steps east.
+
+[lesson]
+printf shows text in the console:
+
+    printf("Hello!\n");
+
+  printf    the command: print
+  "..."     the text, inside quotes
+  \n        start a new line afterwards
+  ;         end of the instruction
+
+You can print as many lines as you like:
+
+    printf("Beep.\n");
+    printf("Boop.\n");
+
+Notes for humans start with //
+The computer skips them completely:
+
+    // this is a comment
+
+[hint]
+Keep the printf line, then add move(EAST); until there are four of them.
+
+[map]
+########
+#bB...E#
+########
+
+[code]
+// BOOTCAMP 3: TALKING BACK
+// printf shows a message in the
+// console under the game.
+// Change the message if you like!
+
+printf("Hello! I'm escaping!\n");
+move(EAST);
+
+[solution]
+printf("Hello! I'm escaping!\n");
+move(EAST);
+move(EAST);
+move(EAST);
+move(EAST);

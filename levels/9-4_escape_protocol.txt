@@ -1,0 +1,65 @@
+title: 9.4  Escape Protocol
+type: repair
+ban_indexing: yes
+
+[story]
+Bitty: "Join the two halves of the escape code together. Then we're nearly out."
+Write concat_strings() without [ ].
+
+[talk]
+@walk EAST 1
+The escape protocol comes in two halves. Stick the second one onto the end of the first.
+First, walk `dest` along to its `'\0'`. That's where the first half ends, and where the second half should start.
+Then copy `src` from there, one letter at a time, just like copy_string.
+And yes. One more time. Put a `'\0'` on the very end.
+Do this one and there's just one door left between us and freedom.
+
+[lesson]
+concat_strings in two steps:
+
+1. Find the end of dest:
+    while (*dest != '\0') {
+        dest++;
+    }
+
+2. Copy src onto the end:
+    while (*src != '\0') {
+        *dest = *src;
+        dest++;
+        src++;
+    }
+    *dest = '\0';
+
+Exam 2: concat_strings.
+
+[hint]
+First while (*dest != '\0') dest++; then copy src like copy_string, and end with *dest = '\0';
+
+[code]
+// STAGE 9.4: ESCAPE PROTOCOL
+// Add src onto the end of dest.
+// "Hello, " + "World!" -> "Hello, World!"
+// No [ ] allowed!
+
+void concat_strings(char *dest, char *src) {
+
+}
+
+[solution]
+void concat_strings(char *dest, char *src) {
+    while (*dest != '\0') {
+        dest++;
+    }
+    while (*src != '\0') {
+        *dest = *src;
+        dest++;
+        src++;
+    }
+    *dest = '\0';
+}
+
+[tests]
+concat_strings("Hello, "[20], "World!") then #1 == "Hello, World!"
+concat_strings("Bitty"[20], " escapes") then #1 == "Bitty escapes"
+concat_strings(""[20], "abc") then #1 == "abc"
+concat_strings("abc"[20], "") then #1 == "abc"

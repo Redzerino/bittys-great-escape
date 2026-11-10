@@ -1,4 +1,4 @@
-title: 5-2  Mirror Mirror
+title: 6.5  Mirror Mirror
 type: repair
 
 [story]
@@ -34,7 +34,7 @@ Exam 1, Q15.
 for (int i = 0; i < size / 2; i++) swap arr[i] with arr[size - 1 - i].
 
 [code]
-// LEVEL 5-2: MIRROR MIRROR
+// STAGE 6.5: MIRROR MIRROR
 // Reverse the array in place.
 // {1, 2, 3} becomes {3, 2, 1}
 

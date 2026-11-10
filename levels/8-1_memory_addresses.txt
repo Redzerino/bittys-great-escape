@@ -1,0 +1,55 @@
+title: 8.1  Memory Addresses
+type: repair
+
+[story]
+Bitty: "I doubled the value... but only my copy. I need its address!"
+Fix doubleValue() so it changes the real value through a pointer.
+
+[talk]
+@walk EAST 1
+The Address Network. Every box in memory has an `address`, like a house number. `&x` means "the address of x".
+A `pointer` is a variable that holds an address. `int *p` means "p holds the address of an int".
+To get to the value at that address, put a star in front: `*p`. That's called dereferencing. Follow the wire to the box.
+The starter code copies the value into `x`, doubles `x`... and then `x` disappears when the function ends. The real value never changes.
+Change the value AT the address instead: `*p = *p * 2;`
+
+[lesson]
+POINTERS hold addresses.
+
+    int score = 5;
+    int *p = &score;   // p = address of score
+
+    *p          the value p points at (5)
+    *p = 10;    changes score to 10!
+
+    &x   "address of x"
+    *p   "the value at address p"
+
+Passing an address lets a function
+change the caller's variable:
+
+    doubleValue(&score);
+
+[hint]
+*p = *p * 2;
+
+[code]
+// STAGE 8.1: MEMORY ADDRESSES
+// Double the int that p points at.
+// x = 5; doubleValue(&x);  -> x is 10
+// This only changes a copy!
+
+void doubleValue(int *p) {
+    int x = *p;
+    x = x * 2;
+}
+
+[solution]
+void doubleValue(int *p) {
+    *p = *p * 2;
+}
+
+[tests]
+doubleValue(&5) then #1 == 10
+doubleValue(&0) then #1 == 0
+doubleValue(&-7) then #1 == -14

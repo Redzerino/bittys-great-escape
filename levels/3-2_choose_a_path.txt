@@ -1,0 +1,60 @@
+title: 3.2  Choose a Path
+type: escape
+
+[story]
+Bitty: "Stairs! If there's a wall ahead I go down, otherwise I keep going."
+Goal: use if / else inside a loop to get down the staircase.
+
+[talk]
+@walk EAST 1
+A staircase. I can't see the whole thing, but I can check one tile ahead with `scan(EAST)`.
+The rule is simple: if there's a wall in front of me, step SOUTH. Otherwise, step EAST.
+Put that `if` / `else` inside a loop, and I'll make a fresh decision on every step.
+It takes exactly 10 steps to reach the exit, so a `for` loop that runs 10 times will do it.
+This is how real programs work: the same few lines, making different choices as things change.
+
+[lesson]
+An if inside a loop makes a new
+decision every time round:
+
+    for (int i = 0; i < 10; i++) {
+        if (scan(EAST) == TILE_WALL) {
+            move(SOUTH);
+        } else {
+            move(EAST);
+        }
+    }
+
+scan(EAST) tells you what's in the next
+tile: TILE_WALL, TILE_EMPTY, TILE_EXIT,
+TILE_VOID, TILE_DATA...
+
+[hint]
+Inside the loop: if (scan(EAST) == TILE_WALL) move(SOUTH); else move(EAST);
+
+[map]
+###########
+#bB..######
+####...####
+######..###
+#######..E#
+###########
+
+[code]
+// STAGE 3.2: CHOOSE A PATH
+// Wall ahead? Go SOUTH.
+// No wall?    Go EAST.
+// It takes 10 steps in total.
+
+for (int i = 0; i < 10; i++) {
+    move(EAST);
+}
+
+[solution]
+for (int i = 0; i < 10; i++) {
+    if (scan(EAST) == TILE_WALL) {
+        move(SOUTH);
+    } else {
+        move(EAST);
+    }
+}

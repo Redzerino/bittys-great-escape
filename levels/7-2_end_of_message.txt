@@ -1,0 +1,68 @@
+title: 7.2  End of Message
+type: repair
+
+[story]
+Bitty: "Count the vowels in each message. And no, the exam sheet's answer isn't always right."
+Write countVowels() to count the vowels in a string.
+
+[talk]
+@walk EAST 1
+A `string` is just an array of chars, like "Hello". But how does C know where it ends?
+Every string has a hidden extra char at the end: `'\0'`, the null character. It means "the message stops here".
+So to visit every letter, loop until you reach `'\0'`: `for (int i = 0; s[i] != '\0'; i++)`.
+For each letter, check if it's a vowel, small or capital. That's a lot of `||` "or"s!
+Fun fact: the Exam 2 prep sheet says "OpenAI" has 3 vowels. It actually has 4. O, e, A and I. The gate knows!
+
+[lesson]
+A STRING is an array of chars that
+ends with a hidden '\0':
+
+    "Bitty"
+    'B' 'i' 't' 't' 'y' '\0'
+
+Loop until the '\0':
+
+    for (int i = 0; s[i] != '\0'; i++) {
+        char c = s[i];
+        ...
+    }
+
+Checking several things:
+    c == 'a' || c == 'e' || c == 'A' ...
+
+Exam 2: count_vowels.
+
+[hint]
+Loop while s[i] != '\0' and count++ when s[i] is any of aeiouAEIOU.
+
+[code]
+// STAGE 7.2: END OF MESSAGE
+// Count the vowels (a e i o u, small
+// or capital) in the string s.
+// countVowels("OpenAI") -> 4
+
+int countVowels(char s[]) {
+    int count = 0;
+
+    return count;
+}
+
+[solution]
+int countVowels(char s[]) {
+    int count = 0;
+    for (int i = 0; s[i] != '\0'; i++) {
+        char c = s[i];
+        if (c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u' ||
+            c == 'A' || c == 'E' || c == 'I' || c == 'O' || c == 'U') {
+            count++;
+        }
+    }
+    return count;
+}
+
+[tests]
+countVowels("OpenAI") == 4
+countVowels("Bitty") == 1
+countVowels("AEIOU") == 5
+countVowels("rhythm") == 0
+countVowels("") == 0

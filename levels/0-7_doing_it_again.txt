@@ -1,0 +1,56 @@
+title: B.7  Doing It Again
+type: escape
+
+[story]
+Bitty: "Nine steps. Nine whole lines. There has to be a better way."
+Goal: use a loop instead of writing every step.
+
+[talk]
+@walk EAST 1
+The exit is 9 steps away. You could write `move(EAST);` nine times... but what if it was 900?
+Computers are brilliant at doing the same thing over and over without getting bored. That's called a `loop`.
+`for (int i = 0; i < 9; i++)` says: make a counter called `i`, start it at 0, keep going while it's less than 9, and add 1 each time.
+Whatever is inside the `{ }` after it runs once for every count. 0, 1, 2... up to 8. That's 9 times!
+The loop at the moment only counts to 3. Change the 3 to 9 and watch `i` count up in the Inspector on the right.
+
+[lesson]
+A LOOP repeats code for you.
+
+    for (int i = 0; i < 9; i++) {
+        move(EAST);
+    }
+
+Read it as: "for i from 0, while i is
+less than 9, adding 1 each time: move"
+
+  int i = 0   start counting at 0
+  i < 9       keep going while true
+  i++         add 1 to i after each go
+
+i goes 0,1,2,3,4,5,6,7,8: that's 9 runs.
+
+The code inside { } is the BODY of the
+loop. It can be as long as you like.
+
+[hint]
+Change i < 3 to i < 9.
+
+[map]
+#############
+#bB........E#
+#############
+
+[code]
+// BOOTCAMP 7: DOING IT AGAIN
+// A for loop repeats the code inside
+// its { } a set number of times.
+// This one only repeats 3 times...
+
+for (int i = 0; i < 3; i++) {
+    move(EAST);
+}
+
+[solution]
+for (int i = 0; i < 9; i++) {
+    move(EAST);
+}

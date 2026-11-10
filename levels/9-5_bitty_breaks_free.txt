@@ -1,0 +1,69 @@
+title: 9.5  Bitty Breaks Free
+type: escape
+door_code: 12
+
+[story]
+Bitty: "This is it. The last door. The code is all the numbers on the floor added up."
+Goal: walk the corridor, add up every data tile, write the total at the door, and escape!
+
+[talk]
+@walk EAST 1
+This is it. The USB exit is right there. Just one door left.
+The door code is every number on the floor of this corridor, added together. I'll need to keep a running total as I walk.
+Walk EAST until the tile in front of me is the gate. After each step, add what's on the floor with `total += read();` Empty floor reads as 0, so that's safe.
+Then `write(total);` at the door. If the code's right, it opens, and two more steps and I'm FREE.
+Everything you've learned: variables, loops, scanning, maths. Let's go home.
+
+[lesson]
+Everything together:
+
+    int total = 0;
+    while (scan(EAST) != TILE_GATE) {
+        move(EAST);
+        total += read();
+    }
+    write(total);
+    move(EAST);
+    move(EAST);
+
+  a variable    to remember the total
+  a loop        to walk the corridor
+  scan()        to know when to stop
+  read()        the number on the floor
+  write()       the code for the door
+
+[hint]
+int total = 0; while (scan(EAST) != TILE_GATE) { move(EAST); total += read(); } write(total); then two moves east.
+
+[map]
+###############
+#bB.3.4..5..GE#
+#xxxxxxxxxxxxx#
+###############
+
+[code]
+// STAGE 9.5: BITTY BREAKS FREE
+// The door code is all the numbers
+// on the floor, added together.
+//   1. Walk east until the gate is
+//      next to you, adding up read()
+//   2. write(total) at the door
+//   3. Walk out to freedom!
+
+int total = 0;
+while (scan(EAST) != TILE_GATE) {
+    move(EAST);
+}
+write(total);
+move(EAST);
+move(EAST);
+
+[solution]
+int total = 0;
+while (scan(EAST) != TILE_GATE) {
+    move(EAST);
+    total += read();
+}
+write(total);
+move(EAST);
+move(EAST);

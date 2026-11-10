@@ -1,0 +1,62 @@
+title: 5.2  Parameters
+type: repair
+
+[story]
+Bitty: "The volume knob goes from low to high. Anything outside that needs fixing."
+Write clamp() with three parameters.
+
+[talk]
+@walk EAST 1
+The System Library is full of little helper functions that other code uses again and again.
+The values in the brackets are called `parameters`. They're like variables that get filled in when the function is called.
+`clamp(15, 0, 10)` fills in value = 15, low = 0 and high = 10. Each call can use different values.
+Clamp keeps a number inside a range. Too low? Give back `low`. Too high? Give back `high`. Otherwise, the value is fine as it is.
+Order matters when you call it too: the first value goes into the first parameter, and so on.
+
+[lesson]
+PARAMETERS are the inputs to a function:
+
+    int clamp(int value, int low, int high)
+
+    clamp(15, 0, 10)
+          |   |   |
+      value  low  high
+
+Inside the function they work just like
+normal variables.
+
+    if (value < low)  return low;
+    if (value > high) return high;
+    return value;
+
+[hint]
+if (value < low) return low; if (value > high) return high; return value;
+
+[code]
+// STAGE 5.2: PARAMETERS
+// Keep value between low and high.
+// clamp(5, 0, 10)  -> 5
+// clamp(-3, 0, 10) -> 0
+// clamp(15, 0, 10) -> 10
+
+int clamp(int value, int low, int high) {
+    return value;
+}
+
+[solution]
+int clamp(int value, int low, int high) {
+    if (value < low) {
+        return low;
+    }
+    if (value > high) {
+        return high;
+    }
+    return value;
+}
+
+[tests]
+clamp(5, 0, 10) == 5
+clamp(-3, 0, 10) == 0
+clamp(15, 0, 10) == 10
+clamp(7, 7, 9) == 7
+clamp(100, 1, 99) == 99

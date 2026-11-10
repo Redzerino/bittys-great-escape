@@ -70,7 +70,9 @@ typedef enum {
     EVENT_NONE = 0,
     EVENT_BONK,       // walked into a wall or a gate
     EVENT_FALL,       // stepped into the void
-    EVENT_WIN         // reached the exit
+    EVENT_WIN,        // reached the exit
+    EVENT_DOOR_OPEN,  // wrote the right door code next to a gate
+    EVENT_WRONG_CODE  // wrote the wrong one
 } WorldEvent;
 
 typedef enum {
@@ -166,6 +168,7 @@ typedef struct {
     bool   speaking;          // letters are appearing right now: his mouth moves
     float  closeUp;           // 0 = normal camera, 1 = close on Bitty (eases towards 'talking')
     int    theme;             // which area of memory this is (the level's world number): sets the colours
+    int    doorCode;          // escape levels: write() this next to a gate to open it (-1 = no door)
     WorldEvent event;         // the latest thing that happened (cleared by World_TakeEvent)
 
     TestDisplay test;         // repair levels: what the current test is doing

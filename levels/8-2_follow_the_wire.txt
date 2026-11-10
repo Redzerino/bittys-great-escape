@@ -1,0 +1,62 @@
+title: 8.2  Follow the Wire
+type: repair
+ban_indexing: yes
+
+[story]
+Bitty: "No square brackets allowed. I'll have to walk along the array myself."
+Write sum_array() using only a pointer.
+
+[talk]
+@walk EAST 1
+In the Address Network, `[ ]` is banned. Just like Exam 2! You have to use pointers.
+Here's the secret: an array's name is really the address of its first box. So `arr` points at the first number.
+`*arr` is the first number. `arr + 1` is the address of the next box, so `*(arr + 1)` is the second number.
+Even neater, `arr++` slides the pointer along to the next box. Do that `size` times and you've visited them all.
+Watch the pointer marker walk along the boxes above my head.
+
+[lesson]
+Walking an array with a pointer:
+
+    int total = 0;
+    for (int i = 0; i < size; i++) {
+        total += *arr;    // value here
+        arr++;            // slide along
+    }
+
+    arr        address of the first box
+    *arr       the first value
+    *(arr + 2) the third value
+    arr++      point at the next box
+
+In Exam 2, [ ] is not allowed.
+Exam 2: sum_array.
+
+[hint]
+total += *arr; arr++; inside a loop that runs size times.
+
+[code]
+// STAGE 8.2: FOLLOW THE WIRE
+// Add up the array WITHOUT [ ].
+// sum_array({1, 2, 3, 4}, 4) -> 10
+
+int sum_array(int *arr, int size) {
+    int total = 0;
+
+    return total;
+}
+
+[solution]
+int sum_array(int *arr, int size) {
+    int total = 0;
+    for (int i = 0; i < size; i++) {
+        total += *arr;
+        arr++;
+    }
+    return total;
+}
+
+[tests]
+sum_array({1, 2, 3, 4}, 4) == 10
+sum_array({7}, 1) == 7
+sum_array({-1, -2, 10}, 3) == 7
+sum_array({20, 30, 50}, 3) == 100

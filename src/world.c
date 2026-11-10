@@ -129,6 +129,7 @@ void World_Init(World *w, int cols, int rows)
     w->speed = 1.0f;
     w->state = WORLD_RUNNING;
     w->mood  = MOOD_IDLE;
+    w->doorCode = -1;
 }
 
 // Map letters:  # wall   . empty   E exit   x void   B Bitty's start   G gate   0-9 data tile with that value
@@ -286,6 +287,28 @@ bool World_StartAction(World *w, Action a)
             Burst_Sparks(at, 8, 0.9f, (Color){ 150, 210, 255, 255 });
         }
         w->actionLength = WRITE_SECONDS / speed;
+
+        // Door codes: writing next to a gate tries the number on it
+        if (w->doorCode >= 0)
+        {
+            static const int DX[4] = { 0, 1, 0, -1 }, DY[4] = { -1, 0, 1, 0 };
+            for (int i = 0; i < 4; i++)
+            {
+                int gx = w->bittyX + DX[i], gy = w->bittyY + DY[i];
+                if (!InGrid(w, gx, gy) || w->tiles[gy][gx].type != TILE_GATE) continue;
+                if (a.value == w->doorCode)
+                {
+                    World_OpenGate(w, gx, gy);
+                    w->event = EVENT_DOOR_OPEN;
+                }
+                else
+                {
+                    w->shake = 0.3f;
+                    w->event = EVENT_WRONG_CODE;
+                    Burst_Sparks(TilePos(w, (float)gx, (float)gy, 0.4f), 10, 1.0f, (Color){ 255, 90, 70, 255 });
+                }
+            }
+        }
     }
 
     w->actionTimer = w->actionLength;
@@ -494,19 +517,25 @@ typedef struct {
     float ambient[3]; // colour of the shadows
 } Theme;
 
+// Indexed by the chip the level sits on in the Escape Circuit map (0 = bootcamp),
+// so the colours match the map: the accent colour is the chip's colour.
 static const Theme THEMES[] = {
-    /* 0-1 Boot Sector    */ { {  7,  8, 18, 255 }, { 24, 28, 62, 255 }, { 110, 210, 255, 255 }, { 180, 130, 255, 255 }, { 0.16f, 0.17f, 0.27f } },
-    /* 2 The Registers    */ { {  5, 13, 16, 255 }, { 14, 46, 50, 255 }, { 110, 255, 215, 255 }, { 120, 190, 255, 255 }, { 0.13f, 0.20f, 0.24f } },
-    /* 3 Branch Junction  */ { { 13,  7, 20, 255 }, { 46, 22, 62, 255 }, { 225, 135, 255, 255 }, { 255, 140, 195, 255 }, { 0.20f, 0.15f, 0.27f } },
-    /* 4 Loop Corridors   */ { { 16, 10,  8, 255 }, { 56, 32, 22, 255 }, { 255, 195, 115, 255 }, { 255, 135,  95, 255 }, { 0.24f, 0.18f, 0.18f } },
-    /* 5 Array Bay        */ { {  5, 10, 20, 255 }, { 14, 36, 66, 255 }, { 110, 175, 255, 255 }, { 110, 255, 230, 255 }, { 0.13f, 0.18f, 0.28f } },
-    /* 6+ Pointer Wires   */ { { 16,  6, 12, 255 }, { 60, 18, 40, 255 }, { 255, 115, 155, 255 }, { 255, 205, 125, 255 }, { 0.24f, 0.15f, 0.20f } },
+    /* 0 Bootcamp         */ { {  6,  9, 18, 255 }, { 20, 32, 60, 255 }, { 150, 215, 255, 255 }, { 230, 240, 255, 255 }, { 0.16f, 0.18f, 0.27f } },
+    /* 1 Boot Sector      */ { {  5, 12, 12, 255 }, { 14, 44, 40, 255 }, { 100, 245, 175, 255 }, { 110, 200, 255, 255 }, { 0.13f, 0.20f, 0.22f } },
+    /* 2 Register Bank    */ { { 16, 11,  6, 255 }, { 54, 36, 18, 255 }, { 255, 198,  95, 255 }, { 255, 150,  90, 255 }, { 0.24f, 0.19f, 0.16f } },
+    /* 3 CPU Control Unit */ { { 17,  7,  9, 255 }, { 58, 22, 28, 255 }, { 255, 135, 125, 255 }, { 255, 190, 140, 255 }, { 0.25f, 0.15f, 0.18f } },
+    /* 4 Processing Core  */ { {  5, 10, 20, 255 }, { 16, 36, 68, 255 }, { 110, 195, 255, 255 }, { 120, 255, 230, 255 }, { 0.13f, 0.18f, 0.28f } },
+    /* 5 System Library   */ { { 11,  7, 20, 255 }, { 38, 24, 66, 255 }, { 185, 150, 255, 255 }, { 255, 150, 220, 255 }, { 0.19f, 0.16f, 0.28f } },
+    /* 6 RAM Banks        */ { {  4, 13, 15, 255 }, { 12, 46, 52, 255 }, { 100, 225, 220, 255 }, { 120, 170, 255, 255 }, { 0.12f, 0.21f, 0.24f } },
+    /* 7 Data Bus         */ { { 16,  6, 13, 255 }, { 58, 20, 46, 255 }, { 245, 145, 210, 255 }, { 190, 150, 255, 255 }, { 0.24f, 0.15f, 0.22f } },
+    /* 8 Address Network  */ { {  9, 14,  5, 255 }, { 32, 48, 16, 255 }, { 180, 235, 115, 255 }, { 255, 225, 120, 255 }, { 0.18f, 0.22f, 0.16f } },
+    /* 9 USB Gateway      */ { {  8,  9, 14, 255 }, { 34, 38, 54, 255 }, { 235, 242, 255, 255 }, { 120, 220, 255, 255 }, { 0.20f, 0.21f, 0.27f } },
 };
 
 static const Theme *ThemeOf(const World *w)
 {
-    int i = w->theme <= 1 ? 0 : w->theme - 1;
-    if (i > 5) i = 5;
+    int i = w->theme;
+    if (i < 0 || i > 9) i = 1;
     return &THEMES[i];
 }
 
@@ -1632,6 +1661,8 @@ static void DrawLabels(const World *w, Camera3D cam, int vw, int vh, float t)
             else if (tile->type == TILE_DATA)
                 DrawLabel((Vector3){ p.x, 0.3f + sinf(t * 2 + c) * 0.04f, p.z }, cam, vw, vh,
                           TextFormat("%d", tile->value), 22, (Color){ 190, 225, 255, 255 });
+            else if (tile->type == TILE_GATE && w->doorCode >= 0)
+                DrawLabel((Vector3){ p.x, 1.15f, p.z }, cam, vw, vh, "CODE ?", 14, (Color){ 255, 190, 120, 235 });
             else if (tile->type == TILE_EXIT && !underBitty)
                 DrawLabel((Vector3){ p.x, 1.1f, p.z }, cam, vw, vh, "EXIT", 14, (Color){ 210, 255, 225, 230 });
         }

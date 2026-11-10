@@ -1,0 +1,63 @@
+title: 2.5  Access Code
+type: repair
+
+[story]
+Bitty: "The access code is all the digits of the number added together."
+Write sumDigits() to add up the digits of a number.
+
+[talk]
+@walk EAST 1
+Last lock in the Register Bank. The access code is every digit of a number added together. 123 becomes 1 + 2 + 3 = 6.
+Remember the Digit Peeler? `n % 10` grabs the last digit, and `n / 10` chops it off.
+So: grab the last digit, add it to a running `total`, chop it off, and keep going while `n` is bigger than 0.
+Watch `n` shrink and `total` grow in the Inspector as it runs.
+
+[lesson]
+Peeling digits off a number:
+
+    n % 10    the last digit
+    n / 10    the number without it
+
+    1234 % 10   is 4
+    1234 / 10   is 123
+
+Loop until there's nothing left:
+
+    while (n > 0) {
+        total += n % 10;
+        n = n / 10;
+    }
+
+1234 -> total 4, 7, 9, 10
+
+[hint]
+Inside while (n > 0): total += n % 10; n = n / 10;
+
+[code]
+// STAGE 2.5: ACCESS CODE
+// Add up all the digits of n.
+// sumDigits(123) -> 6
+// sumDigits(4096) -> 19
+
+int sumDigits(int n) {
+    int total = 0;
+
+    return total;
+}
+
+[solution]
+int sumDigits(int n) {
+    int total = 0;
+    while (n > 0) {
+        total += n % 10;
+        n = n / 10;
+    }
+    return total;
+}
+
+[tests]
+sumDigits(123) == 6
+sumDigits(9) == 9
+sumDigits(0) == 0
+sumDigits(4096) == 19
+sumDigits(1111) == 4

@@ -1,0 +1,68 @@
+title: 3.3  Multiple Routes
+type: repair
+
+[story]
+Bitty: "The grading chip is broken. It gives everyone an F!"
+Write grade() so it gives the right letter for each score.
+
+[talk]
+@walk EAST 1
+This chip gives a letter grade for a score: 70 or more is an 'A', 60 or more a 'B', 50 a 'C', 40 a 'D', and anything lower is an 'F'.
+One `if` and `else` only gives two choices. For more, chain them: `if`, then `else if`, `else if`... and a final `else`.
+C checks them from the top and stops at the first one that's true. So the ORDER matters!
+Check the highest grade first. If you checked `score >= 40` first, a score of 95 would get a 'D'. Oops.
+This function returns a `char`, a single letter in single quotes like 'A'.
+
+[lesson]
+else if gives more than two choices:
+
+    if (score >= 70) {
+        return 'A';
+    } else if (score >= 60) {
+        return 'B';
+    } else {
+        return 'F';
+    }
+
+C checks from the top and runs ONLY
+the first one that is true.
+
+A char is one character in SINGLE
+quotes: 'A'   'b'   '7'
+Double quotes are for strings: "Hi"
+
+[hint]
+if (score >= 70) return 'A'; else if (score >= 60) return 'B'; ... else return 'F';
+
+[code]
+// STAGE 3.3: MULTIPLE ROUTES
+//   70+ -> 'A'    60+ -> 'B'
+//   50+ -> 'C'    40+ -> 'D'
+//   below 40 -> 'F'
+
+char grade(int score) {
+    return 'F';
+}
+
+[solution]
+char grade(int score) {
+    if (score >= 70) {
+        return 'A';
+    } else if (score >= 60) {
+        return 'B';
+    } else if (score >= 50) {
+        return 'C';
+    } else if (score >= 40) {
+        return 'D';
+    } else {
+        return 'F';
+    }
+}
+
+[tests]
+grade(85) == 'A'
+grade(70) == 'A'
+grade(65) == 'B'
+grade(52) == 'C'
+grade(40) == 'D'
+grade(12) == 'F'

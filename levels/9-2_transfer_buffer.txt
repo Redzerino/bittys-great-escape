@@ -1,0 +1,57 @@
+title: 9.2  Transfer Buffer
+type: repair
+ban_indexing: yes
+
+[story]
+Bitty: "Copy the escape plan into the transfer buffer. Pointers only, and don't forget the end."
+Write copy_string() without [ ].
+
+[talk]
+@walk EAST 1
+Time to send the escape plan through the transfer buffer. Copy one string into another, pointers only.
+`*dest = *src;` copies one letter. Then move both pointers along with `dest++` and `src++`.
+Keep going until `*src` is the `'\0'`.
+And remember the lesson from Message Repair: after the loop, put a `'\0'` on the end of `dest`. Otherwise junk.
+Same job as before, just with pointers instead of `[ ]`.
+
+[lesson]
+copy_string with pointers:
+
+    while (*src != '\0') {
+        *dest = *src;
+        dest++;
+        src++;
+    }
+    *dest = '\0';
+
+Both pointers walk along together.
+The '\0' at the end is NOT optional.
+
+Exam 2: copy_string.
+
+[hint]
+while (*src != '\0') { *dest = *src; dest++; src++; } then *dest = '\0';
+
+[code]
+// STAGE 9.2: TRANSFER BUFFER
+// Copy src into dest, WITHOUT [ ].
+// Don't forget the '\0'!
+
+void copy_string(char *dest, char *src) {
+
+}
+
+[solution]
+void copy_string(char *dest, char *src) {
+    while (*src != '\0') {
+        *dest = *src;
+        dest++;
+        src++;
+    }
+    *dest = '\0';
+}
+
+[tests]
+copy_string("##########"[20], "Escape") then #1 == "Escape"
+copy_string("##########"[20], "Go") then #1 == "Go"
+copy_string("##########"[20], "") then #1 == ""

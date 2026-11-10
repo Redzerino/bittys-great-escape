@@ -1,0 +1,70 @@
+title: B.4  Boxes With Names
+type: escape
+door_code: 7
+
+[story]
+Bitty: "A locked door! It wants a code. Good thing I can remember numbers."
+Goal: store the door code in a variable, write it at the door, and walk through.
+
+[talk]
+@walk EAST 1
+A door with a lock. The code to open it is 7. I need a way to remember that number.
+Programs remember things using `variables`. A variable is like a box with a name written on the side, and a value inside.
+`int code = 7;` makes a box called `code` and puts 7 in it. `int` means the box holds a whole number, like 7 or -3 or 2000.
+After that, whenever you write `code`, C opens the box and uses what's inside. So `write(code);` stamps 7 on the floor next to the door.
+Right now the box holds 0, which is the wrong code. Change the 0 to 7, then press RUN!
+
+[lesson]
+A VARIABLE is a named box that holds
+a value.
+
+    int code = 7;
+
+  int       what kind of value: a whole
+            number (an "integer")
+  code      the name you give the box
+  = 7       put 7 inside it
+
+Using the name gives you the value:
+
+    write(code);     same as write(7);
+    printf("%d\n", code);   prints 7
+
+%d inside printf means "put a whole
+number here". The number comes after
+the comma.
+
+write(number) stamps a number on the
+floor. Next to a locked door, the
+door checks if it's the right code.
+
+[hint]
+Change int code = 0; to int code = 7;
+
+[map]
+#######
+#bB.GE#
+#######
+
+[code]
+// BOOTCAMP 4: BOXES WITH NAMES
+// A variable is a box with a name.
+// This one is called code, and it
+// holds 0. The door needs 7!
+
+int code = 0;
+printf("The code is %d\n", code);
+
+move(EAST);
+write(code);
+move(EAST);
+move(EAST);
+
+[solution]
+int code = 7;
+printf("The code is %d\n", code);
+
+move(EAST);
+write(code);
+move(EAST);
+move(EAST);

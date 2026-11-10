@@ -1,0 +1,60 @@
+title: 7.1  Character Codes
+type: repair
+
+[story]
+Bitty: "The Data Bus SHOUTS everything. Let's turn small letters into capitals."
+Write toUpper() to turn a lowercase letter into a capital.
+
+[talk]
+@walk EAST 1
+Secret time: a `char` is really just a number. Every letter has a code. 'A' is 65, 'B' is 66... and 'a' is 97.
+That means you can do maths with letters! 'a' + 1 is 'b'.
+Every small letter is exactly 32 more than its capital. So to make a capital, take away 32. Or more readably: `c - 'a' + 'A'`.
+But ONLY do that for small letters. Check first: `if (c >= 'a' && c <= 'z')`. Anything else, like 'Q' or '7', comes back unchanged.
+`&&` means "and": both sides must be true.
+
+[lesson]
+A char is stored as a number (ASCII):
+
+    'A' = 65    'a' = 97
+    'B' = 66    'b' = 98
+    'Z' = 90    'z' = 122
+
+small letter - 32 = capital letter
+
+    if (c >= 'a' && c <= 'z') {
+        return c - 'a' + 'A';
+    }
+    return c;
+
+&& means AND: both must be true.
+|| means OR: at least one is true.
+
+[hint]
+if (c >= 'a' && c <= 'z') return c - 32; otherwise return c;
+
+[code]
+// STAGE 7.1: CHARACTER CODES
+// Turn a small letter into a capital.
+// toUpper('a') -> 'A'
+// Anything else stays the same:
+// toUpper('Q') -> 'Q'   toUpper('7') -> '7'
+
+char toUpper(char c) {
+    return c;
+}
+
+[solution]
+char toUpper(char c) {
+    if (c >= 'a' && c <= 'z') {
+        return c - 'a' + 'A';
+    }
+    return c;
+}
+
+[tests]
+toUpper('a') == 'A'
+toUpper('z') == 'Z'
+toUpper('m') == 'M'
+toUpper('Q') == 'Q'
+toUpper('7') == '7'

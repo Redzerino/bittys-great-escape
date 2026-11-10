@@ -1,0 +1,65 @@
+title: 4.4  Emergency Stop
+type: repair
+
+[story]
+Bitty: "Find the smallest number that divides it. And stop the moment you find it!"
+Write smallestDivisor() and use break to stop the loop early.
+
+[talk]
+@walk EAST 1
+The core needs the smallest number, bigger than 1, that divides a number exactly. For 15 that's 3. For 49 it's 7.
+Try every number from 2 upwards. When `n % d == 0`, d divides n exactly. That's our answer!
+Once we've found it there's no point carrying on. `break;` jumps straight out of the loop, like an emergency stop.
+Any code after the loop then runs as normal.
+If nothing smaller works, the number itself is the answer. That means it's prime!
+
+[lesson]
+break jumps out of a loop straight away:
+
+    int d = 2;
+    while (d < n) {
+        if (n % d == 0) {
+            break;      // found it, stop
+        }
+        d++;
+    }
+    return d;
+
+After break, the code AFTER the loop
+runs next.
+
+continue is the opposite: it skips to
+the next time round the loop.
+
+[hint]
+Loop d from 2; if (n % d == 0) break; then return d after the loop.
+
+[code]
+// STAGE 4.4: EMERGENCY STOP
+// Smallest number (bigger than 1)
+// that divides n exactly.
+// smallestDivisor(15) -> 3
+// smallestDivisor(97) -> 97
+
+int smallestDivisor(int n) {
+    return n;
+}
+
+[solution]
+int smallestDivisor(int n) {
+    int d = 2;
+    while (d < n) {
+        if (n % d == 0) {
+            break;
+        }
+        d++;
+    }
+    return d;
+}
+
+[tests]
+smallestDivisor(15) == 3
+smallestDivisor(49) == 7
+smallestDivisor(2) == 2
+smallestDivisor(97) == 97
+smallestDivisor(100) == 2

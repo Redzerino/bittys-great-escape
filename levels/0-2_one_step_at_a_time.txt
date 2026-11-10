@@ -1,0 +1,60 @@
+title: B.2  One Step at a Time
+type: escape
+
+[story]
+Bitty: "The instructions are all here... they're just in the wrong order."
+Goal: put the moves in the right order so Bitty reaches the EXIT.
+
+[talk]
+@walk EAST 1
+The computer follows your code in order, top to bottom. It never skips ahead or guesses what you meant.
+Look at the code. All the right moves are there, but in the wrong order. The first one walks me straight into a wall. Bonk.
+To fix it, move the lines around so I go EAST, EAST, then SOUTH, SOUTH. Click a line and use Ctrl+X and Ctrl+V to cut and paste it.
+One more thing: C is very fussy about spelling. `Move(east)` won't work. It has to be exactly `move(EAST);` with the same capitals.
+If you get a red error, don't panic! Every programmer gets errors all day long. Read the message, check the red line, and try again.
+
+[lesson]
+The ORDER of your code matters.
+
+    move(EAST);     runs 1st
+    move(EAST);     runs 2nd
+    move(SOUTH);    runs 3rd
+    move(SOUTH);    runs 4th
+
+Swap two lines and you get a different
+program, with a different result.
+
+C is CASE-SENSITIVE:
+    move(EAST);     works
+    Move(EAST);     error: no such thing
+    move(east);     error: no such thing
+
+Errors are normal! The console tells
+you what went wrong and which line.
+
+[hint]
+Bitty needs to go EAST, EAST, SOUTH, SOUTH. Move the first line down to the bottom.
+
+[map]
+######
+#bB..#
+####.#
+####E#
+######
+
+[code]
+// BOOTCAMP 2: ONE STEP AT A TIME
+// These moves are in the wrong order!
+// Rearrange the lines so Bitty goes
+// EAST, EAST, then SOUTH, SOUTH.
+
+move(SOUTH);
+move(EAST);
+move(EAST);
+move(SOUTH);
+
+[solution]
+move(EAST);
+move(EAST);
+move(SOUTH);
+move(SOUTH);

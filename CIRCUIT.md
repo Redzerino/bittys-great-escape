@@ -35,5 +35,13 @@ file to an occupied slot; Circuit_Init logs a warning on collisions.
 
 Implementation: src/circuit.h, src/circuit.c, and the integration in src/main.c.
 
-Validation: all C sources pass GCC -fsyntax-only -Wall -Wextra; all 14 files
-listed in levels/levels.txt exist and have distinct map positions. The user subsequently built and ran the map locally and confirmed that it works and looks correct.
+Bootcamp (optional): a strip at the top right with 7 lessons for people who have
+never coded. Files 0-1 ... 0-7. They are not counted in the 45, and a new player
+starts on stage 1.1, with Bitty pointing them at the Bootcamp in his first talk.
+
+All 45 stages now have a level. levels/levels.txt lists them in map order, so
+NEXT > follows the same route as the map. Each level's 3D world uses the colour
+of the chip it sits on (Circuit_WorldOf in circuit.c, themes in world.c).
+
+Validation: test_levels.bat (repair levels: every solution passes, every starter
+doesn't) and test_escape.bat (escape levels: every solution reaches the EXIT).
