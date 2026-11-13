@@ -9,6 +9,7 @@
 // The camera looks from the south (+z) and above, so Bitty's face (+z) faces us.
 
 #include "game_api.h"
+#include "world_visuals.h"
 #include "world_internal.h"
 #include "raylib.h"
 #include "rlgl.h"
@@ -2091,4 +2092,139 @@ void World_Draw(const World *w)
 
     // Render textures are stored upside down, hence the negative height
     DrawTextureRec(target.texture, (Rectangle){ 0, 0, (float)vw, (float)-vh }, (Vector2){ w->viewX, w->viewY }, WHITE);
+}
+
+
+// Same materials, lighting and atmosphere as the playable computer worlds.
+// The visual-learning controller owns the camera and real VM access positions.
+void World_DrawDataScene(const DataScene *s)
+{
+    InitGraphics();
+    World environment;
+    World_Init(&environment,8,5+(s->count+5)/6);
+    environment.theme=s->theme;
+    const Theme *th=ThemeOf(&environment);
+    int width=s->target.texture.width,height=s->target.texture.height;
+    BeginTextureMode(s->target);
+    ClearBackground(th->fog);
+    float radius=width*0.8f;
+    DrawTexturePro(glowTex,(Rectangle){0,0,(float)glowTex.width,(float)glowTex.height},
+        (Rectangle){width*0.5f-radius,height*0.4f-radius,radius*2,radius*2},
+        (Vector2){0,0},0,th->sky);
+    BeginMode3D(s->camera);
+    if(shaderOk)
+    {
+        Light lights[4]={
+            {{s->bitty.x,1.1f,s->bitty.z},Customisation_Glow(),2.1f,5.5f},
+            {{-3,2,-2},th->a,1.1f,9},
+            {{3,1,2},th->b,0.8f,8},
+            {{0,1,0},{255,205,90,255},0,3}
+        };
+        if(s->best>=0)
+        {
+            lights[3].pos=s->cells[s->best];lights[3].pos.y=0.8f;
+            lights[3].strength=1.3f;
+        }
+        ApplyLights(&environment,lights,4,s->camera,s->time,false);
+        BeginShaderMode(lightShader);
+    }
+    DrawEnvironment(&environment,s->time);
+    for(int step=1;step<=2;step++)
+    {
+        Vector3 p=s->cells[0];p.x-=step*1.1f;
+        DrawStone(p,(Vector3){0.98f,0.24f,1.02f},COL_FLOOR2);
+        DrawCube((Vector3){p.x,-0.9f,p.z},0.94f,1.6f,0.98f,(Color){70,66,112,255});
+    }
+    for(int i=0;i<s->count;i++)
+    {
+        Vector3 p=s->cells[i];
+        float depth=1.4f+(Hash(i,7)%7)*0.16f;
+        DrawCubeV((Vector3){p.x,-0.15f-depth*0.5f,p.z},(Vector3){0.94f,depth,0.98f},(Color){70,66,112,255});
+        Color stone=i%2?COL_FLOOR:COL_FLOOR2;
+        if(s->visited[i])stone=(Color){85,110,119,255};
+        if(s->visited[i]==2)stone=(Color){140,102,82,255};
+        if(i==s->best)stone=(Color){150,125,75,255};
+        DrawStone((Vector3){p.x,0,p.z},(Vector3){0.98f,0.24f,1.02f},stone);
+        // Circuit engraving and small memory contacts on the platform.
+        DrawCube((Vector3){p.x,0.125f,p.z-0.30f},0.65f,0.008f,0.025f,(Color){75,110,120,255});
+        for(int pin=0;pin<3;pin++)
+            DrawCube((Vector3){p.x-0.24f+pin*0.24f,0.13f,p.z-0.40f},0.07f,0.014f,0.09f,(Color){105,120,135,255});
+        if(i<s->count-1)
+        {
+            Vector3 next=s->cells[i+1];
+            if(fabsf(next.z-p.z)<0.1f)
+                DrawCube((Vector3){(p.x+next.x)/2,-0.05f,p.z},0.20f,0.08f,0.30f,(Color){48,55,80,255});
+        }
+    }
+    if(shaderOk)EndShaderMode();
+    for(int i=0;i<s->count;i++)
+    {
+        Vector3 p=s->cells[i];
+        Color rim=i==s->best?(Color){255,205,90,255}:s->visited[i]==2?(Color){255,165,90,255}:i==s->current?th->a:Fade(th->b,0.45f);
+        DrawCube((Vector3){p.x,0.015f,p.z+0.515f},0.76f,0.025f,0.012f,rim);
+        if(i==s->best)
+        {
+            DrawCylinderEx((Vector3){p.x+0.34f,0.13f,p.z-0.3f},
+                (Vector3){p.x+0.34f,0.48f,p.z-0.3f},0.065f,0,5,rim);
+        }
+    }
+    for(int k=0;k<s->wireCount;k++)
+    {
+        Vector3 a=s->wireFrom[k],b=s->wireTo[k];
+        Vector3 elbow={a.x,0.75f,b.z};
+        DrawCylinderEx(a,elbow,0.014f,0.014f,6,(Color){255,185,90,255});
+        DrawCylinderEx(elbow,b,0.014f,0.014f,6,(Color){255,185,90,255});
+        DrawSphereEx(b,0.045f,6,8,(Color){255,205,100,255});
+    }
+    World actor;
+    World_Init(&actor,1,1);
+    actor.theme=s->theme;
+    actor.mood=s->happy?MOOD_HAPPY:MOOD_IDLE;
+    if(s->victory){actor.state=WORLD_WON;actor.winTime=s->victoryTime;}
+    rlPushMatrix();
+    rlTranslatef(s->bitty.x,0.14f+(s->moving?fabsf(sinf(s->time*10))*0.09f:0),s->bitty.z);
+    rlScalef(0.76f,0.76f,0.76f);
+    DrawBitty(&actor,s->time);
+    rlPopMatrix();
+    rlDrawRenderBatchActive();
+    rlDisableDepthMask();
+    BeginBlendMode(BLEND_ADDITIVE);
+    DrawEnvironmentGlow(&environment,s->camera,s->time);
+    Glow(s->camera,(Vector3){s->bitty.x,0.2f,s->bitty.z},1.6f,Alpha(Customisation_Glow(),48));
+    for(int i=0;i<s->count;i++)
+    {
+        Vector3 p=s->cells[i];p.y=0.12f;
+        if(i==s->current||i==s->best)
+            Glow(s->camera,p,1.4f,Alpha(i==s->best?(Color){255,205,90,255}:th->a,45));
+    }
+    EndBlendMode();
+    rlEnableDepthMask();
+    EndMode3D();
+    // Value plates remain crisp and readable above the lit environment.
+    for(int i=0;i<s->count;i++)
+    {
+        Vector3 p=s->cells[i];p.z+=0.43f;p.y=0.16f;
+        Vector2 at=GetWorldToScreenEx(p,s->camera,width,height);
+        const char *value=s->kinds[i] == 3 ? "?" : s->kinds[i] == 4 ? (s->values[i]?"true":"false") : s->kinds[i] == 2 ? "FREE" : s->kinds[i] == 1 ? (s->values[i] == 0 ? "\\0" : s->values[i] == 32 ? "SPACE" : TextFormat("'%c'",s->values[i])) : TextFormat("%d",s->values[i]);
+        float textWidth=MeasureTextEx(s->font,value,22,0).x;
+        Rectangle plate={at.x-textWidth*0.5f-8,at.y-3,textWidth+16,28};
+        DrawRectangleRounded(plate,0.2f,4,(Color){9,18,30,230});
+        DrawRectangleRoundedLinesEx(plate,0.2f,4,1,i==s->best?(Color){255,205,90,255}:Fade(th->a,0.6f));
+        DrawTextEx(s->font,value,(Vector2){at.x-textWidth*0.5f,at.y},22,0,WHITE);
+        DrawTextEx(s->font,s->labels[i],(Vector2){at.x-12,at.y+29},14,0,th->a);
+    }
+    for(int k=0;k<s->wireCount;k++)
+    {
+        Vector2 p=GetWorldToScreenEx(s->wireFrom[k],s->camera,width,height);
+        DrawTextEx(s->font,s->wireNames[k],p,15,0,(Color){255,205,100,255});
+    }
+    if(s->transfer)
+    {
+        Vector2 p=GetWorldToScreenEx(s->transferAt,s->camera,width,height);
+        const char *value=TextFormat("WRITE %d",s->transferValue);
+        DrawRectangleRounded((Rectangle){p.x-45,p.y-13,90,27},0.2f,4,(Color){125,65,25,245});
+        DrawTextEx(s->font,value,(Vector2){p.x-38,p.y-8},16,0,(Color){255,225,155,255});
+    }
+    DrawVignette(width,height);
+    EndTextureMode();
 }

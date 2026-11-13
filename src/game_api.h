@@ -21,6 +21,7 @@
 #define GAME_API_H
 
 #include <stdbool.h>
+#include "vm.h"
 
 #define WORLD_MAX_COLS 16
 #define WORLD_MAX_ROWS 12
@@ -99,6 +100,9 @@ typedef struct {
     int   values[TEST_ROW_MAX];         // what's really in memory now
     int   shown[TEST_ROW_MAX];          // what the room shows (catches up when Bitty puts the value there)
     bool  isChar;
+    int address;
+    int previous[TEST_ROW_MAX];
+    bool populated;
     float readFlash[TEST_ROW_MAX];      // cyan: the code just read this block
     float writeFlash[TEST_ROW_MAX];     // orange: the code just wrote this block
     int   markerCount;                  // pointers aimed at this row
@@ -161,6 +165,7 @@ typedef struct {
     int          rowCount;
     TestRegister regs[TEST_MAX_REGISTERS];
     int          regCount;
+    VmVisualTrace trace;
     TestWire     wires[TEST_MAX_WIRES];
     int          wireCount;
     bool         quick;                 // later tests: Bitty works faster

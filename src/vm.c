@@ -38,6 +38,7 @@ struct Vm {
 
     Frame     frames[VM_CALL_DEPTH_MAX];
     int       frameCount;
+    VmVisualTrace visualTrace;
 
     int       pc;
     int       memTop;           // first free cell above the current frame
@@ -566,7 +567,16 @@ VmStatus Vm_Run(Vm *vm, int maxInstructions)
                 int a = Pop(vm);
                 bool ok;
                 int r = Arith(vm, op, a, b, &ok);
-                if (ok) Push(vm, r);
+                if (ok)
+                {
+                    const char *name = op == OP_ADD ? "+" : op == OP_SUB ? "-" : op == OP_MUL ? "*" :
+                        op == OP_DIV ? "/" : op == OP_MOD ? "%" : op == OP_EQ ? "==" : op == OP_NE ? "!=" :
+                        op == OP_LT ? "<" : op == OP_GT ? ">" : op == OP_LE ? "<=" : ">=";
+                    vm->visualTrace.operationKnown = true;
+                    vm->visualTrace.left = a; vm->visualTrace.right = b; vm->visualTrace.result = r;
+                    snprintf(vm->visualTrace.operation, sizeof vm->visualTrace.operation, "%s", name);
+                    Push(vm, r);
+                }
                 break;
             }
 
@@ -592,14 +602,22 @@ VmStatus Vm_Run(Vm *vm, int maxInstructions)
             case OP_JUMP_IF_FALSE:
             {
                 int target = code[vm->pc++];
-                if (!Pop(vm)) vm->pc = target;
+                int condition = Pop(vm);
+                vm->visualTrace.branchKnown = true;
+                vm->visualTrace.branchValue = condition != 0;
+                vm->visualTrace.branchLine = vm->line;
+                if (!condition) vm->pc = target;
                 break;
             }
 
             case OP_JUMP_IF_TRUE:
             {
                 int target = code[vm->pc++];
-                if (Pop(vm)) vm->pc = target;
+                int condition = Pop(vm);
+                vm->visualTrace.branchKnown = true;
+                vm->visualTrace.branchValue = condition != 0;
+                vm->visualTrace.branchLine = vm->line;
+                if (condition) vm->pc = target;
                 break;
             }
 
@@ -624,8 +642,13 @@ VmStatus Vm_Run(Vm *vm, int maxInstructions)
             }
 
             case OP_RET:
-                LeaveFunction(vm, Pop(vm));
+            {
+                int value = Pop(vm);
+                vm->visualTrace.returnKnown = true;
+                vm->visualTrace.returnValue = value;
+                LeaveFunction(vm, value);
                 break;
+            }
 
             case OP_NO_RETURN:
                 RuntimeError(vm, VM_ERR_NO_RETURN,
@@ -813,6 +836,7 @@ bool Vm_Start(Vm *vm, const char *functionName, const int *args, int argc)
 
     vm->sp = 0;
     vm->frameCount = 0;
+    memset(&vm->visualTrace, 0, sizeof vm->visualTrace);
     vm->memTop = vm->stackStart;
     vm->status = VM_RUNNING;
     vm->line = 0;
@@ -985,4 +1009,19 @@ int Vm_GetVariables(const Vm *vm, VmVariable *out, int max)
         }
     }
     return n;
+}
+
+void Vm_GetVisualTrace(const Vm *vm, VmVisualTrace *out)
+{
+    *out = vm->visualTrace;
+    out->depth = vm->frameCount;
+    out->frameCount = vm->frameCount < 6 ? vm->frameCount : 6;
+    for (int i = 0; i < out->frameCount; i++)
+    {
+        const Frame *fr = &vm->frames[vm->frameCount - 1 - i];
+        const Function *fn = &vm->prog.funcs[fr->func];
+        snprintf(out->frameName[i], sizeof out->frameName[i], "%.31s", fn->name);
+        int addr = fr->fp + (fn->paramCount ? fn->paramOffsets[0] : 0);
+        out->frameArg[i] = fn->paramCount && addr > 0 && addr < VM_MEM_SIZE ? vm->mem[addr] : 0;
+    }
 }

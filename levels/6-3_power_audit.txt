@@ -35,19 +35,14 @@ Start max at the first box instead of 0.
 Start with int max = arr[0]; not int max = 0;
 
 [code]
-// STAGE 6.3: POWER AUDIT
-// Return the biggest number in arr.
-// findMax({3, 9, 4}, 3) -> 9
-// findMax({-5, -2, -9}, 3) -> -2
+// POWER AUDIT: Bitty is inside the array.
+// Write the search that returns its largest value.
+// Your code must also work with negative numbers.
 
 int findMax(int arr[], int size) {
-    int max = 0;
-    for (int i = 0; i < size; i++) {
-        if (arr[i] > max) {
-            max = arr[i];
-        }
-    }
-    return max;
+    // TODO: choose a starting maximum.
+    // TODO: visit the remaining cells and compare.
+    return 0;
 }
 
 [solution]
