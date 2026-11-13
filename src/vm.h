@@ -118,7 +118,18 @@ typedef struct {
     char pointsToName[VM_VAR_NAME_MAX]; // e.g. "arr[2]", "x", "NULL", "(invalid)"
 } VmVariable;
 
+typedef struct {
+    bool operationKnown, branchKnown;
+    int left, right, result, branchValue, branchLine;
+    char operation[4];
+    bool returnKnown;
+    int returnValue;
+    int depth, frameCount;
+    char frameName[6][32];
+    int frameArg[6];
+} VmVisualTrace;
 typedef struct Vm Vm;
+void Vm_GetVisualTrace(const Vm *vm, VmVisualTrace *out);
 
 // ---- Building and starting ----
 Vm  *Vm_Build(const char *source, const VmOptions *options, const VmHost *host, VmBuildResult *result);

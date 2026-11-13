@@ -211,14 +211,21 @@ static bool DrawNode(Font font, int world, int stage, Vector2 mouse, bool click)
     if (selectedWorld == world && selectedStage == stage)
         DrawCircleLines((int)n.x, (int)n.y, 21 + 2 * sinf(clockTime * 3), accent);
     if (hover) DrawCircleV(n, 21, Fade(accent, 0.17f));
-    DrawCircleV(n, 15, (Color){ 8, 20, 29, 255 });
+    DrawCircleV(n, 15, done ? color : (Color){ 8, 20, 29, 255 });
     DrawCircleLines((int)n.x, (int)n.y, 15, color);
 
     // white pointer over the last level played
     if (index >= 0 && strcmp(Levels_Get(index)->file, Save_GetCurrent()) == 0)
         DrawTriangle((Vector2){ n.x - 5, n.y - 27 }, (Vector2){ n.x, n.y - 20 }, (Vector2){ n.x + 5, n.y - 27 }, WHITE);
 
-    Label(font, done ? "+" : TextFormat("%d", stage + 1), n.x - 4, n.y - 7, 16, color);
+    if (done)
+    {
+        // Draw a tick with lines so it works with every font.
+        Color tick = { 8, 45, 30, 255 };
+        DrawLineEx((Vector2){ n.x - 7, n.y }, (Vector2){ n.x - 2, n.y + 5 }, 3, tick);
+        DrawLineEx((Vector2){ n.x - 2, n.y + 5 }, (Vector2){ n.x + 8, n.y - 6 }, 3, tick);
+    }
+    else Label(font, TextFormat("%d", stage + 1), n.x - 4, n.y - 7, 16, color);
     if (index < 0)          // small padlock: not written yet
     {
         DrawRectangle((int)n.x + 6, (int)n.y + 8, 7, 6, color);
@@ -276,7 +283,10 @@ int Circuit_Draw(Font font, float dt)
             DrawRectangle((int)chip.x + 15 + pin * 25, (int)chip.y - 6, 6, 6, (Color){ 135, 130, 95, 255 });
             DrawRectangle((int)chip.x + 15 + pin * 25, (int)(chip.y + chip.height), 6, 6, (Color){ 135, 130, 95, 255 });
         }
-        DrawRectangleRounded(chip, 0.08f, 4, (Color){ 12, 27, 36, 255 });
+        bool worldComplete = true;
+        for (int s = 0; s < STAGES; s++)
+            if (!Done(stages[w][s])) worldComplete = false;
+        DrawRectangleRounded(chip, 0.08f, 4, worldComplete ? (Color){ 22, 105, 68, 255 } : (Color){ 12, 27, 36, 255 });
         DrawRectangleRoundedLinesEx(chip, 0.08f, 4, selectedWorld == w ? 2 : 1, Fade(accent, selectedWorld == w ? 1 : 0.45f));
         Label(font, TextFormat("%02d", w + 1), chip.x + 13, chip.y + 13, 16, accent);
         FitLabel(font, worldNames[w], chip.x + 44, chip.y + 13, 18, 212, WHITE);
@@ -299,7 +309,10 @@ int Circuit_Draw(Font font, float dt)
     {
         Rectangle chip = BootcampChip();
         Color accent = accents[BOOTCAMP];
-        DrawRectangleRounded(chip, 0.1f, 4, (Color){ 12, 24, 38, 255 });
+        bool bootComplete = true;
+        for (int s = 0; s < BOOTCAMP_STAGES; s++)
+            if (!Done(bootcamp[s])) bootComplete = false;
+        DrawRectangleRounded(chip, 0.1f, 4, bootComplete ? (Color){ 22, 105, 68, 255 } : (Color){ 12, 24, 38, 255 });
         DrawRectangleRoundedLinesEx(chip, 0.1f, 4, selectedWorld == BOOTCAMP ? 2 : 1, Fade(accent, selectedWorld == BOOTCAMP ? 1 : 0.5f));
         Label(font, "00", chip.x + 13, chip.y + 12, 16, accent);
         Label(font, "BOOTCAMP", chip.x + 44, chip.y + 11, 18, WHITE);
@@ -356,7 +369,7 @@ int Circuit_Draw(Font font, float dt)
     Label(font, "USB EXIT", 1140, 634, 16, accents[8]);
     DrawRectangleLinesEx((Rectangle){ 936, 630, 185, 28 }, 2, accents[8]);
     Label(font, "45 stages to freedom", 946, 638, 12, LIGHTGRAY);
-    Label(font, "+ completed     coloured = playable     padlock = coming soon", 34, 660, 15, LIGHTGRAY);
+    Label(font, "Tick + filled green = completed    coloured = playable    padlock = coming soon", 34, 660, 15, LIGHTGRAY);
     Label(font, "White pointer = last played   |   Enter opens the selected stage", 34, 689, 13, (Color){ 120, 155, 166, 255 });
 
     EndMode2D();

@@ -21,6 +21,7 @@
 #define GAME_API_H
 
 #include <stdbool.h>
+#include "vm.h"
 
 #define WORLD_MAX_COLS 16
 #define WORLD_MAX_ROWS 12
@@ -94,6 +95,9 @@ typedef struct {
     int   count;
     int   values[TEST_ROW_MAX];
     bool  isChar;
+    int address;
+    int previous[TEST_ROW_MAX];
+    bool populated;
     float readFlash[TEST_ROW_MAX];      // cyan: the code just read this block
     float writeFlash[TEST_ROW_MAX];     // orange: the code just wrote this block
     int   markerCount;                  // pointers aimed at this row
@@ -124,6 +128,7 @@ typedef struct {
     int          rowCount;
     TestRegister regs[TEST_MAX_REGISTERS];
     int          regCount;
+    VmVisualTrace trace;
 } TestDisplay;
 
 typedef struct {

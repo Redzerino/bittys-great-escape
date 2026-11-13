@@ -19,11 +19,13 @@
 #include "editor.h"
 #include "game_api.h"
 #include "inspector.h"
+#include "visual_learning.h"
 #include "levels.h"
 #include "repair.h"
 #include "save.h"
 #include "vm.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -89,6 +91,9 @@ typedef struct {
 
     // repair levels
     RepairPhase repairPhase;
+    bool       validating;
+    bool       validationStarted;
+    int        validationIndex;
     int        repairTest;      // next test to run
     int        repairGates;     // gates in the map at the start
     float      repairTimer;     // small pauses so the player can follow along
@@ -212,22 +217,16 @@ static void LoadLevel(Game *g, int index, bool keepOldCode)
     Console_PrintKind(CONSOLE_SUCCESS, TextFormat("%s:  %s\n", Circuit_StageName(g->level), lv->title + strcspn(lv->title, " ") + strspn(lv->title + strcspn(lv->title, " "), " ")));
     Console_PrintKind(CONSOLE_STORY, TextFormat("%s\n", lv->story));
     if (lv->type == LEVEL_REPAIR)
-        Console_PrintKind(CONSOLE_STORY, TextFormat("Each gate tests your code (%d tests). Press RUN to try.\n", lv->testCount));
+        Console_PrintKind(CONSOLE_STORY, TextFormat("Your code must pass %d checks. Press RUN to try.\n", lv->testCount));
 
-    // Bitty introduces a level the first time you see it; after that the lesson card is enough
-    g->introDone = false;
+    // Enter the challenge before handing control to the player.
+    VisualLearning_Enter();
+    g->repairTest = 0;
+    g->validating = false;
+    g->introDone = true;
     g->world.talking = false;
-    if (lv->talk[0] && !Save_IsDone(lv->file))
-    {
-        Talk_Start(lv->talk);
-        g->showLesson = false;          // the card opens when he has finished talking
-        g->introDone = true;
-    }
-    else
-    {
-        Talk_Skip();
-        g->showLesson = lv->lesson[0] != '\0';
-    }
+    Talk_Skip();
+    g->showLesson = false;
     g->hintShown = false;
 }
 
@@ -245,6 +244,7 @@ static void Bark(Game *g, const char *a, const char *b, const char *c)
 // ===========================================================================
 static void StartProgram(Game *g, bool step)
 {
+    g->validating = false;
     Talk_Skip();
     g->world.talking = false;
     g->introDone = true;
@@ -288,7 +288,7 @@ static void StartProgram(Game *g, bool step)
         g->mode = MODE_RUNNING;
         g->editor.readOnly = true;
         g->world.mood = MOOD_RUNNING;
-        Console_PrintKind(CONSOLE_STORY, TextFormat("Testing your code against %d gates...\n", lv->testCount));
+        Console_PrintKind(CONSOLE_STORY, TextFormat("Running your code against %d correctness checks...\n", lv->testCount));
         return;
     }
 
@@ -306,6 +306,22 @@ static void FinishRun(Game *g)
     g->mode = MODE_DONE;
     g->editor.readOnly = false;
     g->stepping = false;
+}
+
+// All success routes share persistence, celebration and toolbar state.
+static void CompleteStage(Game *g)
+{
+    g->validating = false;
+    g->world.state = WORLD_WON;
+    g->world.mood = MOOD_HAPPY;
+    g->world.winTime = 0;
+    g->world.talking = false;
+    g->showLesson = false;
+    Talk_Skip();
+    Save_SetDone(Levels_Get(g->level)->file);
+    SaveNow(g);
+    FinishRun(g);
+    Console_PrintKind(CONSOLE_SUCCESS, "SECTOR CLEARED! Use NEXT to continue.\n");
 }
 
 static void ShowHint(Game *g)
@@ -351,6 +367,7 @@ static void UpdateTestDisplay(Game *g, const LevelTest *t)
         n++;
     }
     td->regCount = n;
+    Vm_GetVisualTrace(g->vm, &td->trace);
 
     // ---- data rows: the test's arrays, strings and &values ----
     int reads[VM_MAX_ACCESSES], writes[VM_MAX_ACCESSES], rc, wc;
@@ -365,13 +382,19 @@ static void UpdateTestDisplay(Game *g, const LevelTest *t)
         TestDataRow *d = &td->rows[rows++];
         int base = g->repairRun.argAddr[k];
         int count = arg->kind == VALUE_ARRAY ? (arg->count > 0 ? arg->count : 1) :
-                    arg->kind == VALUE_STRING ? (int)strlen(arg->text) + 1 : 1;
+                    arg->kind == VALUE_STRING ? (arg->capacity > (int)strlen(arg->text) + 1 ? arg->capacity : (int)strlen(arg->text) + 1) : 1;
         if (count > TEST_ROW_MAX) count = TEST_ROW_MAX;
 
         snprintf(d->name, sizeof d->name, "#%d", k + 1);
         d->count  = count;
         d->isChar = arg->kind == VALUE_STRING;
-        for (int i = 0; i < count; i++) d->values[i] = Vm_ReadMemory(g->vm, base + i);
+        d->address = base;
+        for (int i = 0; i < count; i++)
+        {
+            d->previous[i] = d->populated ? d->values[i] : Vm_ReadMemory(g->vm, base + i);
+            d->values[i] = Vm_ReadMemory(g->vm, base + i);
+        }
+        d->populated = true;
 
         for (int i = 0; i < rc; i++) if (reads[i]  >= base && reads[i]  < base + count) d->readFlash[reads[i] - base]   = 0.5f;
         for (int i = 0; i < wc; i++) if (writes[i] >= base && writes[i] < base + count) d->writeFlash[writes[i] - base] = 0.5f;
@@ -390,6 +413,24 @@ static void UpdateTestDisplay(Game *g, const LevelTest *t)
         }
     }
     td->rowCount = rows;
+    // Forward real VM memory accesses to the visual walk (never run a solution).
+    for (int pass = 0; pass < 2; pass++)
+    {
+        int row = 0;
+        for (int k = 0; k < t->argc && row < rows; k++)
+        {
+            if (t->args[k].kind == VALUE_INT) continue;
+            int base = g->repairRun.argAddr[k];
+            int accesses = pass ? wc : rc;
+            for (int a = 0; a < accesses; a++)
+            {
+                int address = pass ? writes[a] : reads[a];
+                if (address >= base && address < base + td->rows[row].count)
+                    VisualLearning_Access(td, row, address - base, pass != 0);
+            }
+            row++;
+        }
+    }
 }
 
 static void StartNextTest(Game *g)
@@ -398,6 +439,7 @@ static void StartNextTest(Game *g)
     const LevelTest *t = &lv->tests[g->repairTest];
     TestDisplay *td = &g->world.test;
 
+    VisualLearning_Reset();
     memset(td, 0, sizeof *td);
     td->active = true;
     int gx = g->world.bittyX + 1, gy = g->world.bittyY;
@@ -435,7 +477,9 @@ static void RunTestFrame(Game *g, float dt)
     VmStatus s = Vm_GetStatus(g->vm);
     if (s == VM_WAITING) { Vm_ActionDone(g->vm, 0); s = Vm_GetStatus(g->vm); }   // move() does nothing here
 
-    bool ff = g->linesShown >= LINES_BEFORE_FF;
+    bool visualData = VisualLearning_HasData(t);
+    if (visualData && VisualLearning_Busy()) return;
+    bool ff = g->linesShown >= (visualData ? 128 : LINES_BEFORE_FF);
     td->fastForward = ff;
 
     if (s == VM_PAUSED || (s == VM_RUNNING && !ff))
@@ -444,7 +488,7 @@ static void RunTestFrame(Game *g, float dt)
         if (g->lineTimer <= 0)
         {
             g->linesShown++;
-            if (g->linesShown < LINES_BEFORE_FF) Vm_PauseAtNextLine(g->vm);
+            if (!ff) Vm_PauseAtNextLine(g->vm);
             g->lineTimer = pace;
             s = Vm_Run(g->vm, 200000);
         }
@@ -474,7 +518,7 @@ static void RunTestFrame(Game *g, float dt)
         td->state = g->repairOutcome.passed ? TEST_PASSED : TEST_FAILED;
         snprintf(td->result, sizeof td->result, "%s", g->repairOutcome.summary);
         g->repairPhase = REPAIR_RESULT;
-        g->repairTimer = (g->repairTest == 0 ? 1.2f : 0.7f) / speed;
+        g->repairTimer = (visualData ? 2.8f : g->repairTest == 0 ? 1.2f : 0.7f) / speed;
     }
 }
 
@@ -483,12 +527,45 @@ static void UpdateRepair(Game *g, float dt)
     World *w = &g->world;
     const Level *lv = Levels_Get(g->level);
 
+    // Additional cases check the player's code in bounded per-frame batches.
+    // Keep the main array on screen: do not turn this into four demonstrations.
+    if (g->validating)
+    {
+        if (g->validationIndex >= lv->testCount)
+        {
+            CompleteStage(g);
+            return;
+        }
+        const LevelTest *check = &lv->tests[g->validationIndex];
+        bool started = true;
+        if (!g->validationStarted)
+        {
+            started = Repair_BeginTest(g->vm, check, &g->repairRun, &g->repairOutcome);
+            g->validationStarted = true;
+        }
+        VmStatus state = started ? Vm_Run(g->vm, 20000) : VM_ERROR;
+        if (state == VM_WAITING) { Vm_ActionDone(g->vm, 0); return; }
+        if (state == VM_RUNNING || state == VM_PAUSED) return;
+        if (started) Repair_FinishTest(g->vm, check, &g->repairRun, &g->repairOutcome);
+        char detail[240];
+        snprintf(detail, sizeof detail, "%.110s -> %.110s", check->text, g->repairOutcome.summary);
+        VisualLearning_Check(g->validationIndex, g->repairOutcome.passed, detail);
+        Console_PrintKind(g->repairOutcome.passed ? CONSOLE_SUCCESS : CONSOLE_ERROR, g->repairOutcome.message);
+        if (!g->repairOutcome.passed)
+        {
+            g->validating = false;
+            ShowHint(g);
+            FinishRun(g);
+            return;
+        }
+        g->validationIndex++;
+        g->validationStarted = false;
+        return;
+    }
+
     if (w->state == WORLD_WON)
     {
-        Console_PrintKind(CONSOLE_SUCCESS, TextFormat("All %d tests passed! Bitty escaped this sector. Press NEXT.\n", lv->testCount));
-        Save_SetDone(lv->file);
-        SaveNow(g);
-        FinishRun(g);
+        CompleteStage(g);
         return;
     }
 
@@ -498,6 +575,7 @@ static void UpdateRepair(Game *g, float dt)
         return;
     }
 
+    if (VisualLearning_HasData(&lv->tests[g->repairTest < lv->testCount ? g->repairTest : lv->testCount - 1]) && VisualLearning_Busy()) return;
     if (g->repairTimer > 0) { g->repairTimer -= dt; return; }
     if (!World_ActionDone(w)) return;
 
@@ -508,6 +586,7 @@ static void UpdateRepair(Game *g, float dt)
 
         if (!o->passed)
         {
+            if (VisualLearning_HasData(&lv->tests[0])) VisualLearning_Check(0, false, o->summary);
             Bark(g, "Bzzt. Not quite. Look what it gave back.", "The gate says no. Check what it wanted.", NULL);
             Action a = { ACT_MOVE, EAST, 0, 0 };   // bonk into the gate
             World_StartAction(w, a);
@@ -520,6 +599,15 @@ static void UpdateRepair(Game *g, float dt)
             }
             ShowHint(g);
             FinishRun(g);   // the gate terminal stays up showing what went wrong
+            return;
+        }
+
+        if (g->repairTest == 0 && VisualLearning_HasData(&lv->tests[0]))
+        {
+            VisualLearning_Check(0, true, "visible array passed");
+            g->validating = true;
+            g->validationIndex = 1;
+            g->validationStarted = false;
             return;
         }
 
@@ -572,10 +660,7 @@ static void UpdateProgram(Game *g, float dt)
     // ---- Did that last move win or crash? ----
     if (w->state == WORLD_WON)
     {
-        Console_PrintKind(CONSOLE_SUCCESS, "Bitty escaped this sector! Press NEXT for the next level.\n");
-        Save_SetDone(Levels_Get(g->level)->file);
-        SaveNow(g);
-        FinishRun(g);
+        CompleteStage(g);
         return;
     }
     if (w->state == WORLD_SEGFAULT)
@@ -664,7 +749,7 @@ static void DrawWorldPanel(Game *g)
     World_Draw(w);
 
     // Big banner when the run ends
-    if (g->mode == MODE_DONE && (w->state == WORLD_WON || w->state == WORLD_SEGFAULT))
+    if (g->mode == MODE_DONE && w->state == WORLD_SEGFAULT)
     {
         bool won = w->state == WORLD_WON;
         const char *msg = won ? "SECTOR CLEARED" : "SEGMENTATION FAULT";
@@ -720,6 +805,33 @@ static float DrawWrapped(Font font, const char *text, float x, float y, float wi
     }
     if (line[0]) { DrawTextEx(font, line, (Vector2){ x, cy }, size, 0, col); cy += lineH; }
     return cy - y;
+}
+
+static void DrawStageCompletion(Game *g)
+{
+    if (g->mode != MODE_DONE || g->world.state != WORLD_WON || g->showWorkshop) return;
+    Rectangle p = WORLD_PANEL;
+    float size = Clamp(p.width / 14.0f, 20, 32);
+    Rectangle box = {p.x + 16, p.y + 85, p.width - 32, 76};
+    DrawRectangleRounded(box, 0.12f, 6, (Color){8,24,22,235});
+    DrawRectangleRoundedLinesEx(box, 0.12f, 6, 2, (Color){110,245,165,255});
+    const char *title = "SECTOR CLEARED";
+    Vector2 text = MeasureTextEx(g->codeFont,title,size,0);
+    DrawTextEx(g->codeFont,title,(Vector2){box.x+(box.width-text.x)/2,box.y+12},size,0,(Color){130,255,180,255});
+    const char *hint = g->level < Levels_Count()-1 ? "NEXT is ready - continue your escape" : "All done! Open CIRCUIT to revisit stages";
+    float small = 14;
+    while(small > 10 && MeasureTextEx(g->codeFont,hint,small,0).x > box.width-20) small--;
+    Vector2 sub = MeasureTextEx(g->codeFont,hint,small,0);
+    DrawTextEx(g->codeFont,hint,(Vector2){box.x+(box.width-sub.x)/2,box.y+51},small,0,WHITE);
+    float t = g->world.winTime;
+    if(t < 2.4f)
+        for(int i=0;i<24;i++)
+        {
+            float x=p.x+p.width*(0.1f+0.8f*(i%8)/7.0f)+sinf(t*4+i)*16;
+            float y=p.y+170+t*(35+i%5*14)+(i/8)*15;
+            if(y<p.y+p.height-145)
+                DrawRectangle((int)x,(int)y,4,7,i%2?(Color){120,245,170,255}:(Color){255,215,105,255});
+        }
 }
 
 static void DrawLessonCard(Game *g)
@@ -884,7 +996,11 @@ static void DrawToolbar(Game *g)
     x += 78 * k;
 
     bool canNext = !running && g->level < Levels_Count() - 1;
-    Color nextCol = (g->world.state == WORLD_WON) ? (Color){ 40, 150, 80, 255 } : (Color){ 70, 70, 100, 255 };
+    bool cleared = g->world.state == WORLD_WON;
+    float nextPulse = 0.5f + 0.5f*sinf((float)GetTime()*4);
+    Color nextCol = cleared ? (Color){40,(unsigned char)(155+50*nextPulse),85,255} : (Color){70,70,100,255};
+    if(cleared && canNext)
+        DrawRectangleRoundedLinesEx((Rectangle){x-3,y-3,70*k+6,h+6},0.3f,6,2,Fade((Color){130,255,180,255},0.5f+0.5f*nextPulse));
     if (Button((Rectangle){ x, y, 70 * k, h }, "NEXT >", nextCol, canNext))
         LoadLevel(g, g->level + 1, true);
 
@@ -1068,6 +1184,7 @@ int main(void)
 
         if (!g->showWorkshop)
         {
+            VisualLearning_Update(dt, SPEEDS[g->speedIndex]);
             UpdateProgram(g, dt);
             if (g->world.state == WORLD_WON)
                 Customisation_RecordCompletion(g->level);
@@ -1090,9 +1207,16 @@ int main(void)
         {
             Editor_Draw(&g->editor);
             DrawStarterButton(g);
-            DrawWorldPanel(g);
+            const Level *visualLevel = Levels_Get(g->level);
+            int visualTest = g->repairTest < visualLevel->testCount ? g->repairTest : visualLevel->testCount - 1;
+            if (visualLevel->type == LEVEL_REPAIR && visualTest >= 0 &&
+                visualLevel->testCount > 0)
+                VisualLearning_Draw(WORLD_PANEL, g->codeFont, visualLevel, &g->world.test,
+                                    visualTest, g->mode == MODE_RUNNING, g->world.state == WORLD_WON, g->world.winTime);
+            else DrawWorldPanel(g);
             Talk_Draw(WORLD_PANEL, g->codeFont);
             DrawLessonCard(g);
+            DrawStageCompletion(g);
         }
         Console_Draw(CONSOLE_PANEL, g->codeFont);
         Inspector_Draw(g->vars, g->varCount, INSPECT_PANEL, g->codeFont,
@@ -1104,6 +1228,7 @@ int main(void)
 
     SaveNow(g);
     StopProgram(g);
+    VisualLearning_Shutdown();
     Talk_Shutdown();
     Startup_Shutdown();
     if (g->ownsFont) UnloadFont(g->codeFont);
