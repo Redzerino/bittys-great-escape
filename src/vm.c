@@ -68,6 +68,8 @@ struct Vm {
     // Recent memory accesses, for the game to show
     int       reads[VM_MAX_ACCESSES], readCount;
     int       writes[VM_MAX_ACCESSES], writeCount;
+    VmAccess  log[VM_MAX_LOG];      // reads and writes in order
+    int       logCount;
 };
 
 static void Remember(int *list, int *count, int addr)
@@ -78,6 +80,27 @@ static void Remember(int *list, int *count, int addr)
         (*count)--;
     }
     list[(*count)++] = addr;
+}
+
+static void Log(Vm *vm, int addr, bool write)
+{
+    if (vm->logCount == VM_MAX_LOG)
+    {
+        memmove(vm->log, vm->log + 1, sizeof(VmAccess) * (VM_MAX_LOG - 1));
+        vm->logCount--;
+    }
+    vm->log[vm->logCount].address = addr;
+    vm->log[vm->logCount].write = write;
+    vm->log[vm->logCount].condition = false;
+    vm->log[vm->logCount].answer = 0;
+    vm->logCount++;
+}
+
+static void LogCondition(Vm *vm, int answer)
+{
+    Log(vm, -1, false);
+    vm->log[vm->logCount - 1].condition = true;
+    vm->log[vm->logCount - 1].answer = answer;
 }
 
 // ===========================================================================
@@ -193,6 +216,7 @@ static int Garbage(int addr)
 static int ReadCell(Vm *vm, int addr)
 {
     Remember(vm->reads, &vm->readCount, addr);
+    Log(vm, addr, false);
     Cell *c = &vm->cells[addr];
     if (c->init) return vm->mem[addr];
 
@@ -216,6 +240,7 @@ static int ReadCell(Vm *vm, int addr)
 static void WriteCell(Vm *vm, int addr, int value)
 {
     Remember(vm->writes, &vm->writeCount, addr);
+    Log(vm, addr, true);
     vm->mem[addr] = value;
     vm->cells[addr].init = 1;
 }
@@ -570,6 +595,10 @@ VmStatus Vm_Run(Vm *vm, int maxInstructions)
                 vm->pc = code[vm->pc];
                 break;
 
+            case OP_NOTE_CONDITION:
+                LogCondition(vm, vm->stack[vm->sp - 1] != 0);
+                break;
+
             case OP_JUMP_IF_FALSE:
             {
                 int target = code[vm->pc++];
@@ -680,6 +709,7 @@ Vm *Vm_Build(const char *source, const VmOptions *options, const VmHost *host, V
     {
         snprintf(result->message, VM_MSG_MAX, "%s", pr.errorMsg);
         result->line = pr.errorLine;
+        result->col = pr.errorCol;
         return NULL;
     }
 
@@ -865,6 +895,17 @@ void Vm_TakeAccesses(Vm *vm, int *reads, int *readCount, int *writes, int *write
     memcpy(reads, vm->reads, sizeof(int) * (size_t)vm->readCount);
     memcpy(writes, vm->writes, sizeof(int) * (size_t)vm->writeCount);
     vm->readCount = vm->writeCount = 0;
+    vm->logCount = 0;
+}
+
+int Vm_TakeAccessLog(Vm *vm, VmAccess *out, int max)
+{
+    int n = vm->logCount < max ? vm->logCount : max;
+    int skip = vm->logCount - n;                    // not enough room: keep the newest
+    memcpy(out, vm->log + skip, sizeof(VmAccess) * (size_t)n);
+    vm->logCount = 0;
+    vm->readCount = vm->writeCount = 0;
+    return n;
 }
 
 VmStatus    Vm_GetStatus(const Vm *vm)    { return vm->status; }

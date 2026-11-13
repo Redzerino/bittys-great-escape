@@ -8,11 +8,9 @@ Goal: store the door code in a variable, write it at the door, and walk through.
 
 [talk]
 @walk EAST 1
-A door with a lock. The code to open it is 7. I need a way to remember that number.
-Programs remember things using `variables`. A variable is like a box with a name written on the side, and a value inside.
-`int code = 7;` makes a box called `code` and puts 7 in it. `int` means the box holds a whole number, like 7 or -3 or 2000.
-After that, whenever you write `code`, C opens the box and uses what's inside. So `write(code);` stamps 7 on the floor next to the door.
-Right now the box holds 0, which is the wrong code. Change the 0 to 7, then press RUN!
+A locked door! The code is 7, and I need to remember it.
+A `variable` is a box with a name. `int code = 7;` makes a box called `code` with 7 inside.
+The box holds 0 at the moment. Change it to 7, then press RUN!
 
 [lesson]
 A VARIABLE is a named box that holds
@@ -39,6 +37,8 @@ floor. Next to a locked door, the
 door checks if it's the right code.
 
 [hint]
+The door's code is 7. What's in the box called code at the moment?
+The box starts with 0 in it. Put 7 there instead.
 Change int code = 0; to int code = 7;
 
 [map]

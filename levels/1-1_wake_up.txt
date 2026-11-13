@@ -1,5 +1,6 @@
 title: 1.1  Wake Up
 type: escape
+buttons: EAST | WEST | NORTH | SOUTH
 
 [story]
 Bitty: "Where... am I? Everything's made of numbers."
@@ -7,13 +8,9 @@ Bitty can't move on its own. Your code is the only way out.
 Goal: reach the green EXIT tile.
 
 [talk]
-Bzzt... systems online. Hello! I'm Bitty.
-I woke up inside a computer's memory, and it's shutting down. I need to get out!
-One problem: I can't move by myself. I only do what your code tells me.
-A line of code is called a `statement`. Each one is one instruction, like `move(EAST);`
-See the `;` at the end? That's how C knows the instruction is finished. Like a full stop.
-C runs your statements from top to bottom, one at a time. Get me to the green EXIT!
-Never written any code before? No problem. The optional BOOTCAMP at the top of the map explains everything from zero.
+Bzzt... hello! I'm Bitty. I woke up inside a computer's memory and it's shutting down. I only move when your code tells me!
+Each line like `move(EAST);` is one step. The `;` at the end is the full stop of C.
+Fill in the gold gaps with a direction (tap the buttons!), then press RUN. New to code? Try the BOOTCAMP on the map first.
 
 [lesson]
 A C program is a list of STATEMENTS.
@@ -29,6 +26,11 @@ brackets with the value it needs inside.
 
 Watch out: forget the ; and C won't compile.
 
+[hint]
+Look at the map: the exit is right, then down, then right again.
+Bitty goes EAST twice, SOUTH once, then EAST twice. One move(); per step.
+move(EAST); move(EAST); move(SOUTH); move(EAST); move(EAST);
+
 [map]
 #######
 #B..###
@@ -43,8 +45,13 @@ Watch out: forget the ; and C won't compile.
 //
 //   move(NORTH);   move(EAST);
 //   move(SOUTH);   move(WEST);
+// Fill in the gold gaps!
 
 move(EAST);
+move(___);
+move(___);
+move(___);
+move(___);
 
 [solution]
 move(EAST);

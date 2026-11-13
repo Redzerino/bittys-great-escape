@@ -7,11 +7,9 @@ Fix addPoints() so it changes the real score.
 
 [talk]
 @walk EAST 1
-Here's a sneaky one. When you call a function, the parameters are COPIES of the values you passed in.
-The function gets its own little local box. Changing that box doesn't touch the original. The points vanish when the function ends!
-This is called "pass by value". It's the default in C.
-In C++ you can add `&` to a parameter: `int &score`. Now it's a `reference`, another name for the caller's actual variable, not a copy.
-Add the `&` and the score will really change. Look at the Inspector to see the difference.
+This function is `void`: it gives nothing back. It's meant to change the score... but it changes a COPY.
+Parameters are copies. Change the copy, and the real score never changes.
+Add `&` to make it a reference: `int &score` is the caller's real box, not a copy.
 
 [lesson]
 PASS BY VALUE (the default): the
@@ -30,6 +28,8 @@ Variables made inside a function are
 LOCAL: they only exist until it ends.
 
 [hint]
+The function changes a copy of score, not the real one.
+Make score a reference by putting & in front of its name.
 Change int score to int &score.
 
 [code]

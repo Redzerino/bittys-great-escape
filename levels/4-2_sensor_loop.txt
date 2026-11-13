@@ -1,5 +1,6 @@
 title: 4.2  Sensor Loop
 type: escape
+fog: 1.4
 
 [story]
 Bitty: "The corridor winds around and I can't see how long each part is."
@@ -7,11 +8,9 @@ Goal: use while loops and scan() to follow the corridor to the EXIT.
 
 [talk]
 @walk EAST 1
-A twisty corridor. I don't know how long each part is, so I can't use a counted `for` loop.
-A `while` loop is perfect for this. It keeps going for as long as its question is true, however long that takes.
-`while (scan(EAST) != TILE_WALL) { move(EAST); }` means: keep walking east until there's a wall in front of me.
-The corridor goes EAST, then SOUTH, then WEST to the exit. One loop for each part!
-The first loop is already written. Add the other two.
+It's so dark in here! I can only see the tiles next to me, so I don't know how long anything is.
+A `while` loop keeps going however long it takes: `while (scan(EAST) != TILE_WALL) { move(EAST); }`
+The corridor goes EAST, then SOUTH, then WEST. One loop for each part!
 
 [lesson]
 while repeats AS LONG AS its condition
@@ -30,6 +29,8 @@ another. Each finishes before the
 next one starts.
 
 [hint]
+Use one while loop for each part of the corridor: EAST, then SOUTH, then WEST.
+Copy the first loop twice. Change EAST to SOUTH in one copy, and to WEST in the other.
 After the first loop, add while (scan(SOUTH) != TILE_WALL) { move(SOUTH); } and the same for WEST.
 
 [map]

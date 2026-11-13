@@ -82,3 +82,5 @@ working compiler setup, then inspect representative stages 2.2, 2.3, 3.3, 3.5,
 No commit, push, or merge has been performed.
 
 Unified completion: movement exits, gate-based repairs and compact array validation now call CompleteStage, persist completion, reset victory time and unlock celebration feedback. The shared banner appears over all gameplay renderers. The data-scene avatar receives WORLD_WON and the real victory timer so it uses the original jump/spin/hop animation only after all checks pass. Next pulses when a successor exists; the final stage instead directs players to CIRCUIT. MSYS2 full build passed. No commit, push or merge.
+
+Merge integration: combined with main's memory room, renamed levels, fill-in gaps, hints and friendly errors. RUN uses the visual-learning scenes; STEP retains the memory-room interaction and prediction questions. The shared completion banner and checkpoint ticks are retained. Full merged game build passed, and visual telemetry regressions passed. The broader VM, level and escape suites compiled but Windows Application Control blocked their executables. In-game integration review remains recommended.

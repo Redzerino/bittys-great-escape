@@ -10,12 +10,13 @@ solution works.
 The file name decides where the level sits on the Escape Circuit map:
 
 ```
-W-S_name.txt     world W (1-9), stage S (1-5)     e.g. 3-2_choose_a_path.txt = stage 3.2
+W-S_name.txt     world W (1-9), stage S (1-6)     e.g. 3-2_choose_a_path.txt = stage 3.2
 0-S_name.txt     the optional BOOTCAMP, lesson S (1-7)
 ```
 
-The first 9 levels were written before the map, so `circuit.c` places them by hand
-(e.g. `2-0_first_function.txt` is stage 5.1). Don't rename level files: saves use them.
+A chip shows a 6th stage only if a W-6 file exists. Every file is named after its
+slot. If you ever rename one, add the old name to RENAMED in save.c so old saves
+still find it.
 Start the title with the map number so it matches: `title: 3.2  Choose a Path`.
 
 ## Header
@@ -28,7 +29,24 @@ ban_indexing: yes     optional: arr[i] not allowed (Pointer Wires levels)
 max_steps: 5000000    optional: instruction limit per test (default 2,000,000)
 door_code: 7          optional, escape levels: G tiles are locked doors that open when
                       Bitty write()s this number while standing next to them
+fog: 1.4              optional, escape levels: Bitty can only see this far (in tiles),
+                      so the player can't count how long the corridor is (use for while loops)
+sign: 4 0 EXIT|11 TILES >>
+                      optional, escape levels: a sign on the wall tile at column 4, row 0
+                      (columns and rows count from 0; | starts a new line). Up to 6 signs.
+buttons: EAST | NORTH | ==
+                      optional: code buttons under the editor. Tapping one types it (into the
+                      selected gold gap, if there is one, then jumps to the next gap).
 ```
+
+Fill-in-the-blank: write ___ (three or more underscores) in the [code] starter
+wherever the player should fill something in. Gaps are drawn in gold; clicking one
+selects it, and Tab jumps to the next. A starter with gaps doesn't have to compile
+(the level tests skip it), but make sure filling the gaps gives a working answer.
+Use small gaps the first time an idea appears, and bigger ones (or none) later.
+
+Repair levels need nothing extra for the memory room: while a test runs, Bitty is
+beamed into the function's memory and acts out every line (see src/room.c).
 
 ## Sections
 
@@ -37,7 +55,7 @@ door_code: 7          optional, escape levels: G tiles are locked doors that ope
 | `[story]`    | Shown in the console when the level loads. Bitty talking + the goal. |
 | `[talk]`     | What Bitty says out loud when the level starts, one speech bubble per line. `@walk EAST 2` makes him walk by himself first. Put C code in `` `backticks` `` to show it in gold. |
 | `[lesson]`   | The "Memory Dump" card: the C concept this level teaches. Keep it to about 14 short lines. |
-| `[hint]`     | Shown in the console after the first failed run. |
+| `[hint]`     | One line per step: a nudge, a bigger nudge, then the answer. The first step shows after the first failed run; the HINT button shows the next. |
 | `[solution]` (escape) | A working answer. `test_escape.bat` plays it and checks Bitty reaches the EXIT. |
 | `[map]`      | Escape levels. Max 16 wide, 12 tall. Repair levels can leave it out and get a corridor of gates. |
 | `[code]`     | Starter code in the editor. Must compile, and must NOT already pass the tests. |

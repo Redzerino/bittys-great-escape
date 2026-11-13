@@ -1,5 +1,6 @@
 title: 3.1  Comparisons
 type: repair
+buttons: a > b | a < b | a == b
 
 [story]
 Bitty: "The control unit keeps asking me which number is bigger. Every. Single. Time."
@@ -7,11 +8,9 @@ Write biggest() to return the larger of two numbers.
 
 [talk]
 @walk EAST 1
-The CPU Control Unit is where programs make decisions. Everything here starts with a comparison.
-`a > b` asks "is a bigger than b?" The answer is `true` or `false`.
-Put it inside an `if` and you can do different things depending on the answer.
-This gate gives two numbers and wants the bigger one back. If they're the same, either one is fine.
-Careful with negative numbers: -1 is bigger than -4!
+The CPU Control Unit makes decisions. `a > b` asks "is a bigger than b?" The answer is true or false.
+Inside an `if`, `return a;` hands back a straight away, and nothing after it runs.
+Give back the bigger number. Careful: -1 is bigger than -4!
 
 [lesson]
 Comparisons give true or false:
@@ -34,15 +33,21 @@ If the if returns, the code after it
 never runs.
 
 [hint]
+Use an if to ask which number is bigger.
+If a > b, return a. Otherwise return b.
 if (a > b) return a; otherwise return b;
 
 [code]
 // STAGE 3.1: COMPARISONS
 // Return the bigger of a and b.
 // biggest(3, 7) -> 7
+// Fill in the gold gaps!
 
 int biggest(int a, int b) {
-    return a;
+    if (___) {
+        return a;
+    }
+    return b;
 }
 
 [solution]

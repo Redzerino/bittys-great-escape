@@ -1,5 +1,6 @@
 title: 3.2  Choose a Path
 type: escape
+buttons: TILE_WALL | TILE_EMPTY | EAST | SOUTH
 
 [story]
 Bitty: "Stairs! If there's a wall ahead I go down, otherwise I keep going."
@@ -7,11 +8,9 @@ Goal: use if / else inside a loop to get down the staircase.
 
 [talk]
 @walk EAST 1
-A staircase. I can't see the whole thing, but I can check one tile ahead with `scan(EAST)`.
-The rule is simple: if there's a wall in front of me, step SOUTH. Otherwise, step EAST.
-Put that `if` / `else` inside a loop, and I'll make a fresh decision on every step.
-It takes exactly 10 steps to reach the exit, so a `for` loop that runs 10 times will do it.
-This is how real programs work: the same few lines, making different choices as things change.
+A staircase! On every step I check the tile ahead with `scan(EAST)`.
+Wall in front? Step SOUTH. Otherwise, step EAST. Put that `if` / `else` inside the loop.
+Same few lines, a different choice each time. That's how real programs work!
 
 [lesson]
 An if inside a loop makes a new
@@ -30,6 +29,8 @@ tile: TILE_WALL, TILE_EMPTY, TILE_EXIT,
 TILE_VOID, TILE_DATA...
 
 [hint]
+On every step Bitty has to choose: is there a wall ahead or not?
+Inside the loop, use if (scan(EAST) == TILE_WALL) to go SOUTH, else go EAST.
 Inside the loop: if (scan(EAST) == TILE_WALL) move(SOUTH); else move(EAST);
 
 [map]
@@ -45,9 +46,14 @@ Inside the loop: if (scan(EAST) == TILE_WALL) move(SOUTH); else move(EAST);
 // Wall ahead? Go SOUTH.
 // No wall?    Go EAST.
 // It takes 10 steps in total.
+// Fill in the gold gaps!
 
 for (int i = 0; i < 10; i++) {
-    move(EAST);
+    if (scan(EAST) == ___) {
+        move(___);
+    } else {
+        move(___);
+    }
 }
 
 [solution]

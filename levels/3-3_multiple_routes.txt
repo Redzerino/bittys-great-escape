@@ -7,11 +7,9 @@ Write grade() so it gives the right letter for each score.
 
 [talk]
 @walk EAST 1
-This chip gives a letter grade for a score: 70 or more is an 'A', 60 or more a 'B', 50 a 'C', 40 a 'D', and anything lower is an 'F'.
-One `if` and `else` only gives two choices. For more, chain them: `if`, then `else if`, `else if`... and a final `else`.
-C checks them from the top and stops at the first one that's true. So the ORDER matters!
-Check the highest grade first. If you checked `score >= 40` first, a score of 95 would get a 'D'. Oops.
-This function returns a `char`, a single letter in single quotes like 'A'.
+Letter grades: 70+ is 'A', 60+ 'B', 50+ 'C', 40+ 'D', anything lower 'F'.
+Chain the choices: `if`, `else if`, `else if`... C stops at the first one that's true.
+So check the HIGHEST grade first. A `char` goes in single quotes: 'A'.
 
 [lesson]
 else if gives more than two choices:
@@ -32,6 +30,8 @@ quotes: 'A'   'b'   '7'
 Double quotes are for strings: "Hi"
 
 [hint]
+Use if, then else if, else if... and check the BIGGEST grade first.
+if (score >= 70) return 'A'; then else if (score >= 60) return 'B'; and so on down.
 if (score >= 70) return 'A'; else if (score >= 60) return 'B'; ... else return 'F';
 
 [code]
@@ -39,8 +39,17 @@ if (score >= 70) return 'A'; else if (score >= 60) return 'B'; ... else return '
 //   70+ -> 'A'    60+ -> 'B'
 //   50+ -> 'C'    40+ -> 'D'
 //   below 40 -> 'F'
+// Fill in the gold gaps!
 
 char grade(int score) {
+    if (score >= 70) {
+        return 'A';
+    } else if (score >= 60) {
+        return ___;
+    } else if (___) {
+        return 'C';
+    }
+    // Add an else if for 'D' (40 or more) here.
     return 'F';
 }
 

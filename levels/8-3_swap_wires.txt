@@ -8,10 +8,9 @@ Write swap_ints() using pointers. In this world [ ] is banned.
 
 [talk]
 @walk EAST 1
-Two wires are crossed. This is Exam 2, question 1, and it's a classic.
-The function gets two addresses, `int *a` and `int *b`. Remember, `*a` means "go to that address and use what's there".
-You can't just copy one into the other, or you'd lose it. Keep a spare in `temp` first, just like Mirror Mirror.
-Swap what's at the ends and the wires untangle. Oh, and `[ ]` is still banned in this sector. Pointers only!
+Two wires are crossed: swap the values that `a` and `b` point at.
+Keep a spare in `temp` first, just like Mirror Mirror, or you'll lose one.
+Pointers only in this sector!
 
 [lesson]
 A POINTER holds an ADDRESS: where a value
@@ -30,6 +29,8 @@ function needs their addresses:
 Exam 2, Q1.
 
 [hint]
+Keep a spare copy first, or you'll lose one of the values.
+int temp = *a; then copy *b into *a, then temp into *b.
 int temp = *a; *a = *b; *b = temp;
 
 [code]

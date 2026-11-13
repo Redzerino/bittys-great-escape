@@ -8,11 +8,9 @@ Write concat_strings() without [ ].
 
 [talk]
 @walk EAST 1
-The escape protocol comes in two halves. Stick the second one onto the end of the first.
-First, walk `dest` along to its `'\0'`. That's where the first half ends, and where the second half should start.
-Then copy `src` from there, one letter at a time, just like copy_string.
-And yes. One more time. Put a `'\0'` on the very end.
-Do this one and there's just one door left between us and freedom.
+Stick the second half of the escape plan onto the end of the first.
+First walk `dest` along to its `'\0'`. Then copy `src` from there, like copy_string.
+And one more time: put a `'\0'` on the very end!
 
 [lesson]
 concat_strings in two steps:
@@ -33,6 +31,8 @@ concat_strings in two steps:
 Exam 2: concat_strings.
 
 [hint]
+First find the end of dest: move along until *dest is '\0'.
+Then copy src onto the end, like copy_string, and finish with a '\0'.
 First while (*dest != '\0') dest++; then copy src like copy_string, and end with *dest = '\0';
 
 [code]

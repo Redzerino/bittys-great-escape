@@ -8,11 +8,9 @@ Goal: walk the corridor, add up every data tile, write the total at the door, an
 
 [talk]
 @walk EAST 1
-This is it. The USB exit is right there. Just one door left.
-The door code is every number on the floor of this corridor, added together. I'll need to keep a running total as I walk.
-Walk EAST until the tile in front of me is the gate. After each step, add what's on the floor with `total += read();` Empty floor reads as 0, so that's safe.
-Then `write(total);` at the door. If the code's right, it opens, and two more steps and I'm FREE.
-Everything you've learned: variables, loops, scanning, maths. Let's go home.
+This is it. The USB exit is right there. The door code is every number on the floor added together.
+Walk EAST until the gate is in front of me, doing `total += read();` after each step.
+Then `write(total);` at the door, and two more steps to FREEDOM. Let's go home!
 
 [lesson]
 Everything together:
@@ -33,6 +31,8 @@ Everything together:
   write()       the code for the door
 
 [hint]
+Add up the floor numbers as you walk.
+After each move(EAST); do total += read(); then write(total); at the door.
 int total = 0; while (scan(EAST) != TILE_GATE) { move(EAST); total += read(); } write(total); then two moves east.
 
 [map]

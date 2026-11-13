@@ -7,11 +7,9 @@ Write countVowels() to count the vowels in a string.
 
 [talk]
 @walk EAST 1
-A `string` is just an array of chars, like "Hello". But how does C know where it ends?
-Every string has a hidden extra char at the end: `'\0'`, the null character. It means "the message stops here".
-So to visit every letter, loop until you reach `'\0'`: `for (int i = 0; s[i] != '\0'; i++)`.
-For each letter, check if it's a vowel, small or capital. That's a lot of `||` "or"s!
-Fun fact: the Exam 2 prep sheet says "OpenAI" has 3 vowels. It actually has 4. O, e, A and I. The gate knows!
+A string is an array of chars, like "Hello". It always ends with a hidden `'\0'` that means "stop here".
+Loop until you reach the `'\0'`, and count the vowels: a, e, i, o, u, small or capital.
+That's a lot of `||` "or"s. You can do it!
 
 [lesson]
 A STRING is an array of chars that
@@ -33,6 +31,8 @@ Checking several things:
 Exam 2: count_vowels.
 
 [hint]
+Visit every letter until you reach the '\0'.
+For each letter, if it's a, e, i, o or u (small or capital), add 1 to count.
 Loop while s[i] != '\0' and count++ when s[i] is any of aeiouAEIOU.
 
 [code]
@@ -40,10 +40,17 @@ Loop while s[i] != '\0' and count++ when s[i] is any of aeiouAEIOU.
 // Count the vowels (a e i o u, small
 // or capital) in the string s.
 // countVowels("OpenAI") -> 4
+// Fill in the gold gaps!
 
 int countVowels(char s[]) {
     int count = 0;
-
+    for (int i = 0; s[i] != ___; i++) {
+        char c = s[i];
+        // is c a vowel? a e i o u, small or capital (join them with ||)
+        if (___) {
+            count++;
+        }
+    }
     return count;
 }
 

@@ -1,5 +1,6 @@
-title: 2.1  Data Types
+title: 2.2  Data Types
 type: repair
+buttons: == | != | < | >
 
 [story]
 Bitty: "The registers sort everything by type. Numbers, letters, true or false."
@@ -7,11 +8,9 @@ Write isEven() so it says whether a number is even.
 
 [talk]
 @walk EAST 1
-Welcome to the Register Bank. Every box in memory has a `type` that says what kind of value it can hold.
-`int` holds whole numbers like 42. `char` holds a single letter like 'A'. `bool` holds just `true` or `false`.
-This gate wants a function that returns a `bool`: true if a number is even, false if it's odd.
-The trick is `%`, the remainder. `n % 2` is what's left over after dividing by 2. Even numbers leave nothing: 0.
-So the whole answer can be one line: `return n % 2 == 0;` The comparison itself is already true or false!
+Every box has a `type`: `int` is a whole number, `char` is a letter, `bool` is true or false.
+This function gives back a `bool`: true if `n` is even. `n % 2` is the remainder after dividing by 2, and for even numbers it's 0.
+A comparison like `n % 2 == 0` is already true or false, so you can return it straight away!
 
 [lesson]
 Every variable has a TYPE:
@@ -33,16 +32,19 @@ A comparison gives back a bool:
 So a number is even when n % 2 == 0.
 
 [hint]
+A number is even when 2 goes into it with nothing left over.
+n % 2 is what's left over. For an even number that's 0, so compare it with == 0.
 return n % 2 == 0;
 
 [code]
-// STAGE 2.1: DATA TYPES
+// STAGE 2.2: DATA TYPES
 // Return true if n is even,
 // false if it's odd.
 // isEven(4) -> true   isEven(7) -> false
+// Fill in the gold gaps!
 
 bool isEven(int n) {
-    return false;
+    return n % 2 ___ 0;
 }
 
 [solution]

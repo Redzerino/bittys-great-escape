@@ -1,6 +1,6 @@
 // circuit.c - the Escape Circuit: the motherboard map where you pick a stage.
 //
-// Nine chips (worlds) with five stages each = the 45 stages of the escape,
+// Nine chips (worlds) with five or six stages each, the stages of the escape,
 // plus the optional BOOTCAMP strip at the top for people who have never
 // coded before. Everything is laid out for a 1280x720 screen and scaled to
 // fit the window (see View()).
@@ -16,11 +16,12 @@
 #include <stdio.h>
 #include <string.h>
 
-enum { WORLDS = 9, STAGES = 5, BOOTCAMP_STAGES = 7 };
+enum { WORLDS = 9, STAGES = 6, BOOTCAMP_STAGES = 7 };   // STAGES = the most a chip can hold
 
 #define BOOTCAMP WORLDS            // "world" number used for the bootcamp strip
 
 static int   stages[WORLDS][STAGES];          // level index in each slot (-1 = not written yet)
+static int   stageCount[WORLDS];              // how many stages each chip shows (5, or 6 if a sixth is written)
 static int   bootcamp[BOOTCAMP_STAGES];       // level index of each bootcamp stage (-1 = none)
 static int   selectedWorld = 0, selectedStage = 0;
 static float clockTime = 0;
@@ -30,17 +31,17 @@ static const char *worldNames[] = {
     "RAM BANKS", "DATA BUS", "ADDRESS NETWORK", "USB GATEWAY", "BOOTCAMP"
 };
 static const char *topics[] = {
-    "Commands / variables", "Types / arithmetic", "Decisions / logic", "Loops / repetition",
-    "Functions / scope", "Arrays / searching", "Characters / strings", "Pointers / addresses",
+    "Commands / variables", "First functions / maths", "Decisions / logic", "Loops / repetition",
+    "Helper functions / scope", "Arrays / searching", "Characters / strings", "Pointers / addresses",
     "Final escape / revision", "Never coded before? Start here"
 };
 // Names shown for stages that aren't written yet
 static const char *planned[WORLDS][STAGES] = {
     { "Wake Up", "Long Corridor", "Mind the Gap", "Memory Boxes", "Fork in the Road" },
-    { "Data Types", "Digit Peeler", "Binary Decoder", "Register Updates", "Access Code" },
+    { "First Function", "Data Types", "Register Updates", "Access Code", "Digit Peeler", "Binary Decoder" },
     { "Comparisons", "Choose a Path", "Multiple Routes", "Logical Gates", "Control Terminal" },
     { "Counted Loops", "Sensor Loop", "Try Again", "Emergency Stop", "Prime Lock" },
-    { "First Function", "Parameters", "Return Values", "Local Memory", "Repair Toolkit" },
+    { "Helper Functions", "Parameters", "Return Values", "Local Memory", "Repair Toolkit" },
     { "Data Shelf", "Array Traversal", "Power Audit", "Search the Bay", "Mirror Mirror" },
     { "Character Codes", "End of Message", "String Length", "Password Terminal", "Message Repair" },
     { "Memory Addresses", "Follow the Wire", "Swap Wires", "Pointer Arithmetic", "Measure the String" },
@@ -88,31 +89,17 @@ static Vector2 Node(int world, int stage)
         return (Vector2){ r.x + 40 + stage * 52, r.y + 80 };
     }
     Rectangle r = Chip(world);
-    return (Vector2){ r.x + 34 + stage * 50, r.y + 89 };
+    float gap = 200.0f / (stageCount[world] - 1);      // 50 apart for 5 stages, 40 for 6
+    return (Vector2){ r.x + 34 + stage * gap, r.y + 89 };
 }
 
-static int StageCount(int world)            { return world == BOOTCAMP ? BOOTCAMP_STAGES : STAGES; }
+static int StageCount(int world)            { return world == BOOTCAMP ? BOOTCAMP_STAGES : stageCount[world]; }
 static int LevelAt(int world, int stage)    { return world == BOOTCAMP ? bootcamp[stage] : stages[world][stage]; }
 
-// Which slot a level file goes in. The first levels were numbered before the
-// map existed, so they are placed by hand; newer files are named "W-S_name.txt"
-// (world W, stage S), and bootcamp files "0-S_name.txt".
+// Which slot a level file goes in: files are named "W-S_name.txt" (world W,
+// stage S), and bootcamp files "0-S_name.txt".
 static bool Placement(const char *file, int *world, int *slot)
 {
-    static const struct { const char *file; int world, slot; } OLD[] = {
-        { "2-0_first_function.txt",     4, 0 },
-        { "2-1_digit_peeler.txt",       1, 1 },
-        { "2-2_binary_decoder.txt",     1, 2 },
-        { "3-1_leap_year_gate.txt",     2, 3 },
-        { "4-1_prime_lock.txt",         3, 4 },
-        { "5-1_search_the_bay.txt",     5, 3 },
-        { "5-2_mirror_mirror.txt",      5, 4 },
-        { "8-1_swap_wires.txt",         7, 2 },
-        { "8-2_measure_the_string.txt", 7, 4 },
-    };
-    for (int i = 0; i < (int)(sizeof OLD / sizeof OLD[0]); i++)
-        if (strcmp(file, OLD[i].file) == 0) { *world = OLD[i].world; *slot = OLD[i].slot; return true; }
-
     int w, s;
     if (sscanf(file, "%d-%d", &w, &s) != 2) return false;
     if (w == 0 && s >= 1 && s <= BOOTCAMP_STAGES) { *world = BOOTCAMP; *slot = s - 1; return true; }
@@ -139,6 +126,11 @@ void Circuit_Init(void)
             slot = (w == BOOTCAMP) ? &bootcamp[s] : &stages[w][s];
         if (slot && *slot < 0) *slot = i;
         else TraceLog(LOG_WARNING, "Circuit: no free slot for %s", Levels_Get(i)->file);
+    }
+    for (int w = 0; w < WORLDS; w++)
+    {
+        stageCount[w] = 5;
+        for (int s = 5; s < STAGES; s++) if (stages[w][s] >= 0) stageCount[w] = s + 1;
     }
 }
 
@@ -240,11 +232,12 @@ int Circuit_Draw(Font font, float dt)
     Camera2D camera = View();
     Vector2 mouse = GetScreenToWorld2D(GetMousePosition(), camera);
     bool click = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-    int launch = -1, cleared = 0, available = 0;
+    int launch = -1, cleared = 0, available = 0, total = 0;
 
     for (int w = 0; w < WORLDS; w++)
-        for (int s = 0; s < STAGES; s++)
+        for (int s = 0; s < StageCount(w); s++)
         {
+            total++;
             if (stages[w][s] >= 0) available++;
             if (Done(stages[w][s])) cleared++;
         }
@@ -260,7 +253,7 @@ int Circuit_Draw(Font font, float dt)
     Label(font, "BITTY'S ESCAPE CIRCUIT", 32, 28, 32, (Color){ 150, 255, 210, 255 });
     Label(font, "Trace a route through the computer.", 34, 73, 16, LIGHTGRAY);
     Label(font, "Choose a stage to write your escape.", 34, 92, 16, LIGHTGRAY);
-    Label(font, TextFormat("%02d / 45 CLEARED   |   %d stages playable", cleared, available), 34, 120, 17, SKYBLUE);
+    Label(font, TextFormat("%02d / %d CLEARED   |   %d stages playable", cleared, total, available), 34, 120, 17, SKYBLUE);
 
     // copper tracks between the chips, with a pulse of data running along each
     for (int w = 0; w < WORLDS - 1; w++)
@@ -284,7 +277,7 @@ int Circuit_Draw(Font font, float dt)
             DrawRectangle((int)chip.x + 15 + pin * 25, (int)(chip.y + chip.height), 6, 6, (Color){ 135, 130, 95, 255 });
         }
         bool worldComplete = true;
-        for (int s = 0; s < STAGES; s++)
+        for (int s = 0; s < StageCount(w); s++)
             if (!Done(stages[w][s])) worldComplete = false;
         DrawRectangleRounded(chip, 0.08f, 4, worldComplete ? (Color){ 22, 105, 68, 255 } : (Color){ 12, 27, 36, 255 });
         DrawRectangleRoundedLinesEx(chip, 0.08f, 4, selectedWorld == w ? 2 : 1, Fade(accent, selectedWorld == w ? 1 : 0.45f));
@@ -293,11 +286,11 @@ int Circuit_Draw(Font font, float dt)
         Label(font, topics[w], chip.x + 14, chip.y + 41, 12, (Color){ 155, 178, 187, 255 });
 
         int worldDone = 0;
-        for (int s = 0; s < STAGES; s++) if (Done(stages[w][s])) worldDone++;
-        Label(font, TextFormat("%d/5", worldDone), chip.x + 231, chip.y + 114, 11, accent);
+        for (int s = 0; s < StageCount(w); s++) if (Done(stages[w][s])) worldDone++;
+        Label(font, TextFormat("%d/%d", worldDone, StageCount(w)), chip.x + 231, chip.y + 114, 11, accent);
 
-        DrawLineEx(Node(w, 0), Node(w, STAGES - 1), 2, (Color){ 45, 78, 86, 255 });
-        for (int s = 0; s < STAGES; s++)
+        DrawLineEx(Node(w, 0), Node(w, StageCount(w) - 1), 2, (Color){ 45, 78, 86, 255 });
+        for (int s = 0; s < StageCount(w); s++)
             if (DrawNode(font, w, s, mouse, click))
             {
                 selectedWorld = w; selectedStage = s;
@@ -368,7 +361,7 @@ int Circuit_Draw(Font font, float dt)
 
     Label(font, "USB EXIT", 1140, 634, 16, accents[8]);
     DrawRectangleLinesEx((Rectangle){ 936, 630, 185, 28 }, 2, accents[8]);
-    Label(font, "45 stages to freedom", 946, 638, 12, LIGHTGRAY);
+    Label(font, TextFormat("%d stages to freedom", total), 946, 638, 12, LIGHTGRAY);
     Label(font, "Tick + filled green = completed    coloured = playable    padlock = coming soon", 34, 660, 15, LIGHTGRAY);
     Label(font, "White pointer = last played   |   Enter opens the selected stage", 34, 689, 13, (Color){ 120, 155, 166, 255 });
 

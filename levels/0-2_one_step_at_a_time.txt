@@ -7,11 +7,9 @@ Goal: put the moves in the right order so Bitty reaches the EXIT.
 
 [talk]
 @walk EAST 1
-The computer follows your code in order, top to bottom. It never skips ahead or guesses what you meant.
-Look at the code. All the right moves are there, but in the wrong order. The first one walks me straight into a wall. Bonk.
-To fix it, move the lines around so I go EAST, EAST, then SOUTH, SOUTH. Click a line and use Ctrl+X and Ctrl+V to cut and paste it.
-One more thing: C is very fussy about spelling. `Move(east)` won't work. It has to be exactly `move(EAST);` with the same capitals.
-If you get a red error, don't panic! Every programmer gets errors all day long. Read the message, check the red line, and try again.
+I follow your code from top to bottom, in order. These moves are right, but in the wrong order: the first one walks me into a wall!
+Put them in order: EAST, EAST, then SOUTH, SOUTH. Cut a line with Ctrl+X and paste it with Ctrl+V.
+Spelling matters: it must be exactly `move(EAST);`. Red errors are normal. I'll show you how to fix them!
 
 [lesson]
 The ORDER of your code matters.
@@ -33,6 +31,8 @@ Errors are normal! The console tells
 you what went wrong and which line.
 
 [hint]
+Look at the map. Which way does Bitty need to go first?
+He needs to go right twice, then down twice. Right is EAST, down is SOUTH.
 Bitty needs to go EAST, EAST, SOUTH, SOUTH. Move the first line down to the bottom.
 
 [map]

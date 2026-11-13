@@ -101,6 +101,7 @@ int main(void)
                end == WORLD_SEGFAULT ? "Bitty fell into the void" : "the program ended before the EXIT");
 
         end = Play(lv, lv->starterCode, problem, sizeof problem);
+        if (strstr(lv->starterCode, "___")) { problem[0] = '\0'; end = WORLD_RUNNING; }   // fill-in-the-blank: gaps don't compile on purpose
         snprintf(name, sizeof name, "%s: starter code compiles but doesn't win yet", lv->title);
         Report(!strstr(problem, "compile") && end != WORLD_WON, name,
                end == WORLD_WON ? "the starter code already reaches the EXIT" : problem);
