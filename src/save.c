@@ -13,6 +13,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#endif
 
 #define SAVE_MAX_LEVELS 128
 #define SAVE_NAME_MAX   64
@@ -134,7 +138,9 @@ void Save_Load(const char *path)
 
 bool Save_Write(void)
 {
-    FILE *f = fopen(savePath, "wb");
+    char temporary[544];
+    snprintf(temporary, sizeof temporary, "%s.tmp", savePath);
+    FILE *f = fopen(temporary, "wb");
     if (!f) return false;
 
     fprintf(f, "BITTY SAVE 1\n");
@@ -149,7 +155,18 @@ bool Save_Write(void)
         fwrite(entries[i].code, 1, len, f);
         fputc('\n', f);
     }
-    fclose(f);
+    bool ok = !ferror(f) && fflush(f) == 0;
+#ifdef _WIN32
+    if (ok && _commit(_fileno(f)) != 0) ok = false;
+#endif
+    if (fclose(f) != 0) ok = false;
+    if (!ok) { remove(temporary); return false; }
+#ifdef _WIN32
+    if (!MoveFileExA(temporary, savePath, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+        { remove(temporary); return false; }
+#else
+    if (rename(temporary, savePath) != 0) { remove(temporary); return false; }
+#endif
     return true;
 }
 
@@ -163,8 +180,10 @@ void Save_SetCode(const char *levelFile, const char *code)
 {
     SaveEntry *e = Find(levelFile, true);
     if (!e) return;
+    char *replacement = CopyString(code, strlen(code));
+    if (!replacement) return;
     free(e->code);
-    e->code = CopyString(code, strlen(code));
+    e->code = replacement;
 }
 
 bool Save_IsDone(const char *levelFile)

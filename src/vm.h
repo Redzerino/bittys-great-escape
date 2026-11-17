@@ -175,6 +175,8 @@ void Vm_TakeAccesses(Vm *vm, int *reads, int *readCount, int *writes, int *write
 typedef struct {
     int  address;
     bool write;
+    int value, before; // exact value at the access, before subsequent writes
+    bool initializedBefore;
     bool condition;     // not a memory access: an if / while / for question was answered
     int  answer;        // ...and this was the answer (0 = false)
 } VmAccess;

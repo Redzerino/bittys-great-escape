@@ -2205,6 +2205,12 @@ void World_DrawDataScene(const DataScene *s)
     {
         Vector3 p=s->cells[i];p.z+=0.43f;p.y=0.16f;
         Vector2 at=GetWorldToScreenEx(p,s->camera,width,height);
+        if(s->kinds[i]==5)
+        {
+            float labelWidth=MeasureTextEx(s->font,s->labels[i],18,0).x;
+            DrawTextEx(s->font,s->labels[i],(Vector2){at.x-labelWidth/2,at.y},18,0,th->a);
+            continue;
+        }
         const char *value=s->kinds[i] == 3 ? "?" : s->kinds[i] == 4 ? (s->values[i]?"true":"false") : s->kinds[i] == 2 ? "FREE" : s->kinds[i] == 1 ? (s->values[i] == 0 ? "\\0" : s->values[i] == 32 ? "SPACE" : TextFormat("'%c'",s->values[i])) : TextFormat("%d",s->values[i]);
         float textWidth=MeasureTextEx(s->font,value,22,0).x;
         Rectangle plate={at.x-textWidth*0.5f-8,at.y-3,textWidth+16,28};
