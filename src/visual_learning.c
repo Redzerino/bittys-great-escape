@@ -18,8 +18,98 @@ static float entrance=6;
 static int checks[LEVEL_MAX_TESTS];
 static char checkDetail[240];
 static bool checkFailed;
+static bool inspectFailure;
+static int failureIndex;
+static LevelTest failedInput;
+static char failureCall[128], failureExpected[160], failureActual[200];
 static RenderTexture2D canvas;
 static int canvasW,canvasH;
+// Each frame is an observed source line, with real memory before and after it.
+typedef struct {
+    TestDisplay before, after;
+    char code[128], title[64];
+    int line, sourceRow, sourceIndex, destRow, destIndex, value;
+    bool token, fromTemp, toTemp;
+    char registerName[16];
+    bool character;
+} SwapFrame;
+static SwapFrame swapFrames[16];
+static int swapCount;
+static float swapTime;
+static bool swapMode, replayRequested, walkthroughMode;
+static int lastReadRow, lastReadIndex=-1, lastReadValue;
+static char functionName[64];
+static TestWire previousSwapWires[TEST_MAX_WIRES];
+static int previousSwapWireCount;
+
+static int DataSlot(const TestDisplay *td,int address,int *row)
+{
+    for(int r=0;r<td->rowCount;r++)
+        if(address>=td->rows[r].address&&address<td->rows[r].address+td->rows[r].count)
+        { *row=r;return address-td->rows[r].address; }
+    return -1;
+}
+void VisualLearning_SetFunction(const char *name)
+{
+    swapMode=strstr(name,"reverse")!=NULL||strstr(name,"swap")!=NULL;
+    walkthroughMode=true;
+    snprintf(functionName,sizeof functionName,"%s",name);
+}
+int VisualLearning_CurrentLine(void){return swapCount?swapFrames[0].line:0;}
+bool VisualLearning_TakeReplay(void)
+{
+    bool requested=replayRequested;replayRequested=false;return requested;
+}
+void VisualLearning_ObserveLine(const TestDisplay *td,const VmAccess *log,int logCount,int line,const char *code)
+{
+    if(!walkthroughMode||td->fastForward||line<=0||logCount<=0||swapCount>=16)return;
+    SwapFrame *frame=&swapFrames[swapCount++];
+    memset(frame,0,sizeof *frame);
+    frame->before=*td;frame->after=*td;frame->line=line;
+    for(int k=0;k<frame->before.wireCount;k++)
+        for(int j=0;j<previousSwapWireCount;j++)
+            if(!strcmp(frame->before.wires[k].name,previousSwapWires[j].name))frame->before.wires[k]=previousSwapWires[j];
+    memcpy(previousSwapWires,td->wires,sizeof previousSwapWires);
+    previousSwapWireCount=td->wireCount;
+    frame->sourceIndex=frame->destIndex=-1;
+    snprintf(frame->code,sizeof frame->code,"%s",code);
+    // Undo this line's writes to reconstruct its actual pre-execution memory.
+    for(int i=logCount-1;i>=0;i--)
+    {
+        if(!log[i].write||log[i].condition)continue;
+        int row=0,index=DataSlot(td,log[i].address,&row);
+        if(index>=0)frame->before.rows[row].values[index]=log[i].before;
+        for(int r=0;r<frame->before.regCount;r++)
+            if(frame->before.regs[r].address==log[i].address){frame->before.regs[r].value=log[i].before;frame->before.regs[r].known=log[i].initializedBefore;}
+    }
+    for(int i=0;i<logCount;i++)
+    {
+        if(log[i].condition)continue;
+        int row=0,index=DataSlot(td,log[i].address,&row);
+        if(index>=0)
+        {
+            if(log[i].write){frame->destRow=row;frame->destIndex=index;frame->value=log[i].value;}
+            else {frame->sourceRow=row;frame->sourceIndex=index;frame->value=log[i].value;lastReadRow=row;lastReadIndex=index;lastReadValue=log[i].value;}
+            frame->character=td->rows[row].isChar;
+        }
+        for(int r=0;r<td->regCount;r++)
+            if(td->regs[r].address==log[i].address&&(!strcmp(td->regs[r].name,"temp")||!strcmp(td->regs[r].name,"max")||!strcmp(td->regs[r].name,"total")||!strcmp(td->regs[r].name,"count")))
+            {
+                if(log[i].write){frame->toTemp=true;frame->value=log[i].value;snprintf(frame->registerName,sizeof frame->registerName,"%s",td->regs[r].name);
+                    if(!swapMode&&lastReadIndex>=0){frame->sourceRow=lastReadRow;frame->sourceIndex=lastReadIndex;frame->value=lastReadValue;frame->character=td->rows[lastReadRow].isChar;}
+                }
+                else if(frame->destIndex<0)frame->fromTemp=true;
+            }
+    }
+    if(!swapMode&&frame->toTemp)frame->fromTemp=false;
+    frame->token=(frame->destIndex>=0||frame->toTemp)&&(frame->sourceIndex>=0||frame->fromTemp);
+    const char *title=frame->toTemp?"SAVE VALUE IN TEMP":frame->fromTemp&&frame->destIndex>=0?"MOVE TEMP INTO THE OTHER CELL":frame->destIndex>=0?"COPY VALUE ACROSS":strstr(code,"++")||strstr(code,"--")?"MOVE THE POINTERS INWARD":strstr(code,"while")?"CHECK WHETHER POINTERS HAVE MET":"POSITION THE POINTERS";
+    if(!swapMode)
+        title=frame->toTemp?"UPDATE THE TRACKED VARIABLE":frame->destIndex>=0?"WRITE TO DESTINATION":strstr(code,"return")?"RETURN THE ANSWER":strstr(code,"if")?"CHECK THIS CELL":strstr(code,"while")||strstr(code,"for")?"CHECK THE LOOP CONDITION":"EXECUTE THIS LINE";
+    snprintf(frame->title,sizeof frame->title,"%s",title);
+    if(swapCount==1)swapTime=0;
+}
+
 static const Color cyan={90,220,255,255}, gold={255,205,90,255};
 
 static Vector3 Cell(int index,int count)
@@ -30,6 +120,7 @@ static Vector3 Cell(int index,int count)
 }
 void VisualLearning_Reset(void)
 {
+    swapCount=0;swapTime=0;swapMode=false;walkthroughMode=false;replayRequested=false;previousSwapWireCount=0;lastReadIndex=-1;inspectFailure=false;failureCall[0]=0;
     queued=0; currentRow=0; currentIndex=0; travel=0;hasPosition=false;paused=false;
     memset(visited,0,sizeof visited);
     memset(checks,0,sizeof checks);checkDetail[0]=0;checkFailed=false;entrance=6;
@@ -44,11 +135,27 @@ void VisualLearning_Check(int index,bool passed,const char *detail)
     if(index>=0&&index<LEVEL_MAX_TESTS)checks[index]=passed?1:-1;
     if(!passed){checkFailed=true;snprintf(checkDetail,sizeof checkDetail,"Check %d: %.220s",index+1,detail);}
 }
+void VisualLearning_ShowFailure(int index,const LevelTest *test,const TestOutcome *outcome)
+{
+    failureIndex=index;failedInput=*test;inspectFailure=false;
+    Repair_Describe(test,failureCall,sizeof failureCall,failureExpected,sizeof failureExpected);
+    snprintf(failureActual,sizeof failureActual,"%s",outcome->summary);
+}
 void VisualLearning_Update(float dt,float speed)
 {
     timeNow+=dt;
     entrance+=dt;
     if(paused)return;
+    if(swapCount)
+    {
+        swapTime+=dt*speed;
+        if(swapTime>=(swapFrames[0].before.rowCount>0?1.8f:0.85f)){
+            SwapFrame *f=&swapFrames[0];
+            if(f->sourceIndex>=0)visited[f->sourceRow][f->sourceIndex]=1;
+            if(f->destIndex>=0)visited[f->destRow][f->destIndex]=2;
+            memmove(swapFrames,swapFrames+1,(--swapCount)*sizeof swapFrames[0]);swapTime=0;
+        }
+    }
     if(queued)
     {
         travel-=dt*speed;
@@ -61,7 +168,7 @@ void VisualLearning_Update(float dt,float speed)
         }
     }
 }
-bool VisualLearning_Busy(void){return paused||queued>0;}
+bool VisualLearning_Busy(void){return paused||queued>0||swapCount>0;}
 bool VisualLearning_HasData(const LevelTest *test)
 {
     if(!test)return false;
@@ -70,6 +177,7 @@ bool VisualLearning_HasData(const LevelTest *test)
 }
 void VisualLearning_Access(const TestDisplay *td,int row,int index,bool write)
 {
+    if(walkthroughMode)return;
     if(row<0||row>=td->rowCount||index<0||index>=td->rows[row].count||index>=TEST_ROW_MAX)return;
     if(queued&&queue[queued-1].row==row&&queue[queued-1].index==index&&!write)return;
     if(queued>=64)return;
@@ -148,9 +256,9 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
     if(level->testCount<1)return;
     if(testIndex<0)testIndex=0;
     if(testIndex>=level->testCount)testIndex=level->testCount-1;
-    const LevelTest *test=&level->tests[testIndex];
+    const LevelTest *test=inspectFailure?&failedInput:&level->tests[testIndex];
     TestDisplay sample;
-    bool actual=live->active||live->rowCount>0||live->regCount>0;
+    bool actual=!inspectFailure&&(live->active||live->rowCount>0||live->regCount>0);
     if(!actual)
     {
         Preview(test,&sample);
@@ -164,6 +272,7 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
             }
     }
     const TestDisplay *td=actual?live:&sample;
+    if(walkthroughMode&&swapCount)td=swapTime<1.55f?&swapFrames[0].before:&swapFrames[0].after;
     int offsets[TEST_MAX_DATA_ROWS]={0};
     Vector3 positions[TEST_MAX_DATA_ROWS*TEST_ROW_MAX];
     int values[TEST_MAX_DATA_ROWS*TEST_ROW_MAX],seen[TEST_MAX_DATA_ROWS*TEST_ROW_MAX];
@@ -203,6 +312,12 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
     if(row>=td->rowCount)row=0;
     int index=queued?queue[0].index:currentIndex;
     if(td->rowCount&&index>=td->rows[row].count)index=0;
+    if(walkthroughMode&&swapCount)
+    {
+        SwapFrame *frame=&swapFrames[0];
+        if(frame->sourceIndex>=0){row=frame->sourceRow;index=frame->sourceIndex;}
+        if(swapTime>0.9f&&frame->destIndex>=0){row=frame->destRow;index=frame->destIndex;}
+    }
     int target=dataScene?offsets[row]+index:0;
     if(queued&&queue[0].write&&travel>0.15f)values[target]=queue[0].before;
     Vector3 aim=positions[target];
@@ -225,15 +340,27 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
     int best=-1;
     if(maxLevel&&actual)for(int i=0;i<count;i++)if(seen[i]&&(best<0||values[i]>values[best]))best=i;
     Vector3 wireFrom[12],wireTo[12];char wireNames[12][16];int wires=0;
-    for(int r=0;r<td->rowCount;r++)for(int k=0;k<td->rows[r].markerCount&&wires<12;k++)
+    for(int k=0;k<td->wireCount&&wires<12;k++)
     {
-        const TestDataRow *d=&td->rows[r];int at=d->markerIndex[k];
-        if(at<0||at>d->count)continue;
+        const TestWire *wire=&td->wires[k];int r=wire->row,at=wire->index;
+        if(swapMode&&!strcmp(wire->name,"arr"))continue;
+        if(r<0||r>=td->rowCount||at<0||at>td->rows[r].count)continue;
+        const TestDataRow *d=&td->rows[r];
         wireTo[wires]=positions[offsets[r]+(at<d->count?at:d->count-1)];
         if(at==d->count)wireTo[wires].x+=1.1f;
-        wireTo[wires].y=0.23f;
-        wireFrom[wires]=(Vector3){positions[offsets[r]].x-0.55f-k*0.45f,0.9f,positions[offsets[r]].z-0.75f};
-        snprintf(wireNames[wires],16,"%.10s%s",d->markerName[k],at==d->count?" END":"");wires++;
+        if(walkthroughMode&&swapCount)
+            for(int j=0;j<swapFrames[0].after.wireCount;j++)
+            {
+                const TestWire *next=&swapFrames[0].after.wires[j];
+                if(strcmp(next->name,wire->name)||next->row!=r||next->index<0||next->index>=d->count)continue;
+                Vector3 end=positions[offsets[r]+next->index];
+                float t=fminf(1,swapTime/1.5f);
+                wireTo[wires].x+=(end.x-wireTo[wires].x)*t;
+                wireTo[wires].z+=(end.z-wireTo[wires].z)*t;
+            }
+        wireTo[wires].y=0.3f;
+        wireFrom[wires]=wireTo[wires];wireFrom[wires].y=1.35f+(k%2)*0.25f;wireFrom[wires].z-=0.5f;
+        snprintf(wireNames[wires],16,"%.6s[%u]%s",wire->name,(unsigned)at%100u,at==d->count?" END":"");wires++;
     }
     int theme=dataScene?6:5;
     for(int i=0;i<Levels_Count();i++)if(Levels_Get(i)==level){theme=Circuit_WorldOf(i);break;}
@@ -243,7 +370,7 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
     scene.current=target;scene.best=best;scene.moving=queued>0;
     scene.happy=!checkFailed&&won;scene.time=timeNow;scene.victory=won;scene.victoryTime=victoryTime;
     scene.wireCount=wires;scene.wireFrom=wireFrom;scene.wireTo=wireTo;scene.wireNames=wireNames;
-    if(queued&&queue[0].write)
+    if(!swapMode&&queued&&queue[0].write)
     {
         scene.transfer=true;scene.transferValue=queue[0].value;scene.transferAt=aim;
         scene.transferAt.y=0.35f+1.2f*fmaxf(0,travel/0.65f);
@@ -253,7 +380,7 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
     DrawRectangleLinesEx(panel,2,cyan);
     Text(font,SceneTitle(test->func),panel.x+12,panel.y+10,19,cyan,panel.width-24);
     Text(font,actual?"LIVE EXECUTION / YOUR CODE":"YOUR CHALLENGE / WRITE CODE THEN RUN",panel.x+12,panel.y+36,13,LIGHTGRAY,panel.width-24);
-    if(dataScene&&running&&Button((Rectangle){panel.x+panel.width-84,panel.y+55,72,26},paused?"PLAY":"PAUSE",font))paused=!paused;
+    if(dataScene&&running&&Button((Rectangle){panel.x+panel.width-84,panel.y+8,72,26},paused?"PLAY":"PAUSE",font))paused=!paused;
     if(!actual&&entrance>=1&&entrance<6)
     {
         Rectangle speech={panel.x+12,panel.y+86,panel.width-24,76};
@@ -261,12 +388,58 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
         Text(font,maxLevel?"Find the largest. I'll follow YOUR code.":copy?"Move the characters between these buffers.":wires?"Follow the addresses. Change the real memory.":dataScene?"Explore these cells with your code.":"Program this machine. Watch its values change.",speech.x+10,speech.y+54,13,WHITE,speech.width-20);
     }
     // A real branch from bytecode, never a guessed outcome from the task answer.
-    if(actual&&td->trace.branchKnown)
+    if((!walkthroughMode||!dataScene)&&actual&&td->trace.branchKnown)
     {
         float bw=(panel.width-36)/2;
         Card(font,(Rectangle){panel.x+12,panel.y+58,bw,52},"LAST CONDITION",td->trace.branchValue?"TRUE":"FALSE",td->trace.branchValue?GREEN:ORANGE);
         Card(font,(Rectangle){panel.x+24+bw,panel.y+58,bw,52},"SOURCE LINE",TextFormat("%d",td->trace.branchLine),cyan);
     }
+    if(walkthroughMode&&dataScene)
+    {
+        Rectangle tempBox={panel.x+panel.width-156,panel.y+119,143,64};
+        const TestRegister *temp=NULL;
+        const char *trackedName=swapMode?"temp":strstr(test->func,"Max")||strstr(test->func,"max")?"max":strstr(test->func,"count")||strstr(test->func,"Vowels")?"count":"total";
+        for(int i=0;i<td->regCount;i++)if(!strcmp(td->regs[i].name,trackedName))temp=&td->regs[i];
+        Card(font,tempBox,swapMode?"TEMP / SPARE STORAGE":trackedName,temp&&temp->known?TextFormat("%d",temp->value):"empty",gold);
+        if(swapCount)
+        {
+            SwapFrame *frame=&swapFrames[0];
+            Rectangle explain={panel.x+12,panel.y+57,panel.width-24,57};
+            DrawRectangleRounded(explain,0.1f,4,(Color){9,24,38,245});
+            Text(font,frame->title,explain.x+9,explain.y+7,14,gold,explain.width-18);
+            Text(font,TextFormat("LINE %d: %s",frame->line,frame->code),explain.x+9,explain.y+31,15,WHITE,explain.width-18);
+            if(frame->token)
+            {
+                Vector2 start={tempBox.x+tempBox.width/2,tempBox.y+tempBox.height/2};
+                Vector2 end=start;
+                if(!frame->fromTemp&&frame->sourceIndex>=0)
+                {
+                    Vector3 p=positions[offsets[frame->sourceRow]+frame->sourceIndex];p.y=0.5f;
+                    start=GetWorldToScreenEx(p,camera,width,height);start.x+=panel.x;start.y+=panel.y;
+                }
+                if(!frame->toTemp&&frame->destIndex>=0)
+                {
+                    Vector3 p=positions[offsets[frame->destRow]+frame->destIndex];p.y=0.5f;
+                    end=GetWorldToScreenEx(p,camera,width,height);end.x+=panel.x;end.y+=panel.y;
+                }
+                float progress=fminf(1,fmaxf(0,(swapTime-0.35f)/1.1f));
+                Vector2 previous=start;
+                for(int step=1;step<=24;step++)
+                {
+                    float t=step/24.0f;
+                    Vector2 p={start.x+(end.x-start.x)*t,start.y+(end.y-start.y)*t-sinf(t*PI)*48};
+                    DrawLineEx(previous,p,2,Fade(gold,0.5f));previous=p;
+                }
+                Vector2 p={start.x+(end.x-start.x)*progress,start.y+(end.y-start.y)*progress-sinf(progress*PI)*48};
+                DrawCircleV(p,20,(Color){120,80,22,255});DrawCircleLines((int)p.x,(int)p.y,20,gold);
+                Text(font,frame->character?TextFormat("'%c'",frame->value):TextFormat("%d",frame->value),p.x-14,p.y-10,20,WHITE,40);
+            }
+        }
+        else if(won)
+            Text(font,"Pointers met. Every swap is complete.",panel.x+12,panel.y+74,15,GREEN,panel.width-24);
+    }
+
+    if(won&&Button((Rectangle){panel.x+panel.width-140,panel.y+8,128,29},"REPLAY CODE",font))replayRequested=true;
     // Stage-specific diagrams: inputs and actual returned values are distinct.
     float diagramY=panel.y+125;
     if(!strcmp(test->func,"grade"))
@@ -339,6 +512,16 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
             char digit[2]={digits[i],0};
             Card(font,(Rectangle){panel.x+12+i*box,panel.y+125,box-3,56},strstr(test->func,"Binary")?TextFormat("%d",1<<(length-i-1)):"digit",digit,cyan);
         }
+    }
+    if(checkFailed&&failureCall[0])
+    {
+        Rectangle error={panel.x+12,panel.y+55,panel.width-24,119};
+        DrawRectangleRounded(error,0.1f,5,(Color){56,22,28,250});
+        Text(font,TextFormat("CHECK %d FAILED / %s",failureIndex+1,inspectFailure?"FAILING INPUT PREVIEW":"DIFFERENT INPUT"),error.x+10,error.y+8,14,ORANGE,error.width-20);
+        Text(font,failureCall,error.x+10,error.y+33,14,WHITE,error.width-20);
+        Text(font,TextFormat("EXPECTED: %s",failureExpected),error.x+10,error.y+57,14,GREEN,error.width-20);
+        Text(font,TextFormat("ACTUAL: %s",failureActual),error.x+10,error.y+79,14,ORANGE,error.width-20);
+        if(Button((Rectangle){error.x+error.width-157,error.y+91,147,24},inspectFailure?"MAIN ARRAY":"FAILING INPUT",font))inspectFailure=!inspectFailure;
     }
     float bottom=panel.y+panel.height-142;
     DrawRectangle((int)panel.x+3,(int)bottom-4,(int)panel.width-6,143,(Color){8,18,30,245});

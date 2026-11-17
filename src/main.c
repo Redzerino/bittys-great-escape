@@ -11,6 +11,7 @@
 
 #include "raylib.h"
 
+#include "ending.h"
 #include "circuit.h"
 #include "startup.h"
 #include "talk.h"
@@ -93,6 +94,9 @@ typedef struct {
     bool       showHelp;        // the F1 shortcuts card
     float      saveTimer;       // autosave countdown
     bool       unsaved;
+    bool       saveFailed;
+    bool       lastRunStepped;
+    bool       showEnding;
 
     // repair levels
     RepairPhase repairPhase;
@@ -216,12 +220,21 @@ static void RememberCode(Game *g)
     Save_SetCode(Levels_Get(g->level)->file, Editor_GetText(&g->editor));
 }
 
+static void WriteProgress(Game *g)
+{
+    bool ok = Save_Write();
+    if (!ok && !g->saveFailed)
+        Console_PrintKind(CONSOLE_WARNING, "Progress could not be saved. Check folder access; the game will retry.\n");
+    g->saveFailed = !ok;
+    g->unsaved = !ok;
+    if (!ok) g->saveTimer = 5.0f;
+}
+
 static void SaveNow(Game *g)
 {
     RememberCode(g);
     Save_SetCurrent(Levels_Get(g->level)->file);
-    Save_Write();
-    g->unsaved = false;
+    WriteProgress(g);
 }
 
 static void LoadLevel(Game *g, int index, bool keepOldCode)
@@ -230,6 +243,8 @@ static void LoadLevel(Game *g, int index, bool keepOldCode)
 
     StopProgram(g);
     g->level = index;
+    g->lastRunStepped = false;
+    g->showEnding = false;
     g->mode = MODE_EDITING;
     LoadWorld(g);
 
@@ -240,7 +255,7 @@ static void LoadLevel(Game *g, int index, bool keepOldCode)
     World_PlayIntro(&g->world);     // Bitty drops into the new level
     g->editor.focused = true;
     Save_SetCurrent(lv->file);
-    Save_Write();
+    WriteProgress(g);
 
     Console_Clear();
     Console_PrintKind(CONSOLE_SUCCESS, TextFormat("%s:  %s\n", Circuit_StageName(g->level), lv->title + strcspn(lv->title, " ") + strspn(lv->title + strcspn(lv->title, " "), " ")));
@@ -273,6 +288,7 @@ static void Bark(Game *g, const char *a, const char *b, const char *c)
 // ===========================================================================
 static void StartProgram(Game *g, bool step)
 {
+    g->lastRunStepped = step;
     g->validating = false;
     Talk_Skip();
     g->world.talking = false;
@@ -363,6 +379,8 @@ static void FinishRun(Game *g)
 static void CompleteStage(Game *g)
 {
     g->validating = false;
+    g->showEnding = strcmp(Levels_Get(g->level)->file, "9-5_bitty_breaks_free.txt") == 0;
+    if(g->showEnding)Ending_Reset();
     g->world.state = WORLD_WON;
     g->world.mood = MOOD_HAPPY;
     g->world.winTime = 0;
@@ -623,6 +641,7 @@ static void UpdateTestDisplay(Game *g, const LevelTest *t, int line)
     }
     char code[128];
     CodeLine(g, line, code, sizeof code);
+    if(!g->stepping)VisualLearning_ObserveLine(td,log,logCount,line,code);
     World_RoomStep(&g->world, list, listCount, !td->fastForward, line, code);
 }
 
@@ -633,6 +652,7 @@ static void StartNextTest(Game *g)
     TestDisplay *td = &g->world.test;
 
     VisualLearning_Reset();
+    VisualLearning_SetFunction(t->func);
     memset(td, 0, sizeof *td);
     td->active = true;
     int gx = g->world.bittyX + 1, gy = g->world.bittyY;
@@ -683,7 +703,7 @@ static void RunTestFrame(Game *g, float dt)
     if (s == VM_WAITING) { Vm_ActionDone(g->vm, 0); s = Vm_GetStatus(g->vm); }   // move() does nothing here
 
     bool visualData = VisualLearning_HasData(t);
-    if (!g->stepping && visualData && VisualLearning_Busy()) return;
+    if (!g->stepping && VisualLearning_Busy()) return;
     bool ff = !g->stepping && g->linesShown >= (visualData ? 128 : LINES_BEFORE_FF);
     td->fastForward = ff;
     td->waitingForStep = false;
@@ -786,7 +806,8 @@ static void UpdateRepair(Game *g, float dt)
         char detail[240];
         snprintf(detail, sizeof detail, "%.110s -> %.110s", check->text, g->repairOutcome.summary);
         VisualLearning_Check(g->validationIndex, g->repairOutcome.passed, detail);
-        Console_PrintKind(g->repairOutcome.passed ? CONSOLE_SUCCESS : CONSOLE_ERROR, g->repairOutcome.message);
+        if (!g->repairOutcome.passed)VisualLearning_ShowFailure(g->validationIndex, check, &g->repairOutcome);
+        Console_PrintKind(g->repairOutcome.passed ? CONSOLE_SUCCESS : CONSOLE_ERROR, TextFormat("%s\n", g->repairOutcome.message));
         if (!g->repairOutcome.passed)
         {
             g->validating = false;
@@ -811,7 +832,7 @@ static void UpdateRepair(Game *g, float dt)
         return;
     }
 
-    if (VisualLearning_HasData(&lv->tests[g->repairTest < lv->testCount ? g->repairTest : lv->testCount - 1]) && VisualLearning_Busy()) return;
+    if (!g->stepping && VisualLearning_Busy()) return;
     if (g->repairTimer > 0) { g->repairTimer -= dt; return; }
     if (!World_ActionDone(w)) return;
     if (g->stepping && World_RoomBusy(w)) return;          // beaming in/out, or Bitty still busy in the room
@@ -836,7 +857,7 @@ static void UpdateRepair(Game *g, float dt)
 
         if (!o->passed)
         {
-            if (VisualLearning_HasData(&lv->tests[0])) VisualLearning_Check(0, false, o->summary);
+            if (VisualLearning_HasData(&lv->tests[0])) { VisualLearning_Check(0, false, o->summary); VisualLearning_ShowFailure(g->repairTest, &lv->tests[g->repairTest], o); }
             Bark(g, "Bzzt. Not quite. Look what it gave back.", "The gate says no. Check what it wanted.", NULL);
             w->mood = MOOD_ERROR;               // Bitty stays in the room, so you can see what the code left behind
             w->shake = 0.4f;
@@ -1060,8 +1081,8 @@ static void DrawStageCompletion(Game *g)
 {
     if (g->mode != MODE_DONE || g->world.state != WORLD_WON || g->showWorkshop) return;
     Rectangle p = WORLD_PANEL;
-    float size = Clamp(p.width / 14.0f, 20, 32);
-    Rectangle box = {p.x + 16, p.y + 85, p.width - 32, 76};
+    float size = Clamp(p.width / 20.0f, 17, 24);
+    Rectangle box = {p.x + 16, p.y + p.height - 61, p.width - 32, 51};
     DrawRectangleRounded(box, 0.12f, 6, (Color){8,24,22,235});
     DrawRectangleRoundedLinesEx(box, 0.12f, 6, 2, (Color){110,245,165,255});
     const char *title = "SECTOR CLEARED";
@@ -1071,7 +1092,7 @@ static void DrawStageCompletion(Game *g)
     float small = 14;
     while(small > 10 && MeasureTextEx(g->codeFont,hint,small,0).x > box.width-20) small--;
     Vector2 sub = MeasureTextEx(g->codeFont,hint,small,0);
-    DrawTextEx(g->codeFont,hint,(Vector2){box.x+(box.width-sub.x)/2,box.y+51},small,0,WHITE);
+    DrawTextEx(g->codeFont,hint,(Vector2){box.x+(box.width-sub.x)/2,box.y+33},small,0,WHITE);
     float t = g->world.winTime;
     if(t < 2.4f)
         for(int i=0;i<24;i++)
@@ -1452,6 +1473,7 @@ static void DrawToolbar(Game *g)
         else
         {
             g->stepping = false;
+            g->lastRunStepped = false;
             if (Levels_Get(g->level)->type == LEVEL_ESCAPE && g->vm && Vm_GetStatus(g->vm) == VM_PAUSED)
                 Vm_Run(g->vm, 1);       // leave the paused line and keep going
         }
@@ -1467,6 +1489,7 @@ static void DrawToolbar(Game *g)
             else
             {
                 g->stepping = true;
+                g->lastRunStepped = true;
                 g->stepRequest = true;
             }
         }
@@ -1643,6 +1666,17 @@ int main(void)
             continue;
         }
 
+        if(g->showEnding)
+        {
+            int completed=0;
+            for(int i=0;i<Levels_Count();i++)if(Save_IsDone(Levels_Get(i)->file))completed++;
+            BeginDrawing();
+            bool back=Ending_Draw(g->codeFont,dt,completed,Levels_Count());
+            EndDrawing();
+            if(back){g->showEnding=false;g->showCircuit=true;Circuit_SelectLevel(g->level);}
+            continue;
+        }
+
         if (g->showCircuit)
         {
             BeginDrawing();
@@ -1709,8 +1743,11 @@ int main(void)
 
         if (!g->showWorkshop)
         {
+            if(g->mode != MODE_RUNNING && VisualLearning_TakeReplay())StartProgram(g,false);
             VisualLearning_Update(dt, SPEEDS[g->speedIndex]);
             UpdateProgram(g, dt);
+            if(!g->stepping && g->mode == MODE_RUNNING && VisualLearning_CurrentLine()>0)
+                g->editor.runLine=VisualLearning_CurrentLine();
             if (g->world.state == WORLD_WON)
                 Customisation_RecordCompletion(g->level);
         }
@@ -1736,11 +1773,16 @@ int main(void)
             DrawStarterButton(g);
             const Level *visualLevel = Levels_Get(g->level);
             int visualTest = g->repairTest < visualLevel->testCount ? g->repairTest : visualLevel->testCount - 1;
-            if (!g->stepping && visualLevel->type == LEVEL_REPAIR && visualTest >= 0 &&
+            if (!g->lastRunStepped && visualLevel->type == LEVEL_REPAIR && visualTest >= 0 &&
                 visualLevel->testCount > 0)
                 VisualLearning_Draw(WORLD_PANEL, g->codeFont, visualLevel, &g->world.test,
                                     visualTest, g->mode == MODE_RUNNING, g->world.state == WORLD_WON, g->world.winTime);
-            else DrawWorldPanel(g);
+            else
+            {
+                DrawWorldPanel(g);
+                if(g->lastRunStepped && visualLevel->type==LEVEL_REPAIR)
+                    DrawTextEx(g->codeFont,"STEP: predict, then advance one line",(Vector2){WORLD_PANEL.x+12,WORLD_PANEL.y+32},14,0,SKYBLUE);
+            }
             DrawQuiz(g);
             Talk_Draw(WORLD_PANEL, g->codeFont);
             DrawLessonCard(g);
@@ -1751,6 +1793,12 @@ int main(void)
                        g->mode == MODE_RUNNING ? g->editor.runLine : 0);
         if (!g->showWorkshop && !g->showHelp) DrawExplainHover(g);   // on top of everything
         DrawHelp(g);
+        if (g->saveFailed)
+        {
+            Rectangle note = {CONSOLE_PANEL.x + 5, CONSOLE_PANEL.y + CONSOLE_PANEL.height - 25, CONSOLE_PANEL.width - 10, 21};
+            DrawRectangleRec(note, (Color){95,35,25,245});
+            DrawText("Progress not saved - retrying", (int)note.x+6, (int)note.y+4, 13, WHITE);
+        }
 
         EndDrawing();
     }
@@ -1759,6 +1807,7 @@ int main(void)
     StopProgram(g);
     VisualLearning_Shutdown();
     Talk_Shutdown();
+    Ending_Shutdown();
     Startup_Shutdown();
     if (g->ownsFont) UnloadFont(g->codeFont);
     CloseWindow();

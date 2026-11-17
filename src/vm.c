@@ -91,6 +91,9 @@ static void Log(Vm *vm, int addr, bool write)
     }
     vm->log[vm->logCount].address = addr;
     vm->log[vm->logCount].write = write;
+    vm->log[vm->logCount].value = addr > 0 && addr < VM_MEM_SIZE ? vm->mem[addr] : 0;
+    vm->log[vm->logCount].before = vm->log[vm->logCount].value;
+    vm->log[vm->logCount].initializedBefore = addr > 0 && addr < VM_MEM_SIZE && vm->cells[addr].init;
     vm->log[vm->logCount].condition = false;
     vm->log[vm->logCount].answer = 0;
     vm->logCount++;
@@ -221,6 +224,7 @@ static int ReadCell(Vm *vm, int addr)
     if (c->init) return vm->mem[addr];
 
     int junk = Garbage(addr);
+    vm->log[vm->logCount - 1].value = junk;
 
     bool warned = false;
     for (int i = 0; i < vm->warnedCount; i++)
@@ -241,6 +245,7 @@ static void WriteCell(Vm *vm, int addr, int value)
 {
     Remember(vm->writes, &vm->writeCount, addr);
     Log(vm, addr, true);
+    vm->log[vm->logCount - 1].value = value;
     vm->mem[addr] = value;
     vm->cells[addr].init = 1;
 }
