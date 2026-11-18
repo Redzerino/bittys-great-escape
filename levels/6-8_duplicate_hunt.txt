@@ -1,0 +1,72 @@
+title: 6.8  Duplicate Hunt
+type: repair
+
+[story]
+Bitty: "Some of these memory boxes are copies. How many duplicates are there?"
+Write countDuplicates(): count every box that has a copy later in the array.
+
+[talk]
+@walk EAST 1
+Some boxes are copies of each other. Count the duplicates!
+For each box, look at every box AFTER it. If one matches, that's a duplicate: count it once and stop looking.
+That's a loop inside a loop, like the Staircase. Row = the box I'm holding, column = the boxes I compare it with.
+
+[lesson]
+Compare each box with every box after it:
+
+for (int i = 0; i < size; i++) {
+    for (int j = i + 1; j < size; j++) {
+        if (arr[i] == arr[j]) {
+            count++;
+            break;     // count arr[i] once
+        }
+    }
+}
+
+{5, 2, 2, 5, 5}
+  i=0: 5 has a copy later   -> 1
+  i=1: 2 has a copy later   -> 2
+  i=3: 5 has a copy later   -> 3
+So there are 3 duplicates.
+
+Exam 1, Q14.
+
+[hint]
+Use two loops: i for the box you're holding, j for every box after it (j starts at i + 1).
+When arr[i] == arr[j], add 1 to count and break out of the inner loop, so each box is counted once.
+for (int j = i + 1; j < size; j++) { if (arr[i] == arr[j]) { count++; break; } }
+
+[code]
+// STAGE 6.8: DUPLICATE HUNT
+// Count every box that has a copy LATER in the array.
+// countDuplicates(5, {5, 2, 2, 5, 5}) -> 3
+
+int countDuplicates(int size, int arr[]) {
+    int count = 0;
+    for (int i = 0; i < size; i++) {
+        // compare arr[i] with every box after it
+
+    }
+    return count;
+}
+
+[solution]
+int countDuplicates(int size, int arr[]) {
+    int count = 0;
+    for (int i = 0; i < size; i++) {
+        for (int j = i + 1; j < size; j++) {
+            if (arr[i] == arr[j]) {
+                count++;
+                break;
+            }
+        }
+    }
+    return count;
+}
+
+[tests]
+countDuplicates(3, {1, 2, 3}) == 0
+countDuplicates(2, {1, 1}) == 1
+countDuplicates(5, {5, 2, 2, 5, 5}) == 3
+countDuplicates(4, {4, 4, 4, 4}) == 3
+countDuplicates(6, {1, 2, 3, 1, 2, 3}) == 3

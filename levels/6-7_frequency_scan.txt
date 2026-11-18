@@ -1,0 +1,66 @@
+title: 6.7  Frequency Scan
+type: repair
+
+[story]
+Bitty: "How many times does this value turn up in the bay?"
+Write frequencyCount(): count how often value appears in the array.
+
+[talk]
+@walk EAST 1
+I need to know how many times one number turns up in the bay.
+Walk every box. Each time a box holds the `value` I'm after, add one to `count`.
+It's the Search the Bay loop, but you keep going instead of stopping at the first one.
+
+[lesson]
+Counting = a total that goes up by 1.
+
+    int count = 0;
+    for (int i = 0; i < size; i++) {
+        if (arr[i] == value) {
+            count++;
+        }
+    }
+    return count;
+
+Search stops at the first match.
+Counting looks at EVERY box.
+
+Exam 1, Q13.
+
+[hint]
+Start a count at 0 and look at every box from 0 to size - 1.
+Each time arr[i] == value, add 1 to count. Return count at the end.
+for (int i = 0; i < size; i++) { if (arr[i] == value) count++; }  return count;
+
+[code]
+// STAGE 6.7: FREQUENCY SCAN
+// How many times does value appear?
+// frequencyCount(5, {1, 2, 1, 3, 1}, 1) -> 3
+// Fill in the gold gaps!
+
+int frequencyCount(int size, int arr[], int value) {
+    int count = 0;
+    for (int i = 0; i < size; i++) {
+        if (___) {
+            ___;
+        }
+    }
+    return count;
+}
+
+[solution]
+int frequencyCount(int size, int arr[], int value) {
+    int count = 0;
+    for (int i = 0; i < size; i++) {
+        if (arr[i] == value) {
+            count++;
+        }
+    }
+    return count;
+}
+
+[tests]
+frequencyCount(5, {1, 2, 1, 3, 1}, 1) == 3
+frequencyCount(5, {1, 2, 1, 3, 1}, 3) == 1
+frequencyCount(4, {7, 7, 7, 7}, 7) == 4
+frequencyCount(3, {4, 5, 6}, 9) == 0

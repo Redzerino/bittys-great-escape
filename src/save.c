@@ -47,6 +47,12 @@ static const char *RENAMED[][2] = {
     { "5-2_mirror_mirror.txt",      "6-5_mirror_mirror.txt" },
     { "8-1_swap_wires.txt",         "8-3_swap_wires.txt" },
     { "8-2_measure_the_string.txt", "8-5_measure_the_string.txt" },
+    // The USB Gateway moved from chip 9 to chip 12 when the Exam revision chips were added
+    { "9-1_port_controller.txt",     "12-1_port_controller.txt" },
+    { "9-2_transfer_buffer.txt",     "12-2_transfer_buffer.txt" },
+    { "9-3_final_firewall.txt",      "12-3_final_firewall.txt" },
+    { "9-4_escape_protocol.txt",     "12-4_escape_protocol.txt" },
+    { "9-5_bitty_breaks_free.txt",   "12-5_bitty_breaks_free.txt" },
 };
 
 static void NewName(char *name, size_t size)

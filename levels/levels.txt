@@ -1,6 +1,6 @@
 # Play order. This is the order NEXT > follows, so it matches the route on the
 # Escape Circuit map. One level file per line. Lines starting with # are ignored.
-# Each file sits on the map by its name: W-S_name.txt = world W, stage S.
+# Each file sits on the map by its name: W-S_name.txt = world W (1-12), stage S (1-8).
 
 # BOOTCAMP (optional): for people who have never coded. Files 0-1 ... 0-7
 0-1_what_is_code.txt
@@ -33,12 +33,15 @@
 3-4_leap_year_gate.txt
 3-5_control_terminal.txt
 
-# 4 Processing Core: loops
+# 4 Processing Core: loops, nested loops and patterns
 4-1_counted_loops.txt
 4-2_sensor_loop.txt
 4-3_try_again.txt
 4-4_emergency_stop.txt
 4-5_prime_lock.txt
+4-6_staircase.txt
+4-7_pyramid_peak.txt
+4-8_no_if_diamond.txt
 
 # 5 System Library: functions calling functions, parameters, scope
 5-1_helper_functions.txt
@@ -46,6 +49,7 @@
 5-3_return_values.txt
 5-4_local_memory.txt
 5-5_repair_toolkit.txt
+5-6_palindrome_gate.txt
 
 # 6 RAM Banks: arrays, searching
 6-1_data_shelf.txt
@@ -53,6 +57,9 @@
 6-3_power_audit.txt
 6-4_search_the_bay.txt
 6-5_mirror_mirror.txt
+6-6_runner_up.txt
+6-7_frequency_scan.txt
+6-8_duplicate_hunt.txt
 
 # 7 Data Bus: characters, strings
 7-1_character_codes.txt
@@ -60,6 +67,9 @@
 7-3_string_length.txt
 7-4_password_terminal.txt
 7-5_message_repair.txt
+7-6_word_counter.txt
+7-7_variable_finder.txt
+7-8_scope_scanner.txt
 
 # 8 Address Network: pointers ([ ] banned)
 8-1_memory_addresses.txt
@@ -67,10 +77,34 @@
 8-3_swap_wires.txt
 8-4_pointer_arithmetic.txt
 8-5_measure_the_string.txt
+8-6_swap_letters.txt
+8-7_vowel_pointer.txt
 
-# 9 USB Gateway: final escape, Exam 2 revision ([ ] banned)
-9-1_port_controller.txt
-9-2_transfer_buffer.txt
-9-3_final_firewall.txt
-9-4_escape_protocol.txt
-9-5_bitty_breaks_free.txt
+# 9 Array Workshop: moving data around arrays (Exam 1 revision)
+9-1_copy_bay.txt
+9-2_rotate_belt.txt
+9-3_make_room.txt
+9-4_close_the_gap.txt
+9-5_in_flight_movies.txt
+
+# 10 Video Memory: 2D arrays and grids (Exam 1 Q19-Q21)
+10-1_pixel_grid.txt
+10-2_screen_dump.txt
+10-3_cluster_buster.txt
+10-4_gravity_drop.txt
+
+# 11 The Heap: structs, new, -> and linked lists (Exam 2 Part 2)
+11-1_new_node.txt
+11-2_follow_the_chain.txt
+11-3_push_to_front.txt
+11-4_append_to_end.txt
+11-5_slot_it_in.txt
+11-6_two_way_street.txt
+11-7_two_way_slot.txt
+
+# 12 USB Gateway: final escape, Exam 2 revision ([ ] banned)
+12-1_port_controller.txt
+12-2_transfer_buffer.txt
+12-3_final_firewall.txt
+12-4_escape_protocol.txt
+12-5_bitty_breaks_free.txt

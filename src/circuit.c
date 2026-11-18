@@ -1,6 +1,6 @@
 // circuit.c - the Escape Circuit: the motherboard map where you pick a stage.
 //
-// Nine chips (worlds) with five or six stages each, the stages of the escape,
+// Twelve chips (worlds) with up to eight stages each, the stages of the escape,
 // plus the optional BOOTCAMP strip at the top for people who have never
 // coded before. Everything is laid out for a 1280x720 screen and scaled to
 // fit the window (see View()).
@@ -16,24 +16,27 @@
 #include <stdio.h>
 #include <string.h>
 
-enum { WORLDS = 9, STAGES = 6, BOOTCAMP_STAGES = 7 };   // STAGES = the most a chip can hold
+enum { WORLDS = 12, STAGES = 8, BOOTCAMP_STAGES = 7 };   // STAGES = the most a chip can hold
 
 #define BOOTCAMP WORLDS            // "world" number used for the bootcamp strip
 
 static int   stages[WORLDS][STAGES];          // level index in each slot (-1 = not written yet)
-static int   stageCount[WORLDS];              // how many stages each chip shows (5, or 6 if a sixth is written)
+static int   stageCount[WORLDS];              // how many stages each chip shows (up to its last written stage)
 static int   bootcamp[BOOTCAMP_STAGES];       // level index of each bootcamp stage (-1 = none)
 static int   selectedWorld = 0, selectedStage = 0;
 static float clockTime = 0;
 
 static const char *worldNames[] = {
     "BOOT SECTOR", "REGISTER BANK", "CPU CONTROL UNIT", "PROCESSING CORE", "SYSTEM LIBRARY",
-    "RAM BANKS", "DATA BUS", "ADDRESS NETWORK", "USB GATEWAY", "BOOTCAMP"
+    "RAM BANKS", "DATA BUS", "ADDRESS NETWORK", "ARRAY WORKSHOP", "VIDEO MEMORY", "THE HEAP",
+    "USB GATEWAY", "BOOTCAMP"
 };
 static const char *topics[] = {
-    "Commands / variables", "First functions / maths", "Decisions / logic", "Loops / repetition",
-    "Helper functions / scope", "Arrays / searching", "Characters / strings", "Pointers / addresses",
-    "Final escape / revision", "Never coded before? Start here"
+    "Commands / variables", "First functions / maths", "Decisions / logic / patterns",
+    "Loops / nested loops", "Helper functions / scope", "Arrays / searching / counting",
+    "Characters / strings / parsing", "Pointers / addresses", "Moving data around arrays",
+    "2D arrays / grids", "Structs / linked lists", "Final escape / revision",
+    "Never coded before? Start here"
 };
 // Names shown for stages that aren't written yet
 static const char *planned[WORLDS][STAGES] = {
@@ -45,12 +48,16 @@ static const char *planned[WORLDS][STAGES] = {
     { "Data Shelf", "Array Traversal", "Power Audit", "Search the Bay", "Mirror Mirror" },
     { "Character Codes", "End of Message", "String Length", "Password Terminal", "Message Repair" },
     { "Memory Addresses", "Follow the Wire", "Swap Wires", "Pointer Arithmetic", "Measure the String" },
+    { "Copy Bay", "Rotate Belt", "Make Room", "Close the Gap", "In-Flight Movies" },
+    { "Pixel Grid", "Screen Dump", "Cluster Buster", "Gravity Drop" },
+    { "New Node", "Follow the Chain", "Push to Front", "Append to End", "Slot It In", "Two-Way Street" },
     { "Port Controller", "Transfer Buffer", "Final Firewall", "Escape Protocol", "Bitty Breaks Free" }
 };
 static const Color accents[] = {
     { 100, 245, 175, 255 }, { 255, 198,  95, 255 }, { 255, 135, 125, 255 },
     { 110, 195, 255, 255 }, { 185, 150, 255, 255 }, { 100, 225, 220, 255 },
-    { 245, 145, 210, 255 }, { 180, 235, 115, 255 }, { 235, 242, 255, 255 },
+    { 245, 145, 210, 255 }, { 180, 235, 115, 255 }, { 255, 170, 120, 255 },
+    { 120, 240, 255, 255 }, { 215, 160, 255, 255 }, { 235, 242, 255, 255 },
     { 150, 215, 255, 255 }      // bootcamp
 };
 
@@ -68,12 +75,18 @@ static Camera2D View(void)
     return c;
 }
 
-// The chips go in a snake: left to right, then right to left, then left to right
+// The chips go in a snake: left to right, then right to left, and so on (4 rows of 3)
 static Rectangle Chip(int world)
 {
     int row = world / 3, col = world % 3;
-    if (row == 1) col = 2 - col;
-    return (Rectangle){ 32 + col * 293.0f, 150 + row * 158.0f, 268, 132 };
+    if (row % 2 == 1) col = 2 - col;
+    return (Rectangle){ 32 + col * 293.0f, 148 + row * 116.0f, 268, 100 };
+}
+
+// Nodes shrink a little on chips with more than six stages so they don't touch
+static float NodeRadius(int world)
+{
+    return (world != WORLDS && stageCount[world] > 6) ? 12.0f : 15.0f;
 }
 
 static Rectangle BootcampChip(void)
@@ -89,8 +102,8 @@ static Vector2 Node(int world, int stage)
         return (Vector2){ r.x + 40 + stage * 52, r.y + 80 };
     }
     Rectangle r = Chip(world);
-    float gap = 200.0f / (stageCount[world] - 1);      // 50 apart for 5 stages, 40 for 6
-    return (Vector2){ r.x + 34 + stage * gap, r.y + 89 };
+    float gap = stageCount[world] > 1 ? 200.0f / (stageCount[world] - 1) : 0;   // 50 apart for 5 stages, ~29 for 8
+    return (Vector2){ r.x + 34 + stage * gap, r.y + 71 };
 }
 
 static int StageCount(int world)            { return world == BOOTCAMP ? BOOTCAMP_STAGES : stageCount[world]; }
@@ -127,10 +140,11 @@ void Circuit_Init(void)
         if (slot && *slot < 0) *slot = i;
         else TraceLog(LOG_WARNING, "Circuit: no free slot for %s", Levels_Get(i)->file);
     }
+    // A chip shows stages up to its last written one (at least 4, so a new chip still looks like a chip)
     for (int w = 0; w < WORLDS; w++)
     {
-        stageCount[w] = 5;
-        for (int s = 5; s < STAGES; s++) if (stages[w][s] >= 0) stageCount[w] = s + 1;
+        stageCount[w] = 4;
+        for (int s = 4; s < STAGES; s++) if (stages[w][s] >= 0) stageCount[w] = s + 1;
     }
 }
 
@@ -197,27 +211,28 @@ static bool DrawNode(Font font, int world, int stage, Vector2 mouse, bool click)
     Vector2 n = Node(world, stage);
     int index = LevelAt(world, stage);
     Color accent = accents[world];
-    bool done = Done(index), hover = CheckCollisionPointCircle(mouse, n, 20);
+    float r = NodeRadius(world), k = r / 15.0f;
+    bool done = Done(index), hover = CheckCollisionPointCircle(mouse, n, r + 5);
     Color color = done ? (Color){ 110, 245, 165, 255 } : index >= 0 ? accent : (Color){ 55, 72, 80, 255 };
 
     if (selectedWorld == world && selectedStage == stage)
-        DrawCircleLines((int)n.x, (int)n.y, 21 + 2 * sinf(clockTime * 3), accent);
-    if (hover) DrawCircleV(n, 21, Fade(accent, 0.17f));
-    DrawCircleV(n, 15, done ? color : (Color){ 8, 20, 29, 255 });
-    DrawCircleLines((int)n.x, (int)n.y, 15, color);
+        DrawCircleLines((int)n.x, (int)n.y, r + 6 + 2 * sinf(clockTime * 3), accent);
+    if (hover) DrawCircleV(n, r + 6, Fade(accent, 0.17f));
+    DrawCircleV(n, r, done ? color : (Color){ 8, 20, 29, 255 });
+    DrawCircleLines((int)n.x, (int)n.y, r, color);
 
     // white pointer over the last level played
     if (index >= 0 && strcmp(Levels_Get(index)->file, Save_GetCurrent()) == 0)
-        DrawTriangle((Vector2){ n.x - 5, n.y - 27 }, (Vector2){ n.x, n.y - 20 }, (Vector2){ n.x + 5, n.y - 27 }, WHITE);
+        DrawTriangle((Vector2){ n.x - 5, n.y - r - 12 }, (Vector2){ n.x, n.y - r - 5 }, (Vector2){ n.x + 5, n.y - r - 12 }, WHITE);
 
     if (done)
     {
         // Draw a tick with lines so it works with every font.
         Color tick = { 8, 45, 30, 255 };
-        DrawLineEx((Vector2){ n.x - 7, n.y }, (Vector2){ n.x - 2, n.y + 5 }, 3, tick);
-        DrawLineEx((Vector2){ n.x - 2, n.y + 5 }, (Vector2){ n.x + 8, n.y - 6 }, 3, tick);
+        DrawLineEx((Vector2){ n.x - 7 * k, n.y }, (Vector2){ n.x - 2 * k, n.y + 5 * k }, 3, tick);
+        DrawLineEx((Vector2){ n.x - 2 * k, n.y + 5 * k }, (Vector2){ n.x + 8 * k, n.y - 6 * k }, 3, tick);
     }
-    else Label(font, TextFormat("%d", stage + 1), n.x - 4, n.y - 7, 16, color);
+    else Label(font, TextFormat("%d", stage + 1), n.x - 4 * k, n.y - 7 * k, 16 * k, color);
     if (index < 0)          // small padlock: not written yet
     {
         DrawRectangle((int)n.x + 6, (int)n.y + 8, 7, 6, color);
@@ -266,7 +281,7 @@ int Circuit_Draw(Font font, float dt)
         DrawCircleV((Vector2){ from.x + (to.x - from.x) * p, from.y + (to.y - from.y) * p }, 3, accents[w]);
     }
 
-    // the nine chips
+    // the twelve chips
     for (int w = 0; w < WORLDS; w++)
     {
         Rectangle chip = Chip(w);
@@ -281,13 +296,13 @@ int Circuit_Draw(Font font, float dt)
             if (!Done(stages[w][s])) worldComplete = false;
         DrawRectangleRounded(chip, 0.08f, 4, worldComplete ? (Color){ 22, 105, 68, 255 } : (Color){ 12, 27, 36, 255 });
         DrawRectangleRoundedLinesEx(chip, 0.08f, 4, selectedWorld == w ? 2 : 1, Fade(accent, selectedWorld == w ? 1 : 0.45f));
-        Label(font, TextFormat("%02d", w + 1), chip.x + 13, chip.y + 13, 16, accent);
-        FitLabel(font, worldNames[w], chip.x + 44, chip.y + 13, 18, 212, WHITE);
-        Label(font, topics[w], chip.x + 14, chip.y + 41, 12, (Color){ 155, 178, 187, 255 });
+        Label(font, TextFormat("%02d", w + 1), chip.x + 13, chip.y + 10, 16, accent);
+        FitLabel(font, worldNames[w], chip.x + 44, chip.y + 10, 18, 212, WHITE);
+        Label(font, topics[w], chip.x + 14, chip.y + 30, 12, (Color){ 155, 178, 187, 255 });
 
         int worldDone = 0;
         for (int s = 0; s < StageCount(w); s++) if (Done(stages[w][s])) worldDone++;
-        Label(font, TextFormat("%d/%d", worldDone, StageCount(w)), chip.x + 231, chip.y + 114, 11, accent);
+        Label(font, TextFormat("%d/%d", worldDone, StageCount(w)), chip.x + 238, chip.y + 12, 11, accent);
 
         DrawLineEx(Node(w, 0), Node(w, StageCount(w) - 1), 2, (Color){ 45, 78, 86, 255 });
         for (int s = 0; s < StageCount(w); s++)
@@ -359,8 +374,8 @@ int Circuit_Draw(Font font, float dt)
     Label(font, selected >= 0 ? "ENTER STAGE  >" : "NOT AVAILABLE YET", 976, 505, 18, selected >= 0 ? WHITE : GRAY);
     if (selected >= 0 && ((click && CheckCollisionPointRec(mouse, play)) || IsKeyPressed(KEY_ENTER))) launch = selected;
 
-    Label(font, "USB EXIT", 1140, 634, 16, accents[8]);
-    DrawRectangleLinesEx((Rectangle){ 936, 630, 185, 28 }, 2, accents[8]);
+    Label(font, "USB EXIT", 1140, 634, 16, accents[WORLDS - 1]);
+    DrawRectangleLinesEx((Rectangle){ 936, 630, 185, 28 }, 2, accents[WORLDS - 1]);
     Label(font, TextFormat("%d stages to freedom", total), 946, 638, 12, LIGHTGRAY);
     Label(font, "Tick + filled green = completed    coloured = playable    padlock = coming soon", 34, 660, 15, LIGHTGRAY);
     Label(font, "White pointer = last played   |   Enter opens the selected stage", 34, 689, 13, (Color){ 120, 155, 166, 255 });

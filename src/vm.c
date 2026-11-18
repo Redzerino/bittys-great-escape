@@ -18,6 +18,7 @@
 #define MAX_HOST_NAMES   32
 #define MAX_WARNED       32
 #define PRINT_MAX        1024
+#define MAX_HEAP_NODES   400      // nodes made with new in one run
 
 typedef struct {
     int func;
@@ -59,11 +60,18 @@ struct Vm {
 
     VmErrorKind errorKind;
     char        errorMsg[VM_MSG_MAX];
+    char        output[VM_OUTPUT_MAX];  // everything printf/cout wrote since Vm_Start
     int         errorLine;
 
     // Warn about each uninitialised cell only once
     int       warnedAddr[MAX_WARNED];
     int       warnedCount;
+
+    // The heap: nodes made with new, packed down from the top of memory
+    int       heapTop;                  // lowest heap cell in use (VM_MEM_SIZE = empty)
+    int       heapCount;                // nodes made so far this run
+    char      heapNames[MAX_HEAP_NODES][24];   // "Node 3": the owner name of each node's cells
+    int       heapStruct[MAX_HEAP_NODES];      // which struct each node is
 
     // Recent memory accesses, for the game to show
     int       reads[VM_MAX_ACCESSES], readCount;
@@ -138,6 +146,9 @@ static void Warn(Vm *vm, const char *fmt, ...)
 
 static void Print(Vm *vm, const char *text)
 {
+    // Keep a copy of everything printed since Vm_Start, so tests can check it
+    size_t have = strlen(vm->output), add = strlen(text);
+    if (have + add < sizeof vm->output) memcpy(vm->output + have, text, add + 1);
     if (vm->host.print) vm->host.print(vm->host.user, text);
 }
 
@@ -152,6 +163,19 @@ static void CellName(const Vm *vm, int addr, char *out, int size)
     if (addr < 0 || addr >= VM_MEM_SIZE)        { snprintf(out, size, "(invalid)"); return; }
     const Cell *c = &vm->cells[addr];
     if (c->state != CELL_USED || !c->owner)     { snprintf(out, size, "(invalid)"); return; }
+    if (addr >= vm->heapTop && c->owner >= vm->heapNames[0] && c->owner < vm->heapNames[MAX_HEAP_NODES])
+    {
+        // a node's field: "Node 3's next"
+        int node = (int)((c->owner - vm->heapNames[0]) / (int)sizeof vm->heapNames[0]);
+        const StructDef *sd = &vm->prog.structs[vm->heapStruct[node]];
+        int offset = addr - c->base;
+        for (int f = 0; f < sd->fieldCount; f++)
+            if (offset >= sd->fieldOffset[f] && offset < sd->fieldOffset[f] + sd->fieldCells[f])
+            {
+                snprintf(out, size, "%s's %s", c->owner, sd->fieldName[f]);
+                return;
+            }
+    }
     if (c->isArray) snprintf(out, size, "%s[%d]", c->owner, addr - c->base);
     else            snprintf(out, size, "%s", c->owner);
 }
@@ -199,7 +223,11 @@ static bool CheckAddress(Vm *vm, int addr, bool write)
         return false;
     }
 
-    if (c->owner)
+    if (c->owner && addr >= vm->heapTop)
+        RuntimeError(vm, VM_ERR_SEGFAULT,
+                     "Segmentation fault! %s was deleted, but a pointer still points at it (a dangling pointer). "
+                     "Don't use a node after you delete it.", c->owner);
+    else if (c->owner)
         RuntimeError(vm, VM_ERR_SEGFAULT,
                      "Segmentation fault! That memory belonged to %s, which no longer exists because "
                      "its function has returned (a dangling pointer).", c->owner);
@@ -298,7 +326,7 @@ static bool EnterFunction(Vm *vm, int fi, int returnPc, const int *args, int arg
 {
     const Function *f = &vm->prog.funcs[fi];
 
-    if (vm->frameCount >= VM_CALL_DEPTH_MAX || vm->memTop + f->frameSize + 1 >= VM_MEM_SIZE)
+    if (vm->frameCount >= VM_CALL_DEPTH_MAX || vm->memTop + f->frameSize + 1 >= vm->heapTop)
     {
         RuntimeError(vm, VM_ERR_STACK_OVERFLOW,
                      "Stack overflow! Too many function calls inside each other (%d deep). "
@@ -351,6 +379,7 @@ static void LeaveFunction(Vm *vm, int value)
     {
         int fi = vm->pendingFunc;
         vm->pendingFunc = -1;
+        vm->line = vm->prog.funcs[fi].declLine;   // the arguments arrive on the function's own first line
         EnterFunction(vm, fi, -1, vm->pendingArgs, vm->pendingArgc);
         return;
     }
@@ -604,6 +633,83 @@ VmStatus Vm_Run(Vm *vm, int maxInstructions)
                 LogCondition(vm, vm->stack[vm->sp - 1] != 0);
                 break;
 
+            case OP_NEW:            // a fresh node on the heap, one cell per field, then a guard cell
+            {
+                const StructDef *sd = &vm->prog.structs[code[vm->pc++]];
+                bool zeroed = code[vm->pc++] != 0;
+                int size = sd->size;
+                if (vm->heapCount >= MAX_HEAP_NODES || vm->heapTop - (size + 1) <= vm->memTop + 64)
+                {
+                    RuntimeError(vm, VM_ERR_OTHER,
+                                 "Out of memory! You've made %d nodes with new. Is a loop making nodes forever?",
+                                 vm->heapCount);
+                    break;
+                }
+                int addr = vm->heapTop - (size + 1);
+                vm->heapTop = addr;
+                vm->heapStruct[vm->heapCount] = (int)(sd - vm->prog.structs);
+                char *name = vm->heapNames[vm->heapCount++];
+                snprintf(name, sizeof vm->heapNames[0], "%.16s %d", sd->name, vm->heapCount);
+
+                for (int k = 0; k <= size; k++)
+                {
+                    Cell *cell = &vm->cells[addr + k];
+                    memset(cell, 0, sizeof *cell);
+                    cell->state = (k < size) ? CELL_USED : CELL_GUARD;
+                    cell->owner = name;
+                    cell->base  = addr;
+                    vm->mem[addr + k] = 0;
+                    if (zeroed) cell->init = 1;           // new Node() starts every field at 0 / nullptr
+                }
+                for (int f = 0; f < sd->fieldCount; f++)
+                    if (sd->hasDefault[f])                // Node *next = nullptr;  inside the struct
+                    {
+                        vm->mem[addr + sd->fieldOffset[f]] = sd->defaultValue[f];
+                        vm->cells[addr + sd->fieldOffset[f]].init = 1;
+                    }
+                Push(vm, addr);
+                break;
+            }
+
+            case OP_DELETE:
+            {
+                int addr = Pop(vm);
+                if (addr == 0) break;                     // delete nullptr does nothing
+                if (addr < vm->heapTop || addr >= VM_MEM_SIZE || vm->cells[addr].base != addr ||
+                    vm->cells[addr].state != CELL_USED)
+                {
+                    if (addr >= vm->heapTop && addr < VM_MEM_SIZE && vm->cells[addr].state == CELL_FREE)
+                        RuntimeError(vm, VM_ERR_SEGFAULT, "%s has already been deleted. Deleting it twice "
+                                     "crashes a real program!", vm->cells[addr].owner ? vm->cells[addr].owner : "That node");
+                    else
+                        RuntimeError(vm, VM_ERR_SEGFAULT, "delete only works on a node made with new.");
+                    break;
+                }
+                for (int a = addr; a < VM_MEM_SIZE && vm->cells[a].base == addr; a++)
+                {
+                    bool last = vm->cells[a].state == CELL_GUARD;
+                    vm->cells[a].state = CELL_FREE;       // the owner name stays, for the dangling-pointer message
+                    if (last) break;
+                }
+                break;
+            }
+
+            case OP_MEMBER:         // p->field: check p points at a live node, then step to the field
+            {
+                int offset = code[vm->pc++];
+                int addr = Pop(vm);
+                if (addr == 0)
+                {
+                    RuntimeError(vm, VM_ERR_SEGFAULT,
+                                 "Segmentation fault! You used -> on a NULL pointer: it doesn't point at any node. "
+                                 "Check it isn't nullptr first (e.g. while (p != nullptr)).");
+                    break;
+                }
+                if (!CheckAddress(vm, addr, false)) break;
+                Push(vm, addr + offset);
+                break;
+            }
+
             case OP_JUMP_IF_FALSE:
             {
                 int target = code[vm->pc++];
@@ -740,6 +846,7 @@ Vm *Vm_Build(const char *source, const VmOptions *options, const VmHost *host, V
 
     vm->mem   = calloc(VM_MEM_SIZE, sizeof(int));
     vm->cells = calloc(VM_MEM_SIZE, sizeof(Cell));
+    vm->heapTop = VM_MEM_SIZE;
     if (!vm->mem || !vm->cells)
     {
         Vm_Destroy(vm);
@@ -838,6 +945,8 @@ bool Vm_Start(Vm *vm, const char *functionName, const int *args, int argc)
     memcpy(vm->mem, vm->prog.staticValues, (size_t)vm->prog.staticEnd * sizeof(int));
     memcpy(vm->cells, vm->prog.staticCells, (size_t)vm->prog.staticEnd * sizeof(Cell));
     memset(vm->cells + vm->stackStart, 0, (size_t)(VM_MEM_SIZE - vm->stackStart) * sizeof(Cell));
+    vm->heapTop = VM_MEM_SIZE;
+    vm->heapCount = 0;
 
     vm->sp = 0;
     vm->frameCount = 0;
@@ -855,6 +964,7 @@ bool Vm_Start(Vm *vm, const char *functionName, const int *args, int argc)
     vm->errorLine = 0;
     vm->pendingFunc = -1;
     vm->pendingArgc = 0;
+    vm->output[0] = '\0';
 
     if (functionName)
     {
@@ -916,6 +1026,7 @@ int Vm_TakeAccessLog(Vm *vm, VmAccess *out, int max)
 VmStatus    Vm_GetStatus(const Vm *vm)    { return vm->status; }
 int         Vm_CurrentLine(const Vm *vm)  { return vm->line; }
 int         Vm_ReturnValue(const Vm *vm)  { return vm->returnValue; }
+const char *Vm_Output(const Vm *vm)       { return vm->output; }
 const char *Vm_ErrorMessage(const Vm *vm) { return vm->errorMsg; }
 int         Vm_ErrorLine(const Vm *vm)    { return vm->errorLine; }
 VmErrorKind Vm_GetErrorKind(const Vm *vm) { return vm->errorKind; }
@@ -1010,6 +1121,12 @@ int Vm_GetVariables(const Vm *vm, VmVariable *out, int max)
                 v->pointsTo = v->initialized[0] ? v->values[0] : -1;
                 if (v->initialized[0]) CellName(vm, v->pointsTo, v->pointsToName, sizeof v->pointsToName);
                 else snprintf(v->pointsToName, sizeof v->pointsToName, "(garbage)");
+
+                // a pointer to a node shows the node's name ("Node 3"), not its first field
+                int at = v->pointsTo;
+                if (s->type.base == TYPE_STRUCT && at > 0 && at < VM_MEM_SIZE && vm->cells[at].base == at &&
+                    vm->cells[at].owner && vm->cells[at].state == CELL_USED)
+                    snprintf(v->pointsToName, sizeof v->pointsToName, "%s", vm->cells[at].owner);
             }
         }
     }

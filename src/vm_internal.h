@@ -9,6 +9,7 @@
 //     [1 ..]      static: string literals and global variables
 //     [host]      test data the game puts in (Vm_AllocArray)
 //     [stack ..]  one frame per function call, holding its local variables
+//     [.. top]    the heap: nodes made with new, growing down from the top
 //
 //   After every variable there is one GUARD cell. Touching a guard cell is a
 //   segfault: "you went past the end of arr". This is how off-by-one bugs
@@ -79,6 +80,9 @@ typedef enum {
     OP_PRINT_CHAR,      //                  : cout << char
     OP_PRINT_STR,       //                  : cout << char*
     OP_NOTE_CONDITION,  //                  : [cond] -> [cond]  remembers the answer of an if/while/for question (for the game)
+    OP_NEW,             // struct zeroed    : -> [address of a fresh node on the heap]
+    OP_DELETE,          //                  : [address] -> []   frees a node made with new
+    OP_MEMBER,          // offset           : [node address] -> [address of the field] (NULL / deleted checked)
 
     OP_COUNT
 } OpCode;
@@ -111,9 +115,27 @@ typedef struct {
     Cell    *frameTemplate;     // how a fresh frame looks; base is relative to the frame start
 } Function;
 
+// A struct or class the player wrote: one cell per field, in order
+#define VM_MAX_STRUCTS  16
+#define VM_MAX_FIELDS   16
+typedef struct {
+    char     name[STRUCT_NAME_MAX];
+    int      size;                          // cells
+    int      fieldCount;
+    char     fieldName[VM_MAX_FIELDS][32];
+    TypeInfo fieldType[VM_MAX_FIELDS];
+    int      fieldOffset[VM_MAX_FIELDS];
+    int      fieldCells[VM_MAX_FIELDS];
+    bool     hasDefault[VM_MAX_FIELDS];     // int count = 0;  Node *next = nullptr;
+    int      defaultValue[VM_MAX_FIELDS];
+} StructDef;
+
 typedef struct {
     int     *code;
     int      codeLen, codeCap;
+
+    StructDef structs[VM_MAX_STRUCTS];
+    int       structCount;
 
     Function funcs[VM_MAX_FUNCS];   // funcs[0] is the program's loose statements
     int      funcCount;

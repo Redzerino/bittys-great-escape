@@ -100,6 +100,7 @@ static void Words(const char *cond, char *out, int size)
         { "TILE_WALL", "a wall" }, { "TILE_EMPTY", "empty floor" }, { "TILE_VOID", "a hole" },
         { "TILE_EXIT", "the exit" }, { "TILE_GATE", "the gate" }, { "TILE_DATA", "a data tile" },
         { "'\\0'", "the end marker \\0" },
+        { "->", "->" },                          // p->next: an arrow, not "is bigger than"
         { "!=", "is not" }, { "==", "is" }, { ">=", "is at least" }, { "<=", "is at most" },
         { ">", "is bigger than" }, { "<", "is smaller than" }, { "&&", "and" }, { "||", "or" },
     };
@@ -202,6 +203,113 @@ static bool ExplainFor(const char *text, char *out, int size)
 
 static bool ExplainRaw(const char *source, int line, char *out, int size);
 
+// Is 'name' a struct or class written somewhere in the program?
+static bool IsStructName(const char *src, const char *name)
+{
+    size_t n = strlen(name);
+    if (!n) return false;
+    for (const char *q = src; (q = strstr(q, name)) != NULL; q += n)
+    {
+        if (IsWord(q[n]) || (q > src && IsWord(q[-1]))) continue;
+        const char *b = q;
+        while (b > src && b[-1] == ' ') b--;
+        if ((b - src >= 6 && strncmp(b - 6, "struct", 6) == 0) || (b - src >= 5 && strncmp(b - 5, "class", 5) == 0))
+            return true;
+    }
+    return false;
+}
+
+// Structs, new, delete and -> (The Heap)
+static bool ExplainHeap(const char *source, const char *t, char *out, int size)
+{
+    char a[40], b[40], c[120];
+
+    if ((sscanf(t, "struct %39[A-Za-z0-9_] {", a) == 1 || sscanf(t, "class %39[A-Za-z0-9_] {", a) == 1) && strchr(t, '{'))
+    {
+        snprintf(out, (size_t)size, "A new kind of box called %s, with named parts (its fields) listed inside the { }.", a);
+        return true;
+    }
+    if (strncmp(t, "public:", 7) == 0 || strncmp(t, "private:", 8) == 0)
+    {
+        snprintf(out, (size_t)size, "%s: who can use the fields below. Here, everything can be reached.", strncmp(t, "public", 6) == 0 ? "public" : "private");
+        return true;
+    }
+    if (strcmp(t, "};") == 0)
+    {
+        snprintf(out, (size_t)size, "This }; ends the struct. Don't forget the ; after it!");
+        return true;
+    }
+    if (sscanf(t, "delete %39[A-Za-z0-9_]", a) == 1)
+    {
+        snprintf(out, (size_t)size, "Give the node %s points at back to the heap. Don't use %s after this!", a, a);
+        return true;
+    }
+
+    // Node *n = new Node();
+    const char *nw = strstr(t, "new ");
+    if (nw && sscanf(nw, "new %39[A-Za-z0-9_]", b) == 1)
+    {
+        const char *star = strchr(t, '*');
+        const char *eq = strchr(t, '=');
+        if (eq && star && star < eq && sscanf(star + 1, " %39[A-Za-z0-9_]", a) == 1)
+            snprintf(out, (size_t)size, "Ask the heap for a brand new %s, and keep its address in the pointer %s.", b, a);
+        else
+            snprintf(out, (size_t)size, "Ask the heap for a brand new %s and get back its address.", b);
+        if (strstr(nw, "()")) { size_t n = strlen(out); snprintf(out + n, (size_t)size - n, " Every part starts at 0 / nullptr."); }
+        return true;
+    }
+
+    // Node *next;   a pointer field or variable to a struct
+    if (sscanf(t, "%39[A-Za-z0-9_] *%39[A-Za-z0-9_]%119s", a, b, c) >= 2 && IsStructName(source, a) &&
+        !strchr(t, '(') && strchr(t, '*'))
+    {
+        const char *eq = strchr(t, '=');
+        if (eq)
+        {
+            snprintf(c, sizeof c, "%s", eq + 1);
+            Trim(c);
+            size_t n = strlen(c);
+            if (n && c[n - 1] == ';') c[n - 1] = '\0';
+            Trim(c);
+            snprintf(out, (size_t)size, "A pointer called %s that can point at a %s. It starts pointing at %s%s.",
+                     b, a, c, strcmp(c, "nullptr") == 0 || strcmp(c, "NULL") == 0 ? " (nothing)" : "");
+        }
+        else snprintf(out, (size_t)size, "A pointer called %s that can point at a %s.", b, a);
+        return true;
+    }
+
+    // p = p->next;   hop along the chain
+    if (sscanf(t, "%39[A-Za-z0-9_] = %39[A-Za-z0-9_]->%39[A-Za-z0-9_];", a, b, c) == 3 && strcmp(a, b) == 0 &&
+        (strstr(c, "next") || strstr(c, "Next") || strstr(c, "prev") || strstr(c, "Prev")))
+    {
+        snprintf(out, (size_t)size, "Hop %s along the chain: it now points at the %s node.", a,
+                 strstr(c, "prev") || strstr(c, "Prev") ? "previous" : "next");
+        return true;
+    }
+
+    // n->data = value;   set a field through a pointer
+    const char *arrow = strstr(t, "->");
+    const char *eq = strchr(t, '=');
+    if (arrow && eq && arrow < eq && eq[1] != '=' && sscanf(t, "%39[A-Za-z0-9_]", a) == 1 && t + strlen(a) == arrow)
+    {
+        char target[80], value[120];
+        int k = 0;
+        for (const char *p = t; p < eq && k < (int)sizeof target - 1; p++) target[k++] = *p;
+        target[k] = '\0';
+        Trim(target);
+        snprintf(value, sizeof value, "%s", eq + 1);
+        Trim(value);
+        size_t n = strlen(value);
+        if (n && value[n - 1] == ';') value[n - 1] = '\0';
+        Trim(value);
+        const char *field = strrchr(target, '>') + 1;
+        snprintf(out, (size_t)size, "Follow %s to its node, and set that node's %s to %s%s.", a, field, value,
+                 strcmp(value, "nullptr") == 0 || strcmp(value, "NULL") == 0 ? " (pointing at nothing)" : "");
+        return true;
+    }
+    return false;
+}
+
 bool Explain_Line(const char *source, int line, char *out, int size)
 {
     if (!ExplainRaw(source, line, out, size)) return false;
@@ -234,6 +342,8 @@ static bool ExplainRaw(const char *source, int line, char *out, int size)
 
     char cond[160], words[200];
     const char *t = text;
+
+    if (ExplainHeap(source, text, out, size)) return true;
 
     // "} else ..." and "} while (...);" start with the brace of the block before
     bool closer = false;

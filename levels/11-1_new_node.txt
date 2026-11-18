@@ -1,0 +1,90 @@
+title: 11.1  New Node
+type: repair
+
+[story]
+Bitty: "The Heap! Memory you ask for while the program runs. Let's build our first node."
+Write makeNode(): make a new Node holding value, with next set to nullptr.
+
+[talk]
+@walk EAST 1
+Welcome to the Heap! A `struct` is a box with named parts. This `Node` has a `data` number and a `next` pointer.
+`new Node()` asks the heap for a fresh node and gives you its ADDRESS, so you keep it in a `Node*`.
+To reach a part through a pointer, use the arrow: `n->data = value;` and `n->next = nullptr;`
+
+[lesson]
+A struct groups values into one box:
+
+    struct Node {
+        int data;       // the value it holds
+        Node *next;     // the next node in the chain
+    };
+
+new makes a node on the heap and gives
+back its address:
+
+    Node *n = new Node();
+
+-> reaches a field through a pointer:
+
+    n->data = 5;
+    n->next = nullptr;   // points nowhere (yet)
+
+(class Node { public: ... }; works the same.)
+
+Exam 2, Part 2.
+
+[hint]
+Make the node with new: Node *n = new Node();
+Set both fields with the arrow: n->data = value; and n->next = nullptr;
+Node *n = new Node(); n->data = value; n->next = nullptr; return n;
+
+[code]
+// STAGE 11.1: NEW NODE
+// Make a new Node holding value, with next = nullptr,
+// and return its address.
+// Fill in the gold gaps!
+
+struct Node {
+    int data;
+    Node *next;
+};
+
+Node* makeNode(int value) {
+    Node *n = new Node();
+    n->data = ___;
+    n->next = ___;
+    return ___;
+}
+
+// ---- Bitty's test rig: leave this alone ----
+int testMakeNode(int value) {
+    Node *n = makeNode(value);
+    if (n == nullptr) return -1;
+    if (n->next != nullptr) return -2;
+    return n->data;
+}
+
+[solution]
+struct Node {
+    int data;
+    Node *next;
+};
+
+Node* makeNode(int value) {
+    Node *n = new Node();
+    n->data = value;
+    n->next = nullptr;
+    return n;
+}
+
+int testMakeNode(int value) {
+    Node *n = makeNode(value);
+    if (n == nullptr) return -1;
+    if (n->next != nullptr) return -2;
+    return n->data;
+}
+
+[tests]
+testMakeNode(5) == 5
+testMakeNode(42) == 42
+testMakeNode(7) == 7

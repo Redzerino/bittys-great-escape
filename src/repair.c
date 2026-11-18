@@ -78,6 +78,22 @@ static bool SameValue(const LevelValue *a, const LevelValue *b)
     return a->value == b->value;
 }
 
+// Printed text on one line for messages: "A / AA / AAA" (a new line becomes " / ")
+static void OneLine(const char *text, char *out, int size)
+{
+    int n = 0;
+    for (int i = 0; text[i] && n < size - 4; i++)
+    {
+        if (text[i] == '\n')
+        {
+            if (text[i + 1]) { out[n++] = ' '; out[n++] = '/'; out[n++] = ' '; }
+        }
+        else out[n++] = text[i];
+    }
+    out[n] = '\0';
+    if (!n) snprintf(out, (size_t)size, "(nothing)");
+}
+
 // The call part of the test text: everything up to the ) that closes the call
 static void CallText(const LevelTest *t, char *out, int size)
 {
@@ -108,6 +124,12 @@ void Repair_Describe(const LevelTest *t, char *call, int callSize, char *expect,
     {
         Level_FormatValue(&t->expect, value, sizeof value);
         len += snprintf(expect + len, (size_t)(expectSize - len), "%s %s", OpWords(t->op), value);
+    }
+    if (t->hasPrints && len < expectSize - 1)
+    {
+        char shown[200];
+        OneLine(t->prints, shown, sizeof shown);
+        len += snprintf(expect + len, (size_t)(expectSize - len), "%sshould print %s", len ? ",  " : "", shown);
     }
     for (int i = 0; i < t->checkCount && len < expectSize - 1; i++)
     {
@@ -213,12 +235,29 @@ void Repair_FinishTest(Vm *vm, const LevelTest *t, const RepairRun *run, TestOut
         if (!Compare(r.value, t->op, t->expect.value))
         {
             Level_FormatValue(&t->expect, want, sizeof want);
-            snprintf(o->message, sizeof o->message, "FAIL  %s\n      returned %s, but it %s %s",
+            snprintf(o->message, sizeof o->message, "FAIL  %.300s\n      returned %s, but it %s %s",
                      t->text, got, OpWords(t->op), want);
             snprintf(o->summary, sizeof o->summary, "returned %s", got);
             return;
         }
         snprintf(o->summary, sizeof o->summary, "returned %s", got);
+    }
+
+    // ---- Check what it printed ----
+    if (t->hasPrints)
+    {
+        const char *printed = Vm_Output(vm);
+        if (strcmp(printed, t->prints) != 0)
+        {
+            char wantText[200], gotText[200];
+            OneLine(t->prints, wantText, sizeof wantText);
+            OneLine(printed, gotText, sizeof gotText);
+            snprintf(o->message, sizeof o->message, "FAIL  %.150s\n      should print  %.200s\n      but printed   %.200s",
+                     t->text, wantText, gotText);
+            snprintf(o->summary, sizeof o->summary, "printed %.180s", gotText);
+            return;
+        }
+        if (!t->hasExpect) snprintf(o->summary, sizeof o->summary, "printed the right pattern");
     }
 
     // ---- Check what the arguments hold now ----
@@ -239,7 +278,7 @@ void Repair_FinishTest(Vm *vm, const LevelTest *t, const RepairRun *run, TestOut
         if (!SameValue(&now, &wantValue))
         {
             Level_FormatValue(&wantValue, want, sizeof want);
-            snprintf(o->message, sizeof o->message, "FAIL  %s\n      afterwards %s #%d should be %s, but it is %s",
+            snprintf(o->message, sizeof o->message, "FAIL  %.300s\n      afterwards %s #%d should be %.120s, but it is %.120s",
                      t->text, arg->kind == VALUE_STRING ? "string" : "argument", c->argIndex, want, got);
             snprintf(o->summary, sizeof o->summary, "#%d is %s", c->argIndex, got);
             return;

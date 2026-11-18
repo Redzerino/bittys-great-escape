@@ -25,7 +25,7 @@
 
 #include <stdbool.h>
 
-#define LEVEL_MAX_LEVELS  64
+#define LEVEL_MAX_LEVELS  100
 #define LEVEL_MAX_ROWS    12
 #define LEVEL_MAX_COLS    16
 #define LEVEL_MAX_TESTS   12
@@ -51,7 +51,7 @@ typedef struct {
     int          value;                     // INT, REF
     int          values[LEVEL_VALUE_MAX];   // ARRAY
     int          count;
-    char         text[96];                  // STRING
+    char         text[256];                 // STRING
     int          capacity;
 } LevelValue;
 
@@ -63,8 +63,9 @@ typedef struct {
 } LevelCheck;
 
 // One test, e.g.   reverse(5, {1,2,3,4,5}) then #2 == {5,4,3,2,1}
+//               or  drawTriangle() prints "A\nAA\n"
 typedef struct {
-    char       text[200];   // the line as written, for messages
+    char       text[400];   // the line as written, for messages
     char       func[64];
     LevelValue args[LEVEL_MAX_ARGS];
     int        argc;
@@ -75,6 +76,9 @@ typedef struct {
 
     LevelCheck checks[LEVEL_MAX_CHECKS];
     int        checkCount;
+
+    bool       hasPrints;   // prints "A\nAA\n": what printf/cout should have printed
+    char       prints[512];
 } LevelTest;
 
 typedef enum { LEVEL_ESCAPE = 0, LEVEL_REPAIR } LevelType;

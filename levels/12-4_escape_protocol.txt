@@ -1,4 +1,4 @@
-title: 9.4  Escape Protocol
+title: 12.4  Escape Protocol
 type: repair
 ban_indexing: yes
 
@@ -36,7 +36,7 @@ Then copy src onto the end, like copy_string, and finish with a '\0'.
 First while (*dest != '\0') dest++; then copy src like copy_string, and end with *dest = '\0';
 
 [code]
-// STAGE 9.4: ESCAPE PROTOCOL
+// STAGE 12.4: ESCAPE PROTOCOL
 // Add src onto the end of dest.
 // "Hello, " + "World!" -> "Hello, World!"
 // No [ ] allowed!

@@ -1,0 +1,206 @@
+title: 11.7  Two-Way Slot
+type: repair
+
+[story]
+Bitty: "Last link! Slot a node into the middle of a doubly linked list without breaking either direction."
+Write InsertAtPosition() for the DoublyLinkedList. 0 is the front; past the end goes on the end.
+
+[talk]
+@walk EAST 1
+Your InsertAtBeginning and InsertAtEnd are here already. Use them for the front, and for anything past the end!
+Otherwise walk to the node that will come AFTER the new one: `position` hops from the head. Call it `after`.
+Four links to fix: the new node points back to `after->prevPointer` and forward to `after`, then both neighbours point at the new node.
+
+[lesson]
+Insert 9 at position 2 in  1 <-> 2 <-> 3:
+
+  after = the node at position 2   ([3])
+  before = after->prevPointer      ([2])
+
+  n->prevPointer = before;
+  n->nextPointer = after;
+  before->nextPointer = n;
+  after->prevPointer = n;
+
+  1 <-> 2 <-> 9 <-> 3
+
+Position 0          -> InsertAtBeginning
+Walked off the end  -> InsertAtEnd
+
+Exam 2, Part 2: InsertAtPosition.
+
+[hint]
+If position is 0, call InsertAtBeginning and return. Then walk after = list->head forward position times, stopping if after becomes nullptr.
+If after is nullptr you walked off the end, so call InsertAtEnd and return. Otherwise before = after->prevPointer.
+n->prevPointer = before; n->nextPointer = after; before->nextPointer = n; after->prevPointer = n;
+
+[code]
+// STAGE 11.7: TWO-WAY SLOT
+// Put value at position in the doubly linked list
+// (0 = the front, past the end = on the end).
+
+class DoublyLinkedNode {
+public:
+    int data = 0;
+    DoublyLinkedNode *prevPointer = nullptr;
+    DoublyLinkedNode *nextPointer = nullptr;
+};
+
+class DoublyLinkedList {
+public:
+    DoublyLinkedNode *head = nullptr;
+    DoublyLinkedNode *tail = nullptr;
+};
+
+void InsertAtBeginning(DoublyLinkedList *list, int value) {
+    DoublyLinkedNode *n = new DoublyLinkedNode();
+    n->data = value;
+    n->nextPointer = list->head;
+    if (list->head != nullptr) list->head->prevPointer = n;
+    else list->tail = n;
+    list->head = n;
+}
+
+void InsertAtEnd(DoublyLinkedList *list, int value) {
+    DoublyLinkedNode *n = new DoublyLinkedNode();
+    n->data = value;
+    n->prevPointer = list->tail;
+    if (list->tail != nullptr) list->tail->nextPointer = n;
+    else list->head = n;
+    list->tail = n;
+}
+
+void InsertAtPosition(DoublyLinkedList *list, int value, int position) {
+    if (position == 0) {
+        InsertAtBeginning(list, value);
+        return;
+    }
+
+}
+
+// ---- Bitty's test rig: leave this alone ----
+// Reads the list front to back (1 2 3 -> 123) and back to front (321)
+int forwards(DoublyLinkedList *list) {
+    int number = 0;
+    for (DoublyLinkedNode *p = list->head; p != nullptr; p = p->nextPointer) number = number * 10 + p->data;
+    return number;
+}
+int backwards(DoublyLinkedList *list) {
+    int number = 0;
+    for (DoublyLinkedNode *p = list->tail; p != nullptr; p = p->prevPointer) number = number * 10 + p->data;
+    return number;
+}
+
+DoublyLinkedList* oneTwoThree() {
+    DoublyLinkedList *list = new DoublyLinkedList();
+    InsertAtEnd(list, 1);
+    InsertAtEnd(list, 2);
+    InsertAtEnd(list, 3);
+    return list;
+}
+int testForwards(int value, int position) {
+    DoublyLinkedList *list = oneTwoThree();
+    InsertAtPosition(list, value, position);
+    return forwards(list);
+}
+int testBackwards(int value, int position) {
+    DoublyLinkedList *list = oneTwoThree();
+    InsertAtPosition(list, value, position);
+    return backwards(list);
+}
+
+[solution]
+class DoublyLinkedNode {
+public:
+    int data = 0;
+    DoublyLinkedNode *prevPointer = nullptr;
+    DoublyLinkedNode *nextPointer = nullptr;
+};
+
+class DoublyLinkedList {
+public:
+    DoublyLinkedNode *head = nullptr;
+    DoublyLinkedNode *tail = nullptr;
+};
+
+void InsertAtBeginning(DoublyLinkedList *list, int value) {
+    DoublyLinkedNode *n = new DoublyLinkedNode();
+    n->data = value;
+    n->nextPointer = list->head;
+    if (list->head != nullptr) list->head->prevPointer = n;
+    else list->tail = n;
+    list->head = n;
+}
+
+void InsertAtEnd(DoublyLinkedList *list, int value) {
+    DoublyLinkedNode *n = new DoublyLinkedNode();
+    n->data = value;
+    n->prevPointer = list->tail;
+    if (list->tail != nullptr) list->tail->nextPointer = n;
+    else list->head = n;
+    list->tail = n;
+}
+
+void InsertAtPosition(DoublyLinkedList *list, int value, int position) {
+    if (position == 0) {
+        InsertAtBeginning(list, value);
+        return;
+    }
+    DoublyLinkedNode *after = list->head;
+    for (int i = 0; i < position && after != nullptr; i++) {
+        after = after->nextPointer;
+    }
+    if (after == nullptr) {
+        InsertAtEnd(list, value);
+        return;
+    }
+    DoublyLinkedNode *before = after->prevPointer;
+    DoublyLinkedNode *n = new DoublyLinkedNode();
+    n->data = value;
+    n->prevPointer = before;
+    n->nextPointer = after;
+    before->nextPointer = n;
+    after->prevPointer = n;
+}
+
+// ---- Bitty's test rig: leave this alone ----
+// Reads the list front to back (1 2 3 -> 123) and back to front (321)
+int forwards(DoublyLinkedList *list) {
+    int number = 0;
+    for (DoublyLinkedNode *p = list->head; p != nullptr; p = p->nextPointer) number = number * 10 + p->data;
+    return number;
+}
+int backwards(DoublyLinkedList *list) {
+    int number = 0;
+    for (DoublyLinkedNode *p = list->tail; p != nullptr; p = p->prevPointer) number = number * 10 + p->data;
+    return number;
+}
+
+DoublyLinkedList* oneTwoThree() {
+    DoublyLinkedList *list = new DoublyLinkedList();
+    InsertAtEnd(list, 1);
+    InsertAtEnd(list, 2);
+    InsertAtEnd(list, 3);
+    return list;
+}
+int testForwards(int value, int position) {
+    DoublyLinkedList *list = oneTwoThree();
+    InsertAtPosition(list, value, position);
+    return forwards(list);
+}
+int testBackwards(int value, int position) {
+    DoublyLinkedList *list = oneTwoThree();
+    InsertAtPosition(list, value, position);
+    return backwards(list);
+}
+
+[tests]
+testForwards(9, 0) == 9123
+testBackwards(9, 0) == 3219
+testForwards(9, 2) == 1293
+testBackwards(9, 2) == 3921
+testForwards(9, 1) == 1923
+testBackwards(9, 1) == 3291
+testForwards(9, 3) == 1239
+testBackwards(9, 3) == 9321
+testForwards(9, 8) == 1239

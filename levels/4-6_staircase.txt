@@ -1,0 +1,65 @@
+title: 4.6  Staircase
+type: repair
+buttons: printf("A"); | printf("\n"); | row
+
+[story]
+Bitty: "This screen wants a staircase of A's. One step, then two, then three, then four."
+Write drawRightAngledTriangle() using a loop inside a loop.
+
+[talk]
+@walk EAST 1
+This display wants a staircase: one `A`, then two, then three, then four.
+A loop INSIDE a loop! The outer loop picks the row, the inner loop prints that row's A's.
+`printf("A");` prints one A. `printf("\n");` ends the line and starts a new row.
+
+[lesson]
+A NESTED loop is a loop inside a loop.
+
+for (int row = 1; row <= 4; row++) {
+    for (int col = 1; col <= row; col++) {
+        printf("A");          // one A
+    }
+    printf("\n");             // end the row
+}
+
+The inner loop runs ALL the way through
+for every turn of the outer loop.
+Row 3 prints 3 A's because col counts to row.
+
+Exam 1, Q6.
+
+[hint]
+The outer loop counts the rows 1 to 4. The inner loop prints the A's for that row.
+Row 1 needs 1 A, row 2 needs 2... so the inner loop goes up to row. After it, print "\n".
+for (int col = 1; col <= row; col++) printf("A");  then  printf("\n");  after the inner loop.
+
+[code]
+// STAGE 4.6: STAIRCASE
+// Print this, using a loop inside a loop:
+// A
+// AA
+// AAA
+// AAAA
+// Fill in the gold gaps!
+
+void drawRightAngledTriangle() {
+    for (int row = 1; row <= 4; row++) {
+        for (int col = 1; col <= ___; col++) {
+            printf("A");
+        }
+        printf(___);
+    }
+}
+
+[solution]
+void drawRightAngledTriangle() {
+    for (int row = 1; row <= 4; row++) {
+        for (int col = 1; col <= row; col++) {
+            printf("A");
+        }
+        printf("\n");
+    }
+}
+
+[tests]
+drawRightAngledTriangle() prints "A\nAA\nAAA\nAAAA\n"

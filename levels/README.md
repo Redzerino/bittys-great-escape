@@ -10,11 +10,11 @@ solution works.
 The file name decides where the level sits on the Escape Circuit map:
 
 ```
-W-S_name.txt     world W (1-9), stage S (1-6)     e.g. 3-2_choose_a_path.txt = stage 3.2
+W-S_name.txt     world W (1-12), stage S (1-8)    e.g. 3-2_choose_a_path.txt = stage 3.2
 0-S_name.txt     the optional BOOTCAMP, lesson S (1-7)
 ```
 
-A chip shows a 6th stage only if a W-6 file exists. Every file is named after its
+A chip shows stages up to its last written one (at least 4). Every file is named after its
 slot. If you ever rename one, add the old name to RENAMED in save.c so old saves
 still find it.
 Start the title with the map number so it matches: `title: 3.2  Choose a Path`.
@@ -85,7 +85,24 @@ reverse(5, {1, 2, 3, 4, 5}) then #2 == {5, 4, 3, 2, 1}
                                                then #n checks argument n afterwards
 swap_ints(&5, &10) then #1 == 10, #2 == 5      &5 = a variable holding 5, passed by
                                                address (works for int* and int&)
+swap_chars(&'A', &'B') then #1 == 'B'          &'A' = a char variable passed by address
+drawTriangle() prints "A\nAA\n"                checks what printf/cout printed (\n = new line)
+countInGrid({0, 0, 3, ...24 values}, 3) == 6   a 2D int grid[4][6] parameter takes its
+                                               24 values in one { } list, row by row
 ```
 
-Values: numbers, `true`/`false`, chars like `'A'`, strings, `{ }` arrays, `&number`.
+Values: numbers, `true`/`false`, chars like `'A'`, strings, `{ }` arrays (up to 24 values),
+`&number`, `&'c'`.
 Up to 12 tests per level. With more than 5 tests, the gates are shared out between them.
+
+## Structs and linked lists (The Heap, world 11)
+
+Bitty's C supports `struct` and `class` with fields only (`public:` is allowed, methods and
+constructors aren't), `new Node()` / `new Node` (with `()` every field starts at 0 / nullptr),
+`delete p;`, `p->field`, `n.field`, and fields with a starting value
+(`Node *next = nullptr;`). Using -> on nullptr, or a node after `delete`, is a friendly segfault.
+
+A test can't build a list itself, so these levels end with a small "test rig" in the
+starter code (marked "leave this alone") that builds a list with the player's functions
+and returns it as a number, e.g. 1 -> 2 -> 3 gives 123. The tests call the rig:
+`testFront(3, 2, 1) == 123`.

@@ -1,0 +1,55 @@
+title: 8.6  Swap Letters
+type: repair
+ban_indexing: yes
+
+[story]
+Bitty: "Same wires as before, but now they carry letters."
+Write swap_chars(): swap two chars through their pointers.
+
+[talk]
+@walk EAST 1
+Swap Wires again, but the boxes hold letters this time: 'A' and 'B' have to trade places.
+A char is just a small number, so the swap is exactly the same: `temp`, then copy across, then put temp back.
+The only change is the types: `char *a`, and the spare box is a `char`.
+
+[lesson]
+A char is stored as a number ('A' is 65),
+so swapping chars works like swapping ints.
+Just give the spare box the right type:
+
+    void swap_chars(char *a, char *b) {
+        char temp = *a;
+        *a = *b;
+        *b = temp;
+    }
+
+*a means "the box a points at".
+
+Exam 2, swap_chars.
+
+[hint]
+It's the same as swap_ints from Swap Wires, but with char instead of int.
+Save *a in a char temp, copy *b into *a, then put temp into *b.
+char temp = *a;  *a = *b;  *b = temp;
+
+[code]
+// STAGE 8.6: SWAP LETTERS
+// Swap the two letters using their pointers.
+// char a = 'A', b = 'B';  swap_chars(&a, &b);
+// now a = 'B' and b = 'A'
+
+void swap_chars(char *a, char *b) {
+
+}
+
+[solution]
+void swap_chars(char *a, char *b) {
+    char temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+[tests]
+swap_chars(&'A', &'B') then #1 == 'B', #2 == 'A'
+swap_chars(&'x', &'y') then #1 == 'y', #2 == 'x'
+swap_chars(&'Q', &'Q') then #1 == 'Q', #2 == 'Q'

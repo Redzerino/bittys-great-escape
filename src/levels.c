@@ -56,10 +56,11 @@ static void SetError(char *error, int size, const char *fmt, const char *a, cons
 
 // ===========================================================================
 // Test lines
-//   test   := call [op value] ["then" check ("," check)*]
+//   test   := call [op value] [prints] ["then" check ("," check)*]
 //   call   := name "(" [value ("," value)*] ")"
 //   check  := "#" number "==" value
-//   value  := number | true | false | 'c' | "text" ["[" capacity "]"] | "{" values "}" | "&" number
+//   prints := "prints" "text"            (what printf/cout should print)
+//   value  := number | true | false | 'c' | "text" ["[" capacity "]"] | "{" values "}" | "&" number | "&" 'c'
 // ===========================================================================
 typedef struct {
     const char *s;
@@ -183,7 +184,14 @@ static void ParseValue(TestParser *p, LevelValue *v)
     {
         p->pos++;
         v->kind = VALUE_REF;
-        v->value = ParseInt(p);
+        if (p->s[p->pos] == '\'')          // &'A': a char variable passed by address
+        {
+            p->pos++;
+            v->display = SHOW_CHAR;
+            v->value = ParseEscapedChar(p);
+            if (!Accept(p, "'")) Fail(p, "missing closing '");
+        }
+        else v->value = ParseInt(p);
     }
     else if (strncmp(p->s + p->pos, "true", 4) == 0)  { p->pos += 4; v->display = SHOW_BOOL; v->value = 1; }
     else if (strncmp(p->s + p->pos, "false", 5) == 0) { p->pos += 5; v->display = SHOW_BOOL; v->value = 0; }
@@ -247,6 +255,26 @@ bool Level_ParseTest(const char *line, LevelTest *t, char *error, int errorSize)
         }
     }
 
+    // what it should print:  prints "A\nAA\n"
+    if (!p.failed && Accept(&p, "prints"))
+    {
+        SkipSpaces(&p);
+        if (p.s[p.pos] != '"') Fail(&p, "expected \"text\" after prints");
+        else
+        {
+            p.pos++;
+            int k = 0;
+            while (!p.failed && p.s[p.pos] && p.s[p.pos] != '"')
+            {
+                int ch = ParseEscapedChar(&p);
+                if (k < (int)sizeof t->prints - 1) t->prints[k++] = (char)ch;
+            }
+            t->prints[k] = '\0';
+            if (!Accept(&p, "\"")) Fail(&p, "missing closing \" after prints");
+            t->hasPrints = true;
+        }
+    }
+
     // checks on the arguments after the call
     if (!p.failed && Accept(&p, "then"))
     {
@@ -267,7 +295,8 @@ bool Level_ParseTest(const char *line, LevelTest *t, char *error, int errorSize)
 
     SkipSpaces(&p);
     if (!p.failed && p.s[p.pos] != '\0') Fail(&p, "unexpected text at the end");
-    if (!p.failed && !t->hasExpect && t->checkCount == 0) Fail(&p, "a test needs == value and/or then #n == ...");
+    if (!p.failed && !t->hasExpect && !t->hasPrints && t->checkCount == 0)
+        Fail(&p, "a test needs == value, prints \"...\" and/or then #n == ...");
     return !p.failed;
 }
 
@@ -287,7 +316,8 @@ void Level_FormatValue(const LevelValue *v, char *out, int size)
             snprintf(out, (size_t)size, "\"%s\"", v->text);
             break;
         case VALUE_REF:
-            snprintf(out, (size_t)size, "&%d", v->value);
+            if (v->display == SHOW_CHAR) snprintf(out, (size_t)size, "&'%c'", v->value);
+            else                         snprintf(out, (size_t)size, "&%d", v->value);
             break;
         default:
             if (v->display == SHOW_BOOL)      snprintf(out, (size_t)size, "%s", v->value ? "true" : "false");

@@ -81,11 +81,11 @@ static void Put(Buf *b, const char *fmt, ...)
 
 void Ast_TypeToString(const TypeInfo *t, char *out, int size)
 {
-    static const char *BASE[] = { "int", "char", "bool", "void" };
+    static const char *BASE[] = { "int", "char", "bool", "void", "struct" };
     Buf b = { out, size, 0 };
     if (size > 0) out[0] = '\0';
 
-    Put(&b, "%s%s", t->isConst ? "const " : "", BASE[t->base]);
+    Put(&b, "%s%s", t->isConst ? "const " : "", t->base == TYPE_STRUCT ? t->structName : BASE[t->base]);
     for (int i = 0; i < t->pointerDepth; i++) Put(&b, "*");
     if (t->isRef) Put(&b, "&");
     for (int i = 0; i < t->arrayDims; i++)
@@ -271,6 +271,9 @@ static void DumpNode(Buf *b, const Node *n)
             break;
 
         case NODE_PROGRAM: Put(b, "(program"); DumpList(b, &n->list); Put(b, ")"); break;
+        case NODE_STRUCT_DEF: Put(b, "(struct %s", n->name); DumpList(b, &n->list); Put(b, ")"); break;
+        case NODE_NEW:     Put(b, "(new "); PutType(b, &n->type); Put(b, ")"); break;
+        case NODE_DELETE:  Put(b, "(delete "); DumpNode(b, n->a); Put(b, ")"); break;
 
         default: Put(b, "(?)"); break;
     }

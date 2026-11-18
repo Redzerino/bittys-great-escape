@@ -1,0 +1,107 @@
+title: 11.4  Append to End
+type: repair
+
+[story]
+Bitty: "Now add at the BACK. There's no pointer to the end, so you have to walk there."
+Write InsertAtEnd(): add a node holding value after the last node, and return the head.
+
+[talk]
+@walk EAST 1
+To add at the back, walk to the LAST node: the one whose `next` is `nullptr`.
+Stop ON the last node, not after it: loop while `p->next != nullptr`. Then hang the new node on `p->next`.
+Careful: if the list is empty, there's no last node! Then the new node is the whole list, so return it.
+
+[lesson]
+head -> [1] -> [2] -> NULL      add 3:
+
+    Node *n = new Node();
+    n->data = value;
+    n->next = nullptr;           // it'll be last
+
+    if (head == nullptr) return n;   // empty list
+
+    Node *p = head;
+    while (p->next != nullptr) p = p->next;
+    p->next = n;                 // hang it on the end
+    return head;                 // head didn't change
+
+head -> [1] -> [2] -> [3] -> NULL
+
+Exam 2, Part 2: InsertAtEnd.
+
+[hint]
+Make the new node with next = nullptr. If head is nullptr, just return the new node.
+Otherwise walk p along while p->next != nullptr, so p stops on the last node.
+p->next = n; return head;
+
+[code]
+// STAGE 11.4: APPEND TO END
+// Add a node holding value at the END of the list.
+// Return the head (it only changes if the list was empty).
+
+struct Node {
+    int data;
+    Node *next;
+};
+
+Node* InsertAtEnd(Node *head, int value) {
+    Node *n = new Node();
+    n->data = value;
+    n->next = nullptr;
+
+    return head;
+}
+
+// ---- Bitty's test rig: leave this alone ----
+// Reads the list as one number: 1 -> 2 -> 3 gives 123
+int digits(Node *head) {
+    int number = 0;
+    for (Node *p = head; p != nullptr; p = p->next) number = number * 10 + p->data;
+    return number;
+}
+
+int testEnd(int a, int b, int c) {
+    Node *head = nullptr;
+    head = InsertAtEnd(head, a);
+    head = InsertAtEnd(head, b);
+    head = InsertAtEnd(head, c);
+    return digits(head);
+}
+
+[solution]
+struct Node {
+    int data;
+    Node *next;
+};
+
+Node* InsertAtEnd(Node *head, int value) {
+    Node *n = new Node();
+    n->data = value;
+    n->next = nullptr;
+    if (head == nullptr) return n;
+    Node *p = head;
+    while (p->next != nullptr) {
+        p = p->next;
+    }
+    p->next = n;
+    return head;
+}
+
+int digits(Node *head) {
+    int number = 0;
+    for (Node *p = head; p != nullptr; p = p->next) number = number * 10 + p->data;
+    return number;
+}
+
+int testEnd(int a, int b, int c) {
+    Node *head = nullptr;
+    head = InsertAtEnd(head, a);
+    head = InsertAtEnd(head, b);
+    head = InsertAtEnd(head, c);
+    return digits(head);
+}
+
+[tests]
+testEnd(1, 2, 3) == 123
+testEnd(3, 2, 1) == 321
+testEnd(7, 7, 4) == 774

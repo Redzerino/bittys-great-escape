@@ -1,0 +1,72 @@
+title: 10.1  Pixel Grid
+type: repair
+
+[story]
+Bitty: "Video memory! The screen is a grid: 4 rows of 6 pixels. How many pixels hold this colour?"
+Write countInGrid(): count how many cells of the 4x6 grid hold value.
+
+[talk]
+@walk EAST 1
+Welcome to Video Memory! The screen is a 2D array: `grid[4][6]` is 4 rows of 6 boxes.
+`grid[row][col]` picks one box: first the row, then the column. Both count from 0.
+To visit every box, use a loop inside a loop: rows on the outside, columns on the inside.
+
+[lesson]
+A 2D array is a grid of boxes:
+
+    int grid[4][6];       4 rows, 6 columns
+
+    grid[0][0]  top-left
+    grid[0][5]  end of the top row
+    grid[3][5]  bottom-right
+
+Visit every box, row by row:
+
+    for (int row = 0; row < 4; row++) {
+        for (int col = 0; col < 6; col++) {
+            ... grid[row][col] ...
+        }
+    }
+
+Exam 1, Q19-Q21 all use this grid.
+
+[hint]
+Use two loops: row from 0 to 3, and inside it col from 0 to 5.
+Each time grid[row][col] == value, add 1 to count.
+for (int row = 0; row < 4; row++) for (int col = 0; col < 6; col++) if (grid[row][col] == value) count++;
+
+[code]
+// STAGE 10.1: PIXEL GRID
+// Count how many cells of the 4x6 grid hold value.
+// Fill in the gold gaps!
+
+int countInGrid(int grid[4][6], int value) {
+    int count = 0;
+    for (int row = 0; row < ___; row++) {
+        for (int col = 0; col < ___; col++) {
+            if (grid[___][___] == value) {
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+[solution]
+int countInGrid(int grid[4][6], int value) {
+    int count = 0;
+    for (int row = 0; row < 4; row++) {
+        for (int col = 0; col < 6; col++) {
+            if (grid[row][col] == value) {
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+[tests]
+countInGrid({0, 0, 3, 1, 3, 4, 0, 0, 2, 3, 4, 3, 0, 0, 1, 3, 3, 2, 0, 0, 1, 1, 1, 1}, 0) == 8
+countInGrid({0, 0, 3, 1, 3, 4, 0, 0, 2, 3, 4, 3, 0, 0, 1, 3, 3, 2, 0, 0, 1, 1, 1, 1}, 3) == 6
+countInGrid({0, 0, 3, 1, 3, 4, 0, 0, 2, 3, 4, 3, 0, 0, 1, 3, 3, 2, 0, 0, 1, 1, 1, 1}, 1) == 6
+countInGrid({0, 0, 3, 1, 3, 4, 0, 0, 2, 3, 4, 3, 0, 0, 1, 3, 3, 2, 0, 0, 1, 1, 1, 1}, 9) == 0

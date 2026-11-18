@@ -1,0 +1,66 @@
+title: 9.5  In-Flight Movies
+type: repair
+
+[story]
+Bitty: "My flight out lasts exactly this long. Are there two different films that fill it exactly?"
+Write twoMovies(): true if exactly two different movies add up to flightLength.
+
+[talk]
+@walk EAST 1
+I'm watching exactly two films on my flight, and they must add up to the flight time.
+Try every PAIR: hold film i, then try each film after it, j. Do they add up to `flightLength`?
+`j` starts at `i + 1`, so I never watch the same film twice. Found a pair? Return true straight away.
+
+[lesson]
+Every pair of different films:
+
+for (int i = 0; i < size; i++) {
+    for (int j = i + 1; j < size; j++) {
+        if (movieLengths[i] + movieLengths[j]
+                == flightLength) {
+            return true;
+        }
+    }
+}
+return false;     // no pair worked
+
+j starts at i + 1:
+  - a film is never paired with itself
+  - each pair is only tried once
+
+Exam 1, Q17.
+
+[hint]
+Use two loops, like the Duplicate Hunt: i for the first film, j for a later film (j starts at i + 1).
+If movieLengths[i] + movieLengths[j] == flightLength, return true. If no pair works, return false after the loops.
+for (int i = 0; i < size; i++) for (int j = i + 1; j < size; j++) if (movieLengths[i] + movieLengths[j] == flightLength) return true;  return false;
+
+[code]
+// STAGE 9.5: IN-FLIGHT MOVIES
+// true if two DIFFERENT movies add up to
+// exactly flightLength.
+// twoMovies(200, {90, 120, 110}, 3) -> true (90 + 110)
+
+bool twoMovies(int flightLength, int movieLengths[], int size) {
+
+    return false;
+}
+
+[solution]
+bool twoMovies(int flightLength, int movieLengths[], int size) {
+    for (int i = 0; i < size; i++) {
+        for (int j = i + 1; j < size; j++) {
+            if (movieLengths[i] + movieLengths[j] == flightLength) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+[tests]
+twoMovies(200, {90, 120, 110}, 3) == true
+twoMovies(180, {90, 100, 60}, 3) == false
+twoMovies(240, {120, 60, 180}, 3) == true
+twoMovies(100, {50}, 1) == false
+twoMovies(150, {70, 80, 75, 10}, 4) == true

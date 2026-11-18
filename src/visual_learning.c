@@ -2,6 +2,7 @@
 #include "world_visuals.h"
 #include "circuit.h"
 #include "customisation.h"
+#include "talk.h"
 #include "rlgl.h"
 #include <math.h>
 #include <stdio.h>
@@ -118,6 +119,17 @@ static Vector3 Cell(int index,int count)
     if(columns<1)columns=1;
     return (Vector3){(index%columns-(columns-1)*0.5f)*1.1f,0,(index/columns)*1.25f};
 }
+// A comparison reads as a question with a YES/NO answer ("9 > 3?  YES"),
+// because "= 1" means nothing to a beginner. Maths keeps its "= result".
+static const char *OperationText(const VmVisualTrace *t)
+{
+    static const char *questions[]={"<",">","<=",">=","==","!=","&&","||"};
+    for(int i=0;i<(int)(sizeof questions/sizeof questions[0]);i++)
+        if(!strcmp(t->operation,questions[i]))
+            return TextFormat("LAST CHECK   %d %s %d ?   %s",t->left,t->operation,t->right,t->result?"YES (true)":"NO (false)");
+    return TextFormat("LAST OPERATION   %d %s %d = %d",t->left,t->operation,t->right,t->result);
+}
+
 void VisualLearning_Reset(void)
 {
     swapCount=0;swapTime=0;swapMode=false;walkthroughMode=false;replayRequested=false;previousSwapWireCount=0;lastReadIndex=-1;inspectFailure=false;failureCall[0]=0;
@@ -241,6 +253,23 @@ static const char *SceneTitle(const char *f)
     if(!strcmp(f,"clamp"))return "RANGE LIMITER";
     if(!strcmp(f,"toFahrenheit"))return "TEMPERATURE CONVERTER";
     if(!strcmp(f,"toUpper"))return "CHARACTER CONVERTER";
+    // Exam revision stages
+    if(strstr(f,"Triangle"))return "PATTERN PRINTER";
+    if(!strcmp(f,"isAPalindrome"))return "PALINDROME CHECK";
+    if(strstr(f,"2ndLargest"))return "RUNNER-UP SEARCH";
+    if(!strcmp(f,"frequencyCount"))return "FREQUENCY COUNTER";
+    if(!strcmp(f,"countDuplicates"))return "DUPLICATE HUNTER";
+    if(!strcmp(f,"wordCounter"))return "WORD COUNTER";
+    if(strstr(f,"FindAllVariables"))return "CODE SCANNER";
+    if(strstr(f,"vowels"))return "VOWEL SCANNER";
+    if(!strcmp(f,"rotateLeft"))return "CONVEYOR ROTATION";
+    if(!strcmp(f,"insertElement"))return "MAKE ROOM: SHIFT RIGHT";
+    if(!strcmp(f,"deleteElement"))return "CLOSE THE GAP: SHIFT LEFT";
+    if(!strcmp(f,"twoMovies"))return "PAIR FINDER";
+    if(!strcmp(f,"countInGrid")||!strcmp(f,"PrintArray"))return "VIDEO MEMORY GRID";
+    if(!strcmp(f,"ReplaceWithMinusOne"))return "CLUSTER SCANNER";
+    if(!strcmp(f,"FallDownAndReplace"))return "GRAVITY DROP";
+    if(!strncmp(f,"test",4))return "HEAP NODES / LINKED LIST";
     return "FUNCTION TERMINAL";
 }
 static void Card(Font font,Rectangle box,const char *label,const char *value,Color accent)
@@ -379,9 +408,9 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
     DrawTextureRec(canvas.texture,(Rectangle){0,0,(float)width,(float)-height},(Vector2){panel.x,panel.y},WHITE);
     DrawRectangleLinesEx(panel,2,cyan);
     Text(font,SceneTitle(test->func),panel.x+12,panel.y+10,19,cyan,panel.width-24);
-    Text(font,actual?"LIVE EXECUTION / YOUR CODE":"YOUR CHALLENGE / WRITE CODE THEN RUN",panel.x+12,panel.y+36,13,LIGHTGRAY,panel.width-24);
+    Text(font,actual?"WATCH MODE  -  RUN plays your code. STEP goes one line at a time.":"WRITE YOUR CODE  -  RUN to watch it, STEP to go line by line",panel.x+12,panel.y+36,13,LIGHTGRAY,panel.width-24);
     if(dataScene&&running&&Button((Rectangle){panel.x+panel.width-84,panel.y+8,72,26},paused?"PLAY":"PAUSE",font))paused=!paused;
-    if(!actual&&entrance>=1&&entrance<6)
+    if(!actual&&entrance>=1&&entrance<6&&!Talk_Active())   // Bitty's intro talk uses this space
     {
         Rectangle speech={panel.x+12,panel.y+86,panel.width-24,76};
         Card(font,speech,"BITTY / YOUR MISSION",test->func,Customisation_Glow());
@@ -400,7 +429,8 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
         const TestRegister *temp=NULL;
         const char *trackedName=swapMode?"temp":strstr(test->func,"Max")||strstr(test->func,"max")?"max":strstr(test->func,"count")||strstr(test->func,"Vowels")?"count":"total";
         for(int i=0;i<td->regCount;i++)if(!strcmp(td->regs[i].name,trackedName))temp=&td->regs[i];
-        Card(font,tempBox,swapMode?"TEMP / SPARE STORAGE":trackedName,temp&&temp->known?TextFormat("%d",temp->value):"empty",gold);
+        bool letters=strstr(test->func,"char")!=NULL;   // swap_chars: show 'A', not 65
+        Card(font,tempBox,swapMode?"TEMP / SPARE STORAGE":trackedName,temp&&temp->known?(letters?TextFormat("'%c'",temp->value):TextFormat("%d",temp->value)):"empty",gold);
         if(swapCount)
         {
             SwapFrame *frame=&swapFrames[0];
@@ -526,7 +556,8 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
     float bottom=panel.y+panel.height-142;
     DrawRectangle((int)panel.x+3,(int)bottom-4,(int)panel.width-6,143,(Color){8,18,30,245});
     float cardW=(panel.width-36)/2;
-    const char *focusName="CURRENT CELL",*focusValue=dataScene?TextFormat("%s = %d",labels[target],values[target]):test->func;
+    const char *focusName=dataScene?"CURRENT CELL":"FUNCTION",*focusValue=dataScene?TextFormat("%s = %d",labels[target],values[target]):test->func;
+    if(dataScene&&strstr(test->func,"char")&&values[target]>=32&&values[target]<127)focusValue=TextFormat("%s = '%c'",labels[target],values[target]);
     if(maxLevel&&best>=0){focusName="LARGEST VISITED";focusValue=TextFormat("%d at %s",values[best],labels[best]);}
     Card(font,(Rectangle){panel.x+12,bottom,cardW,59},focusName,focusValue,maxLevel?gold:cyan);
     const TestRegister *tracked=NULL;
@@ -537,7 +568,7 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
     Rectangle operation={panel.x+12,bottom+65,panel.width-24,42};
     DrawRectangleRounded(operation,0.12f,4,(Color){20,37,54,255});
     const VmVisualTrace *trace=&td->trace;
-    Text(font,actual&&trace->operationKnown?TextFormat("LAST OPERATION   %d %s %d = %d",trace->left,trace->operation,trace->right,trace->result):"WRITE YOUR SOLUTION / RUN TO SEE IT EXECUTE",operation.x+10,operation.y+13,15,WHITE,operation.width-20);
+    Text(font,actual&&trace->operationKnown?OperationText(trace):"WRITE YOUR SOLUTION / RUN TO SEE IT EXECUTE",operation.x+10,operation.y+13,15,WHITE,operation.width-20);
     float x=panel.x+15;
     for(int i=0;i<level->testCount;i++)
     {

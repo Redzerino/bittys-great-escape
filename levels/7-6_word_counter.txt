@@ -1,0 +1,84 @@
+title: 7.6  Word Counter
+type: repair
+
+[story]
+Bitty: "This message is split by spaces. How many words are in it?"
+Write wordCounter(): a word is one or more letters (A..Z or a..z) separated by spaces.
+
+[talk]
+@walk EAST 1
+A word is a run of letters. Spaces sit between words, sometimes more than one!
+Count the START of each word: a letter where you weren't already inside a word.
+Keep a `bool inWord`. A letter flips it on (and counts if it was off). A space flips it off.
+
+[lesson]
+A letter is in 'a'..'z' or 'A'..'Z':
+    (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+
+"  Hi  Bitty "
+   ^   ^        a word starts here
+
+bool inWord = false;
+for each character c:
+    if c is a letter:
+        if (!inWord) count++;   // a new word
+        inWord = true;
+    else:
+        inWord = false;         // a space
+
+Exam 1, Q18.
+
+[hint]
+Count the first letter of each word: a letter that comes when you're not already inside a word.
+Use bool inWord = false. On a letter: if (!inWord) count++; then inWord = true. On anything else: inWord = false.
+for (int i = 0; i < size; i++) { char c = characters[i]; if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) { if (!inWord) count++; inWord = true; } else inWord = false; }
+
+[code]
+// STAGE 7.6: WORD COUNTER
+// Count the words. A word is one or more
+// letters, with spaces between words.
+// wordCounter(11, "Hello world") -> 2
+// Fill in the gold gaps!
+
+int wordCounter(int size, char characters[]) {
+    int count = 0;
+    bool inWord = false;
+    for (int i = 0; i < size; i++) {
+        char c = characters[i];
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+            if (___) {
+                count++;
+            }
+            inWord = ___;
+        } else {
+            inWord = ___;
+        }
+    }
+    return count;
+}
+
+[solution]
+int wordCounter(int size, char characters[]) {
+    int count = 0;
+    bool inWord = false;
+    for (int i = 0; i < size; i++) {
+        char c = characters[i];
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+            if (!inWord) {
+                count++;
+            }
+            inWord = true;
+        } else {
+            inWord = false;
+        }
+    }
+    return count;
+}
+
+[tests]
+wordCounter(11, "Hello world") == 2
+wordCounter(5, "Bitty") == 1
+wordCounter(16, "  Bitty  is free") == 3
+wordCounter(4, "    ") == 0
+wordCounter(0, "") == 0
+wordCounter(9, "a b c d e") == 5

@@ -1,0 +1,127 @@
+title: 7.7  Variable Finder
+type: repair
+
+[story]
+Bitty: "A scrap of C code! List every int and char variable it declares, with commas between."
+Write FindAllVariables(). One declaration per line; strings end with '\0'.
+
+[talk]
+@walk EAST 1
+Someone dropped a scrap of C code in memory. I want a list of its variables, like `a,c,total`.
+Go line by line. If a line starts with `int ` or `char `, the name comes next: copy letters until you hit `=`, `;` or a space.
+Careful: `int main()` is a function, not a variable! If the name is followed by `(`, skip it.
+
+[lesson]
+Code is just a string with '\n' between lines:
+  "int a=1;\nchar c;\nint total;"
+gives  "a,c,total"
+
+Two helpers are written for you:
+  startsWith(code, i, "int ")  true if the
+                               text at i is "int "
+  isNameChar(ch)               letter, digit or _
+
+For each line:
+  1. skip spaces at the front
+  2. "int " -> name starts 4 later
+     "char " -> name starts 5 later
+  3. read name chars: end = first non-name char
+  4. if code[end] != '(' copy the name across
+     (a ',' first if the list isn't empty)
+  5. jump past the '\n' to the next line
+
+Exam 1, Q21.
+
+[hint]
+Walk the code a line at a time: skip leading spaces, check for "int " or "char ", read the name, then skip to after the '\n'.
+The name runs from start while isNameChar(code[end]) is true. Skip it if code[end] == '(' (a function). Put a ',' before every name except the first.
+if (code[end] != '(') { if (out > 0) variables[out++] = ','; for (int k = start; k < end; k++) variables[out++] = code[k]; }   and finish with variables[out] = '\0';
+
+[code]
+// STAGE 7.7: VARIABLE FINDER
+// List every int / char variable, commas between:
+// "int a=1;\nchar c;\nint total;" -> "a,c,total"
+// int main() is a function: skip it.
+
+bool startsWith(char code[], int i, char word[]) {
+    for (int k = 0; word[k] != '\0'; k++) {
+        if (code[i + k] != word[k]) return false;
+    }
+    return true;
+}
+
+bool isNameChar(char ch) {
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+           (ch >= '0' && ch <= '9') || ch == '_';
+}
+
+void FindAllVariables(char variables[], char code[]) {
+    int out = 0;   // next free spot in variables
+    int i = 0;     // where we are in code
+    while (code[i] != '\0') {
+        while (code[i] == ' ') i++;       // skip indentation
+        int start = -1;
+        if (startsWith(code, i, "int ")) start = i + 4;
+        else if (startsWith(code, i, "char ")) start = i + 5;
+
+        if (start >= 0) {
+            int end = start;
+            while (isNameChar(code[end])) end++;
+            // copy code[start .. end-1] into variables, unless it's a function
+
+        }
+
+        while (code[i] != '\n' && code[i] != '\0') i++;   // to the end of the line
+        if (code[i] == '\n') i++;                         // and onto the next one
+    }
+    variables[out] = '\0';
+}
+
+[solution]
+bool startsWith(char code[], int i, char word[]) {
+    for (int k = 0; word[k] != '\0'; k++) {
+        if (code[i + k] != word[k]) return false;
+    }
+    return true;
+}
+
+bool isNameChar(char ch) {
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+           (ch >= '0' && ch <= '9') || ch == '_';
+}
+
+void FindAllVariables(char variables[], char code[]) {
+    int out = 0;
+    int i = 0;
+    while (code[i] != '\0') {
+        while (code[i] == ' ') i++;
+        int start = -1;
+        if (startsWith(code, i, "int ")) start = i + 4;
+        else if (startsWith(code, i, "char ")) start = i + 5;
+
+        if (start >= 0) {
+            int end = start;
+            while (isNameChar(code[end])) end++;
+            if (code[end] != '(') {
+                if (out > 0) {
+                    variables[out] = ',';
+                    out++;
+                }
+                for (int k = start; k < end; k++) {
+                    variables[out] = code[k];
+                    out++;
+                }
+            }
+        }
+
+        while (code[i] != '\n' && code[i] != '\0') i++;
+        if (code[i] == '\n') i++;
+    }
+    variables[out] = '\0';
+}
+
+[tests]
+FindAllVariables(""[60], "int var1=10;") then #1 == "var1"
+FindAllVariables(""[60], "int a=1;\nchar c;\nint total;") then #1 == "a,c,total"
+FindAllVariables(""[60], "int main() {\n    int score = 0;\n    char grade;\n}") then #1 == "score,grade"
+FindAllVariables(""[60], "x = 5;\nprintf(x);") then #1 == ""

@@ -1,0 +1,89 @@
+title: 10.3  Cluster Buster
+type: repair
+
+[story]
+Bitty: "Three or more of the same pixel in a line is a glitch. Find the first one, score it, and blank it out."
+Write ReplaceWithMinusOne(): score the first line of 3+ identical items and replace it with -1's.
+
+[talk]
+@walk EAST 1
+Scan the grid from the top-left, row by row. At each box, look RIGHT first: are there 3 or more the same in a row?
+If not, look DOWN from that box. The first line you find is the cluster: add up its values, set its boxes to -1, and return the score.
+Only values 1 to 4 count. 0 and -2 are never part of a cluster. No cluster anywhere? Return 0.
+
+[lesson]
+At each box (row, col) holding v (1 to 4):
+
+  1. Horizontal: count how many in a row
+     match v going right:
+       int len = 1;
+       while (col + len < 6 &&
+              array[row][col + len] == v) len++;
+     if len >= 3: it's a cluster!
+
+  2. Otherwise vertical, going down
+     (row + len < 4).
+
+  Score = v * len. Set those len boxes to -1,
+  then return the score straight away.
+
+  0 and -2 never count, so skip them:
+       if (v < 1 || v > 4) continue;
+
+Exam 1, Q20.
+
+[hint]
+Two loops over every box. Skip it if the value isn't 1 to 4. Then measure the run going right: len starts at 1 and grows while the next box matches.
+If len >= 3, set those boxes to -1 and return v * len. If not, measure the run going down the same way.
+int len = 1; while (col + len < 6 && array[row][col + len] == v) len++; if (len >= 3) { for (int k = 0; k < len; k++) array[row][col + k] = -1; return v * len; }
+
+[code]
+// STAGE 10.3: CLUSTER BUSTER
+// Find the FIRST line of 3+ identical items
+// (scan rows left to right, try horizontal
+// before vertical). Score = sum of its values.
+// Replace it with -1's and return the score.
+// 0 and -2 are never part of a cluster.
+
+int ReplaceWithMinusOne(int array[4][6]) {
+    for (int row = 0; row < 4; row++) {
+        for (int col = 0; col < 6; col++) {
+            int v = array[row][col];
+            if (v < 1 || v > 4) continue;
+            // look right, then look down
+
+        }
+    }
+    return 0;
+}
+
+[solution]
+int ReplaceWithMinusOne(int array[4][6]) {
+    for (int row = 0; row < 4; row++) {
+        for (int col = 0; col < 6; col++) {
+            int v = array[row][col];
+            if (v < 1 || v > 4) continue;
+
+            int len = 1;
+            while (col + len < 6 && array[row][col + len] == v) len++;
+            if (len >= 3) {
+                for (int k = 0; k < len; k++) array[row][col + k] = -1;
+                return v * len;
+            }
+
+            len = 1;
+            while (row + len < 4 && array[row + len][col] == v) len++;
+            if (len >= 3) {
+                for (int k = 0; k < len; k++) array[row + k][col] = -1;
+                return v * len;
+            }
+        }
+    }
+    return 0;
+}
+
+[tests]
+ReplaceWithMinusOne({0, 0, 3, 1, 3, 4, 0, 0, 2, 3, 4, 3, 0, 0, 1, 3, 3, 2, 0, 0, 1, 1, 1, 1}) == 4 then #1 == {0, 0, 3, 1, 3, 4, 0, 0, 2, 3, 4, 3, 0, 0, 1, 3, 3, 2, 0, 0, -1, -1, -1, -1}
+ReplaceWithMinusOne({1, 2, 1, 2, 1, 2, 3, 2, 4, 1, 4, 1, 1, 2, 1, 4, 1, 4, 2, 1, 2, 1, 2, 1}) == 6 then #1 == {1, -1, 1, 2, 1, 2, 3, -1, 4, 1, 4, 1, 1, -1, 1, 4, 1, 4, 2, 1, 2, 1, 2, 1}
+ReplaceWithMinusOne({-2, -2, -2, 1, 2, 3, 0, 0, 0, 2, 3, 1, 1, 2, 3, 1, 2, 3, 3, 1, 2, 3, 1, 2}) == 0
+ReplaceWithMinusOne({1, 2, 3, 4, 1, 2, 3, 4, 2, 2, 2, 1, 4, 1, 3, 2, 3, 3, 1, 3, 1, 2, 1, 2}) == 6 then #1 == {1, 2, 3, 4, 1, 2, 3, 4, -1, -1, -1, 1, 4, 1, 3, 2, 3, 3, 1, 3, 1, 2, 1, 2}

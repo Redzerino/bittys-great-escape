@@ -1,0 +1,67 @@
+title: 9.2  Rotate Belt
+type: repair
+
+[story]
+Bitty: "This conveyor belt moves everything one step left. The front box goes round to the back."
+Write rotateLeft(): left rotate the array by one, and return the value that moved to the end.
+
+[talk]
+@walk EAST 1
+A conveyor belt! Everything shuffles one box to the left, and the front box goes round to the back.
+Save the front box first, or it gets overwritten! Then slide each box left: `arr[i] = arr[i + 1]`.
+Finally put the saved value in the last box, and return it.
+
+[lesson]
+{1, 2, 3, 4}  ->  {2, 3, 4, 1}
+
+    int first = arr[0];            // save it
+    for (int i = 0; i < size - 1; i++) {
+        arr[i] = arr[i + 1];       // slide left
+    }
+    arr[size - 1] = first;         // round the back
+    return first;
+
+The loop stops at size - 1: the last box
+has nothing to its right to copy from.
+
+The lab doesn't say what to return, so this
+level returns the value that went round.
+
+Exam 1, Q16.
+
+[hint]
+Save arr[0] in a variable first, because the slide will overwrite it.
+Slide every box one to the left with arr[i] = arr[i + 1], for i from 0 up to size - 2.
+int first = arr[0]; for (int i = 0; i < size - 1; i++) arr[i] = arr[i + 1]; arr[size - 1] = first; return first;
+
+[code]
+// STAGE 9.2: ROTATE BELT
+// Move everything one box left. The first
+// value goes round to the end. Return it.
+// {1, 2, 3, 4} becomes {2, 3, 4, 1}, returns 1
+// Fill in the gold gaps!
+
+int rotateLeft(int size, int arr[]) {
+    int first = ___;
+    for (int i = 0; i < size - 1; i++) {
+        arr[i] = ___;
+    }
+    arr[___] = first;
+    return first;
+}
+
+[solution]
+int rotateLeft(int size, int arr[]) {
+    int first = arr[0];
+    for (int i = 0; i < size - 1; i++) {
+        arr[i] = arr[i + 1];
+    }
+    arr[size - 1] = first;
+    return first;
+}
+
+[tests]
+rotateLeft(4, {1, 2, 3, 4}) == 1 then #2 == {2, 3, 4, 1}
+rotateLeft(5, {9, 8, 7, 6, 5}) == 9 then #2 == {8, 7, 6, 5, 9}
+rotateLeft(2, {3, 4}) == 3 then #2 == {4, 3}
+rotateLeft(1, {7}) == 7 then #2 == {7}

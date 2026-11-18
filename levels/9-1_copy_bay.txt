@@ -1,0 +1,54 @@
+title: 9.1  Copy Bay
+type: repair
+
+[story]
+Bitty: "Welcome to the Array Workshop! First job: back up this bay into an empty one."
+Write copyArraytoArray(): copy every element of arr1 into arr2.
+
+[talk]
+@walk EAST 1
+Welcome to the Array Workshop, where we move data around. First job: make a backup copy.
+You can't copy a whole array with `=` in C. You copy it box by box, with a loop.
+Box 0 to box 0, box 1 to box 1... `arr2[i] = arr1[i];`
+
+[lesson]
+In C, this does NOT copy an array:
+    arr2 = arr1;          // not allowed
+
+Copy it one box at a time instead:
+
+    for (int i = 0; i < size; i++) {
+        arr2[i] = arr1[i];
+    }
+
+Arrays are passed by reference, so the
+boxes you fill in arr2 are the caller's real
+boxes. The copy is still there afterwards.
+
+Exam 1, Q10.
+
+[hint]
+Loop i from 0 to size - 1.
+Each time, copy one box from arr1 into the same place in arr2.
+for (int i = 0; i < size; i++) arr2[i] = arr1[i];
+
+[code]
+// STAGE 9.1: COPY BAY
+// Copy every element of arr1 into arr2.
+// Both arrays are the same size.
+
+void copyArraytoArray(int size, int arr1[], int arr2[]) {
+
+}
+
+[solution]
+void copyArraytoArray(int size, int arr1[], int arr2[]) {
+    for (int i = 0; i < size; i++) {
+        arr2[i] = arr1[i];
+    }
+}
+
+[tests]
+copyArraytoArray(3, {1, 2, 3}, {0, 0, 0}) then #3 == {1, 2, 3}
+copyArraytoArray(5, {9, 8, 7, 6, 5}, {0, 0, 0, 0, 0}) then #3 == {9, 8, 7, 6, 5}, #2 == {9, 8, 7, 6, 5}
+copyArraytoArray(1, {42}, {7}) then #3 == {42}

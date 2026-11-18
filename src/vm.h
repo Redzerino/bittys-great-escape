@@ -24,6 +24,7 @@
 #include <stdbool.h>
 
 #define VM_MSG_MAX          300
+#define VM_OUTPUT_MAX       2048   // printed text kept for tests that check output
 #define VM_MAX_WARNINGS     8
 #define VM_VAR_MAX_VALUES   64
 #define VM_VAR_NAME_MAX     64
@@ -156,6 +157,7 @@ void     Vm_PauseAtNextLine(Vm *vm);
 VmStatus    Vm_GetStatus(const Vm *vm);
 int         Vm_CurrentLine(const Vm *vm);
 int         Vm_ReturnValue(const Vm *vm);
+const char *Vm_Output(const Vm *vm);          // what printf/cout printed since Vm_Start
 const char *Vm_ErrorMessage(const Vm *vm);
 int         Vm_ErrorLine(const Vm *vm);
 VmErrorKind Vm_GetErrorKind(const Vm *vm);

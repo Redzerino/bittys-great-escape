@@ -1,0 +1,140 @@
+title: 11.5  Slot It In
+type: repair
+
+[story]
+Bitty: "Now anywhere in the chain. Position 0 is the front, 1 is after the first node..."
+Write InsertAtPosition(): put value at position. Past the end? Put it at the end.
+
+[talk]
+@walk EAST 1
+Position 0 is the front, so that's just InsertAtBeginning. It's written for you below, so call it!
+For any other position, walk to the node just BEFORE the spot: `position - 1` hops. Stop early if you hit the last node.
+Then re-link: the new node points at what came after, and the node before points at the new node. In that order!
+
+[lesson]
+Insert 9 at position 2 in  1 -> 2 -> 3:
+
+  walk to the node BEFORE the spot (position - 1 hops):
+      p = [2]
+  link the new node in:
+      n->next = p->next;   // 9 points at 3
+      p->next = n;         // 2 points at 9
+
+  1 -> 2 -> 9 -> 3
+
+Do n->next FIRST. If you change p->next
+first, you lose the rest of the chain!
+
+Walk with:
+  for (int i = 0; i < position - 1 &&
+                  p->next != nullptr; i++)
+      p = p->next;
+
+Exam 2, Part 2: InsertAtPosition.
+
+[hint]
+If position is 0 or the list is empty, return InsertAtBeginning(head, value).
+Walk p from head for position - 1 hops, but stop if p->next is nullptr (that makes "past the end" add at the end).
+n->next = p->next; p->next = n; return head;
+
+[code]
+// STAGE 11.5: SLOT IT IN
+// Put value at position (0 = the front).
+// If position is past the end, put it at the end.
+
+struct Node {
+    int data;
+    Node *next;
+};
+
+Node* InsertAtBeginning(Node *head, int value) {
+    Node *n = new Node();
+    n->data = value;
+    n->next = head;
+    return n;
+}
+
+Node* InsertAtPosition(Node *head, int value, int position) {
+    if (position == 0 || head == nullptr) return InsertAtBeginning(head, value);
+
+    Node *n = new Node();
+    n->data = value;
+
+    return head;
+}
+
+// ---- Bitty's test rig: leave this alone ----
+// Reads the list as one number: 1 -> 2 -> 3 gives 123
+int digits(Node *head) {
+    int number = 0;
+    for (Node *p = head; p != nullptr; p = p->next) number = number * 10 + p->data;
+    return number;
+}
+
+int testInsert(int value, int position) {
+    Node *head = nullptr;
+    head = InsertAtBeginning(head, 3);
+    head = InsertAtBeginning(head, 2);
+    head = InsertAtBeginning(head, 1);    // 1 -> 2 -> 3
+    head = InsertAtPosition(head, value, position);
+    return digits(head);
+}
+
+int testEmpty(int value) {
+    return digits(InsertAtPosition(nullptr, value, 0));
+}
+
+[solution]
+struct Node {
+    int data;
+    Node *next;
+};
+
+Node* InsertAtBeginning(Node *head, int value) {
+    Node *n = new Node();
+    n->data = value;
+    n->next = head;
+    return n;
+}
+
+Node* InsertAtPosition(Node *head, int value, int position) {
+    if (position == 0 || head == nullptr) return InsertAtBeginning(head, value);
+
+    Node *n = new Node();
+    n->data = value;
+
+    Node *p = head;
+    for (int i = 0; i < position - 1 && p->next != nullptr; i++) {
+        p = p->next;
+    }
+    n->next = p->next;
+    p->next = n;
+    return head;
+}
+
+int digits(Node *head) {
+    int number = 0;
+    for (Node *p = head; p != nullptr; p = p->next) number = number * 10 + p->data;
+    return number;
+}
+
+int testInsert(int value, int position) {
+    Node *head = nullptr;
+    head = InsertAtBeginning(head, 3);
+    head = InsertAtBeginning(head, 2);
+    head = InsertAtBeginning(head, 1);
+    head = InsertAtPosition(head, value, position);
+    return digits(head);
+}
+
+int testEmpty(int value) {
+    return digits(InsertAtPosition(nullptr, value, 0));
+}
+
+[tests]
+testInsert(9, 0) == 9123
+testInsert(9, 1) == 1923
+testInsert(9, 2) == 1293
+testInsert(9, 3) == 1239
+testInsert(9, 10) == 1239
+testEmpty(4) == 4

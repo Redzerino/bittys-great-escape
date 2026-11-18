@@ -1,0 +1,74 @@
+title: 5.6  Palindrome Gate
+type: repair
+
+[story]
+Bitty: "This gate only opens for numbers that read the same both ways, like 121."
+Write isAPalindrome(). Your Reversed() from the Digit Peeler is already here to help.
+
+[talk]
+@walk EAST 1
+A palindrome reads the same forwards and backwards: 121, 1221, 7.
+You already built `Reversed()` in the Digit Peeler. It's written for you below.
+So a number is a palindrome if reversing it gives the same number. One line!
+
+[lesson]
+A function can call another function.
+That's what helpers are for.
+
+    int Reversed(int n)        123 -> 321
+
+A palindrome is the same when reversed:
+
+    121  reversed is 121   -> palindrome
+    123  reversed is 321   -> not one
+
+    return Reversed(n) == n;
+
+== already gives true or false, so you can
+return it straight away.
+
+Exam 1, Q2.
+
+[hint]
+You don't have to reverse anything yourself: call Reversed(testNumber).
+Compare what Reversed gives you with the number you started with.
+return Reversed(testNumber) == testNumber;
+
+[code]
+// STAGE 5.6: PALINDROME GATE
+// A palindrome reads the same both ways (121).
+// Reversed() is written for you. Use it!
+
+int Reversed(int testNumber) {
+    int result = 0;
+    while (testNumber > 0) {
+        result = result * 10 + testNumber % 10;
+        testNumber = testNumber / 10;
+    }
+    return result;
+}
+
+bool isAPalindrome(int testNumber) {
+    return ___;
+}
+
+[solution]
+int Reversed(int testNumber) {
+    int result = 0;
+    while (testNumber > 0) {
+        result = result * 10 + testNumber % 10;
+        testNumber = testNumber / 10;
+    }
+    return result;
+}
+
+bool isAPalindrome(int testNumber) {
+    return Reversed(testNumber) == testNumber;
+}
+
+[tests]
+isAPalindrome(1) == true
+isAPalindrome(121) == true
+isAPalindrome(1213) == false
+isAPalindrome(1221) == true
+isAPalindrome(10) == false

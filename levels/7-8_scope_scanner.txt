@@ -1,0 +1,165 @@
+title: 7.8  Scope Scanner
+type: repair
+max_steps: 5000000
+
+[story]
+Bitty: "Which variables can line 4 still see? Track the { } to find out."
+Write FindAllVariablesInScope(): list the int/char variables in scope after lineNumber.
+
+[talk]
+@walk EAST 1
+Same scrap of code, harder question: which variables are still alive after a given line?
+Count braces as you go: `{` goes one level deeper, `}` comes back out. That's the depth.
+A variable is born at its depth. When a `}` takes the depth below it, it dies, so drop it from the list.
+
+[lesson]
+line 1  int main() {        depth 0 -> 1
+line 2      int a = 1;      a lives at depth 1
+line 3      if (a > 0) {    depth 1 -> 2
+line 4          int b = 2;  b lives at depth 2
+line 5      }               depth 2 -> 1: b dies
+line 6      char c;         c lives at depth 1
+
+after line 4: "a,b"     after line 5: "a"
+after line 6: "a,c"
+
+Keep the live variables in three arrays:
+  starts[n], lens[n], depths[n]
+A '}' drops every variable deeper than the
+new depth (they're at the end of the list).
+
+Exam 1, Q22.
+
+[hint]
+Go through lines 1 to lineNumber. On each line, first record a declaration (at the current depth), then go through its characters for { and }.
+On '}' reduce depth, then remove variables from the end of your list while their depth is bigger than the new depth.
+while (n > 0 && depths[n - 1] > depth) n--;   and at the end copy each live name into variables with commas between.
+
+[code]
+// STAGE 7.8: SCOPE SCANNER
+// Which int / char variables are in scope AFTER lineNumber?
+// Lines count from 1. { goes deeper, } comes back out.
+// startsWith() and isNameChar() are from the Variable Finder.
+
+bool startsWith(char code[], int i, char word[]) {
+    for (int k = 0; word[k] != '\0'; k++) {
+        if (code[i + k] != word[k]) return false;
+    }
+    return true;
+}
+
+bool isNameChar(char ch) {
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+           (ch >= '0' && ch <= '9') || ch == '_';
+}
+
+void FindAllVariablesInScope(char variables[], char code[], int lineNumber) {
+    int starts[20];    // where each live variable's name starts in code
+    int lens[20];      // how long its name is
+    int depths[20];    // the depth it was declared at
+    int n = 0;         // how many are alive
+    int depth = 0;
+    int i = 0;
+    int line = 1;
+
+    while (code[i] != '\0' && line <= lineNumber) {
+        int j = i;
+        while (code[j] == ' ') j++;
+        int start = -1;
+        if (startsWith(code, j, "int ")) start = j + 4;
+        else if (startsWith(code, j, "char ")) start = j + 5;
+        if (start >= 0) {
+            int end = start;
+            while (isNameChar(code[end])) end++;
+            if (code[end] != '(') {
+                // remember this variable at the current depth
+
+            }
+        }
+
+        // walk this line: { goes deeper, } comes out (and drops variables)
+        while (code[i] != '\n' && code[i] != '\0') {
+
+            i++;
+        }
+        if (code[i] == '\n') i++;
+        line++;
+    }
+
+    // write the live names into variables, commas between
+    int out = 0;
+
+    variables[out] = '\0';
+}
+
+[solution]
+bool startsWith(char code[], int i, char word[]) {
+    for (int k = 0; word[k] != '\0'; k++) {
+        if (code[i + k] != word[k]) return false;
+    }
+    return true;
+}
+
+bool isNameChar(char ch) {
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+           (ch >= '0' && ch <= '9') || ch == '_';
+}
+
+void FindAllVariablesInScope(char variables[], char code[], int lineNumber) {
+    int starts[20];
+    int lens[20];
+    int depths[20];
+    int n = 0;
+    int depth = 0;
+    int i = 0;
+    int line = 1;
+
+    while (code[i] != '\0' && line <= lineNumber) {
+        int j = i;
+        while (code[j] == ' ') j++;
+        int start = -1;
+        if (startsWith(code, j, "int ")) start = j + 4;
+        else if (startsWith(code, j, "char ")) start = j + 5;
+        if (start >= 0) {
+            int end = start;
+            while (isNameChar(code[end])) end++;
+            if (code[end] != '(') {
+                starts[n] = start;
+                lens[n] = end - start;
+                depths[n] = depth;
+                n++;
+            }
+        }
+
+        while (code[i] != '\n' && code[i] != '\0') {
+            if (code[i] == '{') depth++;
+            if (code[i] == '}') {
+                depth--;
+                while (n > 0 && depths[n - 1] > depth) n--;
+            }
+            i++;
+        }
+        if (code[i] == '\n') i++;
+        line++;
+    }
+
+    int out = 0;
+    for (int v = 0; v < n; v++) {
+        if (out > 0) {
+            variables[out] = ',';
+            out++;
+        }
+        for (int k = 0; k < lens[v]; k++) {
+            variables[out] = code[starts[v] + k];
+            out++;
+        }
+    }
+    variables[out] = '\0';
+}
+
+[tests]
+FindAllVariablesInScope(""[60], "int main() {\n    int a = 1;\n    if (a > 0) {\n        int b = 2;\n    }\n    char c;\n}", 4) then #1 == "a,b"
+FindAllVariablesInScope(""[60], "int main() {\n    int a = 1;\n    if (a > 0) {\n        int b = 2;\n    }\n    char c;\n}", 5) then #1 == "a"
+FindAllVariablesInScope(""[60], "int main() {\n    int a = 1;\n    if (a > 0) {\n        int b = 2;\n    }\n    char c;\n}", 6) then #1 == "a,c"
+FindAllVariablesInScope(""[60], "int main() {\n    int a = 1;\n    if (a > 0) {\n        int b = 2;\n    }\n    char c;\n}", 1) then #1 == ""
+FindAllVariablesInScope(""[60], "int main() {\n    int x;\n    {\n        char y;\n        int z = 3;\n    }\n    int w;\n}", 5) then #1 == "x,y,z"

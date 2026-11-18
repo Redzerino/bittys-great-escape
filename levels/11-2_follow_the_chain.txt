@@ -1,0 +1,91 @@
+title: 11.2  Follow the Chain
+type: repair
+
+[story]
+Bitty: "Nodes linked by their next pointers make a chain: a linked list. Walk it and print every value."
+Write printList(): print each value with " -> " after it, then NULL.
+
+[talk]
+@walk EAST 1
+A linked list is nodes chained by their `next` pointers. `head` points at the first one, and the last one's `next` is `nullptr`.
+To walk it, keep a pointer `p`. Print `p->data`, then hop along with `p = p->next;`
+Stop when `p` becomes `nullptr`: that's the end of the chain. Then print NULL.
+
+[lesson]
+head -> [1|next] -> [2|next] -> [3|nullptr]
+
+Walk the chain with a pointer:
+
+    Node *p = head;
+    while (p != nullptr) {
+        printf("%d -> ", p->data);
+        p = p->next;          // hop along
+    }
+    printf("NULL\n");
+
+This prints:  1 -> 2 -> 3 -> NULL
+
+An empty list is just head == nullptr,
+so it prints:  NULL
+
+[hint]
+Start a pointer at the head: Node *p = head; and loop while (p != nullptr).
+Inside the loop print p->data followed by " -> ", then move on with p = p->next. After the loop print "NULL\n".
+while (p != nullptr) { printf("%d -> ", p->data); p = p->next; }  printf("NULL\n");
+
+[code]
+// STAGE 11.2: FOLLOW THE CHAIN
+// Print the list like this:  1 -> 2 -> 3 -> NULL
+
+struct Node {
+    int data;
+    Node *next;
+};
+
+void printList(Node *head) {
+    Node *p = head;
+
+}
+
+// ---- Bitty's test rig: leave this alone ----
+Node* link(int value, Node *next) {
+    Node *n = new Node();
+    n->data = value;
+    n->next = next;
+    return n;
+}
+
+void testThree() { printList(link(1, link(2, link(3, nullptr)))); }
+void testOne()   { printList(link(7, nullptr)); }
+void testEmpty() { printList(nullptr); }
+
+[solution]
+struct Node {
+    int data;
+    Node *next;
+};
+
+void printList(Node *head) {
+    Node *p = head;
+    while (p != nullptr) {
+        printf("%d -> ", p->data);
+        p = p->next;
+    }
+    printf("NULL\n");
+}
+
+Node* link(int value, Node *next) {
+    Node *n = new Node();
+    n->data = value;
+    n->next = next;
+    return n;
+}
+
+void testThree() { printList(link(1, link(2, link(3, nullptr)))); }
+void testOne()   { printList(link(7, nullptr)); }
+void testEmpty() { printList(nullptr); }
+
+[tests]
+testThree() prints "1 -> 2 -> 3 -> NULL\n"
+testOne() prints "7 -> NULL\n"
+testEmpty() prints "NULL\n"

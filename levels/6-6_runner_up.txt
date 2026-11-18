@@ -1,0 +1,80 @@
+title: 6.6  Runner-Up
+type: repair
+
+[story]
+Bitty: "The power audit wants the SECOND biggest reading, not the biggest."
+Write find2ndLargest(). Return -1 if there isn't one.
+
+[talk]
+@walk EAST 1
+Like the Power Audit, but now I need the runner-up: the second biggest number.
+Keep TWO boxes: `largest` and `second`. A new champion pushes the old one down into second.
+If every number is the same, there's no runner-up, so return -1.
+
+[lesson]
+Track the top two as you walk the array:
+
+    int largest = -1, second = -1;
+
+    if (arr[i] > largest) {
+        second = largest;     // old champ drops
+        largest = arr[i];     // new champ
+    }
+    else if (arr[i] < largest && arr[i] > second) {
+        second = arr[i];      // new runner-up
+    }
+
+Starting at -1 works because every number
+is positive. If second is still -1 at the
+end, there was no runner-up.
+
+Exam 1, Q9.
+
+[hint]
+Keep two variables, largest and second, both starting at -1, and look at every element.
+A number bigger than largest pushes largest down into second. A number between second and largest becomes the new second.
+if (arr[i] > largest) { second = largest; largest = arr[i]; } else if (arr[i] < largest && arr[i] > second) { second = arr[i]; }  then return second.
+
+[code]
+// STAGE 6.6: RUNNER-UP
+// Return the second largest number.
+// find2ndLargest(4, {3, 9, 4, 8}) -> 8
+// Every number is positive. No second? Return -1.
+// Fill in the gold gaps!
+
+int find2ndLargest(int size, int arr[]) {
+    int largest = -1;
+    int second = -1;
+    for (int i = 0; i < size; i++) {
+        if (arr[i] > largest) {
+            second = ___;
+            largest = arr[i];
+        } else if (arr[i] < largest && arr[i] > ___) {
+            second = arr[i];
+        }
+    }
+    return ___;
+}
+
+[solution]
+int find2ndLargest(int size, int arr[]) {
+    int largest = -1;
+    int second = -1;
+    for (int i = 0; i < size; i++) {
+        if (arr[i] > largest) {
+            second = largest;
+            largest = arr[i];
+        } else if (arr[i] < largest && arr[i] > second) {
+            second = arr[i];
+        }
+    }
+    return second;
+}
+
+[tests]
+find2ndLargest(4, {3, 9, 4, 8}) == 8
+find2ndLargest(2, {10, 20}) == 10
+find2ndLargest(4, {2, 9, 9, 4}) == 4
+find2ndLargest(6, {4, 1, 2, 9, 8, 7}) == 8
+find2ndLargest(3, {5, 5, 5}) == -1
+find2ndLargest(1, {7}) == -1

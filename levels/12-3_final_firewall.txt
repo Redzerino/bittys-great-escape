@@ -1,4 +1,4 @@
-title: 9.3  Final Firewall
+title: 12.3  Final Firewall
 type: repair
 ban_indexing: yes
 
@@ -36,7 +36,7 @@ Stop when they're different or a string ends, then return *a - *b.
 while (*a != '\0' && *a == *b) { a++; b++; } return *a - *b;
 
 [code]
-// STAGE 9.3: FINAL FIREWALL
+// STAGE 12.3: FINAL FIREWALL
 // 0 if a and b are the same,
 // negative if a comes first,
 // positive if b comes first.

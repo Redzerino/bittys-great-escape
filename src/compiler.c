@@ -179,6 +179,15 @@ static bool IsAddr(TypeInfo t)  { return IsArr(t) || IsPtr(t); }
 static bool IsVoidT(TypeInfo t) { return t.base == TYPE_VOID && !IsAddr(t); }
 static bool IsCharT(TypeInfo t) { return t.base == TYPE_CHAR && !IsAddr(t); }
 static bool IsBoolT(TypeInfo t) { return t.base == TYPE_BOOL && !IsAddr(t); }
+static bool IsStructPtr(TypeInfo t) { return t.base == TYPE_STRUCT && t.pointerDepth > 0; }
+static bool IsWholeStruct(TypeInfo t) { return t.base == TYPE_STRUCT && t.pointerDepth == 0 && !IsArr(t); }
+
+// Different base types?  int vs char, or Node vs DoublyLinkedNode
+static bool DifferentBase(TypeInfo a, TypeInfo b)
+{
+    if (a.base != b.base) return true;
+    return a.base == TYPE_STRUCT && strcmp(a.structName, b.structName) != 0;
+}
 
 // The type of one element: int[5] -> int,  int[4][6] -> int[6],  int* -> int
 static TypeInfo Element(TypeInfo t)
@@ -247,6 +256,9 @@ static void CheckAssign(Compiler *c, int line, TypeInfo target, TypeInfo value,
 
     if (IsVoidT(value))
         Fail(c, line, "that doesn't give back a value (it's void), so it can't be stored in %s.", what);
+    if (IsWholeStruct(t) || IsWholeStruct(v))
+        Fail(c, line, "copying a whole %s isn't available here. Use a pointer (%s*) and ->, or copy one field at a time.",
+             IsWholeStruct(t) ? t.structName : v.structName, IsWholeStruct(t) ? t.structName : v.structName);
 
     if (IsPtr(t) && !IsPtr(v))
     {
@@ -259,7 +271,7 @@ static void CheckAssign(Compiler *c, int line, TypeInfo target, TypeInfo value,
                       "Use * to get the value a pointer points at.", what, Describe(target, a, sizeof a));
 
     if (IsPtr(t) && IsPtr(v) && v.base != TYPE_VOID &&
-        (v.base != t.base || v.pointerDepth != t.pointerDepth))
+        (DifferentBase(v, t) || v.pointerDepth != t.pointerDepth))
         Fail(c, line, "%s is %s but you gave it %s.", what,
              Describe(target, a, sizeof a), Describe(value, b, sizeof b));
 }
@@ -528,8 +540,128 @@ static int RootSymbol(const Compiler *c, const Node *n)
 static const char *TargetName(const Node *n)
 {
     while (n->kind == NODE_INDEX) n = n->a;
-    if (n->kind == NODE_IDENT) return n->name;
+    if (n->kind == NODE_IDENT || n->kind == NODE_MEMBER) return n->name;
     return "this";
+}
+
+// ---- Structs ----
+static const StructDef *FindStruct(const Compiler *c, const char *name, int *index)
+{
+    for (int i = 0; i < c->prog->structCount; i++)
+        if (strcmp(c->prog->structs[i].name, name) == 0)
+        {
+            if (index) *index = i;
+            return &c->prog->structs[i];
+        }
+    return NULL;
+}
+
+// Every struct { } in the program, laid out one cell per field (arrays: one per element)
+static void RegisterStructs(Compiler *c, const Node *program)
+{
+    Program *p = c->prog;
+    for (int i = 0; i < program->list.count; i++)
+    {
+        const Node *def = program->list.items[i];
+        if (def->kind != NODE_STRUCT_DEF) continue;
+        if (p->structCount >= VM_MAX_STRUCTS) Fail(c, def->line, "too many structs (max %d).", VM_MAX_STRUCTS);
+        if (def->list.count > VM_MAX_FIELDS)
+            Fail(c, def->line, "%s has too many fields (max %d).", def->name, VM_MAX_FIELDS);
+
+        StructDef *sd = &p->structs[p->structCount++];
+        memset(sd, 0, sizeof *sd);
+        snprintf(sd->name, sizeof sd->name, "%.31s", def->name);
+
+        for (int k = 0; k < def->list.count; k++)
+        {
+            const Node *field = def->list.items[k];
+            for (int j = 0; j < k; j++)
+                if (strcmp(sd->fieldName[j], field->name) == 0)
+                    Fail(c, field->line, "%s already has a field called %s.", def->name, field->name);
+
+            int cells = 1;
+            if (IsArr(field->type))
+                cells = field->type.arraySize[0] * (field->type.arrayDims == 2 ? field->type.arraySize[1] : 1);
+
+            snprintf(sd->fieldName[k], sizeof sd->fieldName[k], "%.31s", field->name);
+            sd->fieldType[k]   = field->type;
+            sd->fieldOffset[k] = sd->size;
+            sd->fieldCells[k]  = cells;
+            sd->size += cells;
+            if (sd->size > 256) Fail(c, field->line, "%s is too big for the machine.", def->name);
+
+            const Node *v = field->a;
+            if (v)
+            {
+                if (v->kind != NODE_NUMBER && v->kind != NODE_CHAR_LIT && v->kind != NODE_BOOL_LIT &&
+                    v->kind != NODE_NULL_LIT)
+                    Fail(c, v->line, "a field's starting value must be a plain value like 0, 'A', false or nullptr.");
+                if (IsPtr(field->type) && v->kind != NODE_NULL_LIT && !IsZeroLiteral(v))
+                    Fail(c, v->line, "%s is a pointer, so it can only start as nullptr.", field->name);
+                if (!IsPtr(field->type) && v->kind == NODE_NULL_LIT)
+                    Fail(c, v->line, "%s isn't a pointer, so it can't be nullptr. Use 0.", field->name);
+                sd->hasDefault[k]   = true;
+                sd->defaultValue[k] = v->intValue;
+            }
+        }
+        sd->fieldCount = def->list.count;
+    }
+}
+
+// a node's field:  p->next  or  n.data   (leaves the field's ADDRESS on the stack)
+static TypeInfo CompileMemberAddress(Compiler *c, const Node *n)
+{
+    char a[64];
+    TypeInfo st;
+    if (n->isArrow)
+    {
+        if (n->a->kind == NODE_IDENT)
+        {
+            int s = LookupSymbol(c, n->a->name);
+            if (s >= 0 && IsWholeStruct(c->prog->syms[s].type))
+                Fail(c, n->line, "%s is a whole %s, not a pointer, so use . instead of -> (e.g. %s.%s).",
+                     n->a->name, c->prog->syms[s].type.structName, n->a->name, n->name);
+        }
+        TypeInfo pt = CompileValue(c, n->a);
+        if (IsWholeStruct(pt))
+            Fail(c, n->line, "%s is a whole %s, not a pointer, so use . instead of ->", TargetName(n->a), pt.structName);
+        if (!IsStructPtr(pt) || pt.pointerDepth != 1 || IsArr(pt))
+            Fail(c, n->line, "-> is used on a pointer to a struct, e.g. node->next, but %s is %s.",
+                 TargetName(n->a), Describe(pt, a, sizeof a));
+        st = pt;
+        st.pointerDepth = 0;
+    }
+    else
+    {
+        TypeInfo vt = CompileAddress(c, n->a);
+        if (IsStructPtr(vt) && !IsArr(vt))
+            Fail(c, n->line, "%s is a pointer, so use -> instead of . (e.g. %s->%s).", TargetName(n->a),
+                 TargetName(n->a), n->name);
+        if (!IsWholeStruct(vt))
+            Fail(c, n->line, ". is used on a struct, e.g. node.data, but %s is %s.",
+                 TargetName(n->a), Describe(vt, a, sizeof a));
+        st = vt;
+    }
+
+    const StructDef *sd = FindStruct(c, st.structName, NULL);
+    if (!sd) Fail(c, n->line, "there's no struct called %s.", st.structName);
+    for (int k = 0; k < sd->fieldCount; k++)
+    {
+        if (strcmp(sd->fieldName[k], n->name) != 0) continue;
+        Emit2(c, OP_MEMBER, sd->fieldOffset[k]);
+        TypeInfo ft = sd->fieldType[k];
+        ft.isRef = false;
+        return ft;
+    }
+
+    char list[200] = "";
+    for (int k = 0; k < sd->fieldCount; k++)
+    {
+        size_t len = strlen(list);
+        snprintf(list + len, sizeof list - len, "%s%s", k ? ", " : "", sd->fieldName[k]);
+    }
+    Fail(c, n->line, "a %s has no field called %s. Its fields are: %s.", sd->name, n->name, list);
+    return st;
 }
 
 static void CheckModifiable(Compiler *c, TypeInfo t, const Node *target, int line)
@@ -588,6 +720,9 @@ static TypeInfo CompileAddress(Compiler *c, const Node *n)
             if (!IsAddr(bt))
                 Fail(c, n->line, "%s is %s, not an array or pointer, so [ ] can't be used on it.",
                      TargetName(n->a), Describe(bt, a, sizeof a));
+            if (IsStructPtr(bt))
+                Fail(c, n->line, "nodes aren't side by side in memory, so [ ] doesn't work on %s. "
+                                 "Follow the ->next pointers instead.", TargetName(n->a));
 
             TypeInfo it = CompileValue(c, n->b);
             if (IsAddr(it)) Fail(c, n->line, "an array index must be a number.");
@@ -619,8 +754,7 @@ static TypeInfo CompileAddress(Compiler *c, const Node *n)
             break;
 
         case NODE_MEMBER:
-            Fail(c, n->line, ". and -> are for structs and classes, which arrive in the Rail Yard world.");
-            break;
+            return CompileMemberAddress(c, n);
 
         default:
             break;
@@ -632,7 +766,7 @@ static TypeInfo CompileAddress(Compiler *c, const Node *n)
 
 static bool IsLValueNode(const Node *n)
 {
-    return n->kind == NODE_IDENT || n->kind == NODE_INDEX ||
+    return n->kind == NODE_IDENT || n->kind == NODE_INDEX || n->kind == NODE_MEMBER ||
            (n->kind == NODE_UNARY && n->op == TOK_STAR);
 }
 
@@ -722,6 +856,10 @@ static TypeInfo CompileBinary(Compiler *c, const Node *n)
     TypeInfo rt = CompileValue(c, n->b);
     bool lp = IsAddr(lt), rp = IsAddr(rt);
 
+    if ((IsStructPtr(lt) || IsStructPtr(rt)) && n->op != TOK_EQ && n->op != TOK_NEQ)
+        Fail(c, n->line, "pointers to nodes can only be compared with == or !=. "
+                         "To move along a list, use p = p->next (not p + 1).");
+
     switch (n->op)
     {
         case TOK_PLUS:
@@ -792,6 +930,7 @@ static TypeInfo CompileAssign(Compiler *c, const Node *n)
         }
         if (IsPtr(t) && n->op != TOK_PLUS_ASSIGN && n->op != TOK_MINUS_ASSIGN)
             Fail(c, n->line, "only += and -= can be used on a pointer.");
+        if (IsStructPtr(t)) Fail(c, n->line, "to move along a list, use p = p->next (not += or -=).");
     }
 
     EmitCast(c, t);
@@ -865,7 +1004,7 @@ static void CheckArgument(Compiler *c, const Node *call, const Function *f, int 
         Fail(c, call->line, "value %d of %s() should be %s, but you gave an array or address.",
              k + 1, f->name, Describe(param, a, sizeof a));
     if (IsPtr(p) && IsPtr(v) && v.base != TYPE_VOID &&
-        (v.base != p.base || v.pointerDepth != p.pointerDepth))
+        (DifferentBase(v, p) || v.pointerDepth != p.pointerDepth))
         Fail(c, call->line, "value %d of %s() should be %s, but you gave %s.",
              k + 1, f->name, TypeText(param, a, sizeof a), Describe(arg, b, sizeof b));
 }
@@ -935,7 +1074,7 @@ static TypeInfo CompileCall(Compiler *c, const Node *n)
                                  "reference (%s).", k + 1, name, a);
             }
             TypeInfo at = CompileAddress(c, arg);
-            if (IsArr(at) || at.base != param.base || at.pointerDepth != param.pointerDepth)
+            if (IsArr(at) || DifferentBase(at, param) || at.pointerDepth != param.pointerDepth)
             {
                 TypeInfo plain = param;
                 plain.isRef = false;
@@ -996,7 +1135,27 @@ static TypeInfo CompileValueRaw(Compiler *c, const Node *n)
                 return MakeType(TYPE_INT);
             }
             TypeInfo t = CompileAddress(c, n);
+            if (IsWholeStruct(t))
+                Fail(c, n->line, "%s is a whole %s. Use %s.field to get one of its fields, or &%s for its address.",
+                     n->name, t.structName, n->name, n->name);
             if (!IsArr(t)) Emit(c, OP_LOAD);   // arrays are used by address
+            return t;
+        }
+
+        case NODE_MEMBER:
+        {
+            TypeInfo t = CompileMemberAddress(c, n);
+            if (!IsArr(t)) Emit(c, OP_LOAD);   // an array field is used by address
+            return t;
+        }
+
+        case NODE_NEW:
+        {
+            int index = 0;
+            if (!FindStruct(c, n->type.structName, &index)) Fail(c, n->line, "there's no struct called %s.", n->type.structName);
+            Emit3(c, OP_NEW, index, n->intValue);
+            TypeInfo t = n->type;
+            t.pointerDepth = 1;
             return t;
         }
 
@@ -1041,6 +1200,8 @@ static TypeInfo CompileValueRaw(Compiler *c, const Node *n)
                 {
                     TypeInfo t = CompileAddress(c, n->a);
                     if (IsArr(t)) Fail(c, n->line, "you can't use %s on a whole array.", Lexer_TokenName(n->op));
+                    if (IsStructPtr(t) || IsWholeStruct(t))
+                        Fail(c, n->line, "%s doesn't work on nodes. To move along a list, use p = p->next.", Lexer_TokenName(n->op));
                     CheckModifiable(c, t, n->a, n->line);
                     Emit2(c, OP_INC_PRE, n->op == TOK_PLUS_PLUS ? 1 : -1);
                     return t;
@@ -1054,6 +1215,8 @@ static TypeInfo CompileValueRaw(Compiler *c, const Node *n)
         {
             TypeInfo t = CompileAddress(c, n->a);
             if (IsArr(t)) Fail(c, n->line, "you can't use %s on a whole array.", Lexer_TokenName(n->op));
+            if (IsStructPtr(t) || IsWholeStruct(t))
+                Fail(c, n->line, "%s doesn't work on nodes. To move along a list, use p = p->next.", Lexer_TokenName(n->op));
             CheckModifiable(c, t, n->a, n->line);
             Emit2(c, OP_INC_POST, n->op == TOK_PLUS_PLUS ? 1 : -1);
             return t;
@@ -1080,10 +1243,6 @@ static TypeInfo CompileValueRaw(Compiler *c, const Node *n)
             }
             return t;
         }
-
-        case NODE_MEMBER:
-            Fail(c, n->line, ". and -> are for structs and classes, which arrive in the Rail Yard world.");
-            break;
 
         case NODE_INIT_LIST:
             Fail(c, n->line, "{ } lists can only be used when creating an array.");
@@ -1158,7 +1317,16 @@ static void CompileVarDecl(Compiler *c, const Node *d)
     CheckNotInThisScope(c, d->name, d->line);
 
     int cells = 1;
-    if (IsArr(t))
+    if (t.base == TYPE_STRUCT && !IsPtr(t))
+    {
+        const StructDef *sd = FindStruct(c, t.structName, NULL);
+        if (IsArr(t))
+            Fail(c, d->line, "arrays of %s aren't available here. Link them together with pointers instead.", t.structName);
+        if (d->a && !t.isRef)
+            Fail(c, d->line, "a whole %s can't be given a starting value here. Set its fields one at a time.", t.structName);
+        if (!t.isRef) cells = sd ? sd->size : 1;
+    }
+    else if (IsArr(t))
     {
         cells = t.arraySize[0] * (t.arrayDims == 2 ? t.arraySize[1] : 1);
         if (cells > MAX_ARRAY_CELLS)
@@ -1175,7 +1343,7 @@ static void CompileVarDecl(Compiler *c, const Node *d)
                 Fail(c, d->line, "a reference must be linked to a variable, e.g. int &r = x;");
             EmitSlotAddress(c, sym, 0);
             TypeInfo at = CompileAddress(c, d->a);
-            if (IsArr(at) || at.base != t.base || at.pointerDepth != t.pointerDepth)
+            if (IsArr(at) || DifferentBase(at, t) || at.pointerDepth != t.pointerDepth)
                 Fail(c, d->line, "%s must be linked to a variable of the same type.", d->name);
             Emit(c, OP_STORE);
             Emit(c, OP_POP);
@@ -1316,6 +1484,20 @@ static void CompileStatement(Compiler *c, const Node *n)
             CompileValueRaw(c, n->a);
             Emit(c, OP_POP);
             break;
+
+        case NODE_STRUCT_DEF:      // laid out by RegisterStructs; makes no code
+            break;
+
+        case NODE_DELETE:
+        {
+            EmitLine(c, n->line);
+            TypeInfo t = CompileValue(c, n->a);
+            if (!IsStructPtr(t) && !(IsPtr(t) && t.base == TYPE_VOID))
+                Fail(c, n->line, "delete frees a node made with new, so it needs a pointer like %s*.",
+                     c->prog->structCount ? c->prog->structs[0].name : "Node");
+            Emit(c, OP_DELETE);
+            break;
+        }
 
         case NODE_IF:
         {
@@ -1459,6 +1641,18 @@ static void RegisterFunctions(Compiler *c, const Node *program)
         if (fn->kind != NODE_FUNCTION) continue;
 
         CheckNameAllowed(c, fn->name, fn->line, true);
+        if (IsWholeStruct(fn->type))
+            Fail(c, fn->line, "%s() can't return a whole %s here. Return a %s* instead.", fn->name,
+                 fn->type.structName, fn->type.structName);
+        for (int k = 0; k < fn->list.count; k++)
+        {
+            const Node *param = fn->list.items[k];
+            if (IsWholeStruct(param->type) && !param->type.isRef)
+                Fail(c, param->line, "passing a whole %s isn't available here. Pass a pointer (%s *%s) instead.",
+                     param->type.structName, param->type.structName, param->name[0] ? param->name : "n");
+            if (param->type.base == TYPE_STRUCT && IsArr(param->type))
+                Fail(c, param->line, "arrays of %s aren't available here.", param->type.structName);
+        }
         if (fn->type.isRef)
             Fail(c, fn->line, "%s() can't return a reference here. Return a value or a pointer.", fn->name);
         if (fn->list.count > VM_MAX_PARAMS)
@@ -1556,6 +1750,7 @@ bool Compiler_Compile(const Ast *ast, const VmOptions *options, Program *prog, V
     // Address 0 is NULL
     AllocStatic(&c, 1);
 
+    RegisterStructs(&c, ast->root);
     RegisterFunctions(&c, ast->root);
 
     // ---- The loose statements and global variables (funcs[0]) ----

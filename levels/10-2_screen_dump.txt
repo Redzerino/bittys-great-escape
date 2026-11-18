@@ -1,0 +1,62 @@
+title: 10.2  Screen Dump
+type: repair
+
+[story]
+Bitty: "Show me the whole screen: print the grid in rows and columns."
+Write PrintArray(): print the 4x6 array, one row per line, numbers separated by a space.
+
+[talk]
+@walk EAST 1
+Let's dump the screen so we can see it! Print each row on its own line.
+Put ONE space between the numbers in a row, but not after the last one. Then `"\n"` ends the row.
+`printf("%d", grid[row][col])` prints a number. In the exam, this is the only function allowed to use printf.
+
+[lesson]
+The grid prints like this:
+
+    0 0 3 1 3 4
+    0 0 2 3 4 3
+    0 0 1 3 3 2
+    0 0 1 1 1 1
+
+printf("%d", x)   prints the number x
+printf(" ")       a space
+printf("\n")      ends the line
+
+A space goes BETWEEN numbers, so print one
+only when col < 5 (not after the last one).
+
+Exam 1, Q19.
+
+[hint]
+Two loops again: rows outside, columns inside. Print each number with printf("%d", array[row][col]).
+After a number, print a space only if it isn't the last column (col < 5). After each row, print "\n".
+for (row...) { for (col...) { printf("%d", array[row][col]); if (col < 5) printf(" "); } printf("\n"); }
+
+[code]
+// STAGE 10.2: SCREEN DUMP
+// Print the 4x6 grid, one row per line,
+// with a single space between numbers:
+// 0 0 3 1 3 4
+// 0 0 2 3 4 3   ...
+
+void PrintArray(int array[4][6]) {
+
+}
+
+[solution]
+void PrintArray(int array[4][6]) {
+    for (int row = 0; row < 4; row++) {
+        for (int col = 0; col < 6; col++) {
+            printf("%d", array[row][col]);
+            if (col < 5) {
+                printf(" ");
+            }
+        }
+        printf("\n");
+    }
+}
+
+[tests]
+PrintArray({0, 0, 3, 1, 3, 4, 0, 0, 2, 3, 4, 3, 0, 0, 1, 3, 3, 2, 0, 0, 1, 1, 1, 1}) prints "0 0 3 1 3 4\n0 0 2 3 4 3\n0 0 1 3 3 2\n0 0 1 1 1 1\n"
+PrintArray({-2, -2, -2, -2, -2, -2, 1, 2, 3, 4, 1, 2, 0, 0, 0, 0, 0, 0, -1, 4, 4, 4, -1, 3}) prints "-2 -2 -2 -2 -2 -2\n1 2 3 4 1 2\n0 0 0 0 0 0\n-1 4 4 4 -1 3\n"

@@ -1,0 +1,98 @@
+title: 11.3  Push to Front
+type: repair
+
+[story]
+Bitty: "The fastest way to add to a linked list: put the new node at the very front."
+Write InsertAtBeginning(): make a node, link it in front of head, and return the new head.
+
+[talk]
+@walk EAST 1
+Adding at the front is quick: no walking needed!
+Make a new node. Point ITS `next` at the old head, so the old chain hangs off the back of it.
+The new node is now first, so return it. It's the new `head`.
+
+[lesson]
+Before:   head -> [2] -> [3] -> NULL
+
+    Node *n = new Node();
+    n->data = value;
+    n->next = head;     // new node points at the old first one
+    return n;           // ...and becomes the head
+
+After:    head -> [1] -> [2] -> [3] -> NULL
+
+The order matters: set n->next = head
+BEFORE you change head.
+
+Works on an empty list too: n->next is then
+nullptr, and n is the only node.
+
+Exam 2, Part 2: InsertAtBeginning.
+
+[hint]
+Make the new node with new and give it the value.
+Its next must point at the current first node: n->next = head;
+Node *n = new Node(); n->data = value; n->next = head; return n;
+
+[code]
+// STAGE 11.3: PUSH TO FRONT
+// Put a new node holding value at the FRONT of the
+// list and return the new head.
+
+struct Node {
+    int data;
+    Node *next;
+};
+
+Node* InsertAtBeginning(Node *head, int value) {
+
+    return head;
+}
+
+// ---- Bitty's test rig: leave this alone ----
+// Reads the list as one number: 1 -> 2 -> 3 gives 123
+int digits(Node *head) {
+    int number = 0;
+    for (Node *p = head; p != nullptr; p = p->next) number = number * 10 + p->data;
+    return number;
+}
+
+int testFront(int a, int b, int c) {
+    Node *head = nullptr;
+    head = InsertAtBeginning(head, a);
+    head = InsertAtBeginning(head, b);
+    head = InsertAtBeginning(head, c);
+    return digits(head);
+}
+
+[solution]
+struct Node {
+    int data;
+    Node *next;
+};
+
+Node* InsertAtBeginning(Node *head, int value) {
+    Node *n = new Node();
+    n->data = value;
+    n->next = head;
+    return n;
+}
+
+int digits(Node *head) {
+    int number = 0;
+    for (Node *p = head; p != nullptr; p = p->next) number = number * 10 + p->data;
+    return number;
+}
+
+int testFront(int a, int b, int c) {
+    Node *head = nullptr;
+    head = InsertAtBeginning(head, a);
+    head = InsertAtBeginning(head, b);
+    head = InsertAtBeginning(head, c);
+    return digits(head);
+}
+
+[tests]
+testFront(3, 2, 1) == 123
+testFront(1, 2, 3) == 321
+testFront(5, 5, 9) == 955

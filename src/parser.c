@@ -33,6 +33,7 @@
 #include <string.h>
 
 #define MAX_NESTING 150     // stops deeply nested code from overflowing the C stack
+#define MAX_STRUCT_NAMES 16
 
 typedef struct {
     const Token *tokens;
@@ -42,6 +43,10 @@ typedef struct {
     Ast         *ast;
     ParseResult *res;
     jmp_buf      jump;
+
+    // struct / class names written so far, so "Node *head;" is known to be a declaration
+    char         structNames[MAX_STRUCT_NAMES][STRUCT_NAME_MAX];
+    int          structCount;
 } Parser;
 
 typedef Node *(*ParseFn)(Parser *p);
@@ -204,6 +209,23 @@ static bool IsTypeStart(TokenType t)
     return IsBaseTypeToken(t) || t == TOK_CONST;
 }
 
+static bool IsStructName(const Parser *p, const char *name)
+{
+    for (int i = 0; i < p->structCount; i++)
+        if (strcmp(p->structNames[i], name) == 0) return true;
+    return false;
+}
+
+// Does a type start 'offset' tokens ahead?  int, const, struct Node, or a struct name like Node
+static bool IsTypeStartAt(const Parser *p, int offset)
+{
+    const Token *t = PeekAt(p, offset);
+    if (IsTypeStart(t->type) || t->type == TOK_STRUCT) return true;
+    return t->type == TOK_IDENT && IsStructName(p, t->text);
+}
+
+static bool IsTypeStartHere(const Parser *p) { return IsTypeStartAt(p, 0); }
+
 // Friendly errors for types that exist in C/C++ but not inside the machine.
 static void CheckUnsupportedType(Parser *p)
 {
@@ -233,6 +255,13 @@ static TypeInfo ParseBaseType(Parser *p)
 
     if (Match(p, TOK_CONST)) t.isConst = true;
 
+    if (Match(p, TOK_STRUCT))      // C style: struct Node *next;
+    {
+        const Token *name = Peek(p);
+        if (name->type != TOK_IDENT || !IsStructName(p, name->text))
+            ErrorAtToken(p, name, "there's no struct called %s. Write the struct { } first.", name->text);
+    }
+
     const Token *tok = Peek(p);
     switch (tok->type)
     {
@@ -240,6 +269,14 @@ static TypeInfo ParseBaseType(Parser *p)
         case TOK_CHAR: t.base = TYPE_CHAR; break;
         case TOK_BOOL: t.base = TYPE_BOOL; break;
         case TOK_VOID: t.base = TYPE_VOID; break;
+        case TOK_IDENT:
+            if (IsStructName(p, tok->text))
+            {
+                t.base = TYPE_STRUCT;
+                snprintf(t.structName, sizeof t.structName, "%.31s", tok->text);
+                break;
+            }
+            // fall through
         default:
             ErrorAtToken(p, tok, "expected a type (int, char, bool or void) but found %s.", Describe(tok));
     }
@@ -466,7 +503,9 @@ static bool LooksLikeFunction(const Parser *p)
 {
     int i = 0;
     if (PeekAt(p, i)->type == TOK_CONST) i++;
-    if (!IsBaseTypeToken(PeekAt(p, i)->type)) return false;
+    if (PeekAt(p, i)->type == TOK_STRUCT) i++;
+    const Token *base = PeekAt(p, i);
+    if (!IsBaseTypeToken(base->type) && !(base->type == TOK_IDENT && IsStructName(p, base->text))) return false;
     i++;
     if (PeekAt(p, i)->type == TOK_CONST) i++;
     while (PeekAt(p, i)->type == TOK_STAR) i++;
@@ -478,7 +517,7 @@ static Node *ParseParam(Parser *p)
 {
     const Token *start = Peek(p);
     CheckUnsupportedType(p);
-    if (!IsTypeStart(start->type))
+    if (!IsTypeStartHere(p))
         ErrorAtToken(p, start, "each parameter needs a type, e.g. int x. Found %s.", Describe(start));
 
     TypeInfo t = ParseBaseType(p);
@@ -609,7 +648,7 @@ static Node *ParseFor(Parser *p)
     {
         n->a = NULL;
     }
-    else if (IsTypeStart(Peek(p)->type))
+    else if (IsTypeStartHere(p))
     {
         n->a = ParseDeclarationEx(p, true);         // includes the ;
     }
@@ -726,6 +765,18 @@ static Node *ParseStatementInner(Parser *p)
         case TOK_SEMICOLON:
             return NewNode(p, NODE_EMPTY, Advance(p));
 
+        case TOK_DELETE:                              // delete p;
+            n = NewNode(p, NODE_DELETE, Advance(p));
+            n->a = ParseExpression(p);
+            ExpectSemicolon(p);
+            return n;
+
+        case TOK_STRUCT:
+        case TOK_CLASS:
+            if (PeekAt(p, 2)->type == TOK_LBRACE)
+                ErrorAtToken(p, t, "a %s has to be written outside every function, at the top of the code.", t->text);
+            break;
+
         case TOK_ELSE:
             ErrorAtToken(p, t, "this else has no matching if. Check the { } braces above it.");
             break;
@@ -745,7 +796,10 @@ static Node *ParseStatementInner(Parser *p)
 
     CheckUnsupportedType(p);
 
-    if (IsTypeStart(t->type))
+    // Node *head;  (a struct name followed by a name or *) is a declaration
+    bool structDecl = t->type == TOK_IDENT && IsStructName(p, t->text) &&
+                      (PeekAt(p, 1)->type == TOK_IDENT || PeekAt(p, 1)->type == TOK_STAR);
+    if (IsTypeStart(t->type) || t->type == TOK_STRUCT || structDecl)
     {
         if (LooksLikeFunction(p))
             ErrorAtToken(p, t, "a function can't be written inside another function. "
@@ -1035,6 +1089,32 @@ static Node *ParsePrimary(Parser *p)
         case TOK_NULL:
             return NewNode(p, NODE_NULL_LIT, Advance(p));
 
+        case TOK_NEW:                                // new Node   or   new Node()
+        {
+            n = NewNode(p, NODE_NEW, Advance(p));
+            const Token *name = Peek(p);
+            if (name->type != TOK_IDENT || !IsStructName(p, name->text))
+                ErrorAtToken(p, name, "new makes a struct or class you've written, e.g. new Node(). "
+                                      "%s isn't one.", Describe(name));
+            n->type.base = TYPE_STRUCT;
+            snprintf(n->type.structName, sizeof n->type.structName, "%.31s", name->text);
+            Advance(p);
+            if (Match(p, TOK_LPAREN))
+            {
+                if (!Check(p, TOK_RPAREN))
+                    ErrorAtToken(p, Peek(p), "constructors with values aren't available here. Write new %s() "
+                                             "and then set each field with ->.", n->type.structName);
+                Advance(p);
+                n->intValue = 1;      // new Node() sets every field to 0 / nullptr
+            }
+            return n;
+        }
+
+        case TOK_THIS:
+            ErrorAtToken(p, t, "'this' only exists inside class functions, which aren't available here. "
+                               "Write normal functions that take a pointer instead.");
+            break;
+
         case TOK_IDENT:
         {
             n = NewNode(p, NODE_IDENT, Advance(p));
@@ -1070,12 +1150,76 @@ static Node *ParsePrimary(Parser *p)
             break;
 
         default:
-            if (IsTypeStart(t->type))
+            if (IsTypeStartHere(p))
                 ErrorAtToken(p, t, "you can't declare a variable here. Declare it on its own line first.");
             ErrorAtToken(p, t, "expected a value or expression but found %s.", Describe(t));
             break;
     }
     return NULL;   // not reached: ErrorAt never returns
+}
+
+// ===========================================================================
+// Structs and classes:   struct Node { int data; Node *next; };
+//                        class Node { public: int data; Node *next = nullptr; };
+// Only fields: functions inside a class (methods, constructors) aren't supported.
+// ===========================================================================
+static Node *ParseStructDef(Parser *p)
+{
+    const Token *kw = Advance(p);                          // struct / class
+    const Token *name = Advance(p);
+    if (IsStructName(p, name->text))
+        ErrorAtToken(p, name, "there's already a struct called %s.", name->text);
+    if (p->structCount >= MAX_STRUCT_NAMES)
+        ErrorAtToken(p, name, "that's too many structs for the machine.");
+    snprintf(p->structNames[p->structCount++], STRUCT_NAME_MAX, "%.31s", name->text);   // known from here on
+
+    Node *def = NewNode(p, NODE_STRUCT_DEF, name);
+    SetName(def, name->text);
+    Expect(p, TOK_LBRACE, "{");
+
+    while (!Check(p, TOK_RBRACE))
+    {
+        if ((Check(p, TOK_PUBLIC) || Check(p, TOK_PRIVATE)) && PeekAt(p, 1)->type == TOK_COLON)
+        {
+            Advance(p); Advance(p);                        // public:  (everything is reachable here)
+            continue;
+        }
+        if (Check(p, TOK_EOF))
+            ErrorAtToken(p, kw, "this %s is missing its closing };", kw->text);
+
+        const Token *start = Peek(p);
+        if (start->type == TOK_IDENT && strcmp(start->text, def->name) == 0 && PeekAt(p, 1)->type == TOK_LPAREN)
+            ErrorAtToken(p, start, "constructors aren't available here. Make the %s with new %s() and set "
+                                   "its fields with ->.", def->name, def->name);
+        if (!IsTypeStartHere(p))
+            ErrorAtToken(p, start, "expected a field like int data; inside the %s but found %s.",
+                         kw->text, Describe(start));
+        if (LooksLikeFunction(p))
+            ErrorAtToken(p, start, "functions inside a %s (methods) aren't available here. Write it as a normal "
+                                   "function that takes a %s* instead.", kw->text, def->name);
+
+        TypeInfo base = ParseBaseType(p);
+        do
+        {
+            Node *field = ParseDeclarator(p, base);
+            if (field->type.isRef)
+                ErrorAt(p, field->line, field->col, "a field can't be a reference (&). Use a pointer.");
+            if (field->type.base == TYPE_STRUCT && field->type.pointerDepth == 0)
+                ErrorAt(p, field->line, field->col, "a field can hold a pointer to a %s (%s *%s), but not a whole one.",
+                        field->type.structName, field->type.structName, field->name);
+            if (field->a && field->type.arrayDims > 0)
+                ErrorAt(p, field->a->line, field->a->col, "array fields can't have a starting value here.");
+            AddChild(p, &def->list, field);
+        } while (Match(p, TOK_COMMA));
+        ExpectSemicolon(p);
+    }
+    Advance(p);                                            // }
+    if (!Check(p, TOK_SEMICOLON))
+        ErrorAtToken(p, Previous(p), "a %s ends with }; (don't forget the ;).", kw->text);
+    Advance(p);
+    if (def->list.count == 0)
+        ErrorAtToken(p, name, "%s needs at least one field, e.g. int data;", def->name);
+    return def;
 }
 
 // ===========================================================================
@@ -1095,8 +1239,11 @@ static Node *ParseProgram(Parser *p)
             continue;
         }
 
-        if (LooksLikeFunction(p)) AddChild(p, &program->list, ParseFunction(p));
-        else                      AddChild(p, &program->list, ParseStatement(p));
+        if ((Check(p, TOK_STRUCT) || Check(p, TOK_CLASS)) && PeekAt(p, 1)->type == TOK_IDENT &&
+            PeekAt(p, 2)->type == TOK_LBRACE)
+            AddChild(p, &program->list, ParseStructDef(p));
+        else if (LooksLikeFunction(p)) AddChild(p, &program->list, ParseFunction(p));
+        else                           AddChild(p, &program->list, ParseStatement(p));
     }
     return program;
 }

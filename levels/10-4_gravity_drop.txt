@@ -1,0 +1,81 @@
+title: 10.4  Gravity Drop
+type: repair
+
+[story]
+Bitty: "Blanked pixels leave holes. Let everything above them fall down, and fill the top with -2."
+Write FallDownAndReplace(): remove the -1's column by column.
+
+[talk]
+@walk EAST 1
+After a cluster is blanked, the -1's are holes. Everything above a hole falls down to fill it.
+Work one column at a time, from the BOTTOM up. Keep a `fill` row: the lowest box still waiting to be filled.
+Every box that isn't -1 drops into `fill`, and fill moves up. Whatever is left at the top becomes -2.
+
+[lesson]
+One column, bottom to top:
+
+    3          -2
+    2    ->     3
+    1           2
+   -1           1
+
+int fill = 3;                 // bottom row
+for (int row = 3; row >= 0; row--) {
+    if (array[row][col] != -1) {
+        array[fill][col] = array[row][col];
+        fill--;
+    }
+}
+// rows 0 .. fill are now empty:
+for (int row = fill; row >= 0; row--)
+    array[row][col] = -2;
+
+Exam 1, Q21.
+
+[hint]
+Go column by column. In each column, keep a fill row starting at the bottom (3), and walk row from 3 up to 0.
+When array[row][col] isn't -1, copy it down to array[fill][col] and move fill up by one.
+After the walk, set array[r][col] = -2 for every r from fill up to 0.
+
+[code]
+// STAGE 10.4: GRAVITY DROP
+// Remove the -1's: everything above a -1 falls
+// down into the space. New boxes at the top
+// become -2. Work column by column.
+// Fill in the gold gaps!
+
+void FallDownAndReplace(int array[4][6]) {
+    for (int col = 0; col < 6; col++) {
+        int fill = 3;
+        for (int row = 3; row >= 0; row--) {
+            if (array[row][col] != -1) {
+                array[___][col] = array[row][col];
+                ___;
+            }
+        }
+        for (int row = fill; row >= 0; row--) {
+            array[row][col] = ___;
+        }
+    }
+}
+
+[solution]
+void FallDownAndReplace(int array[4][6]) {
+    for (int col = 0; col < 6; col++) {
+        int fill = 3;
+        for (int row = 3; row >= 0; row--) {
+            if (array[row][col] != -1) {
+                array[fill][col] = array[row][col];
+                fill--;
+            }
+        }
+        for (int row = fill; row >= 0; row--) {
+            array[row][col] = -2;
+        }
+    }
+}
+
+[tests]
+FallDownAndReplace({0, 0, 3, 1, 3, 4, 0, 0, 2, 3, 4, 3, 0, 0, 1, 3, 3, 2, 0, 0, -1, -1, -1, -1}) then #1 == {0, 0, -2, -2, -2, -2, 0, 0, 3, 1, 3, 4, 0, 0, 2, 3, 4, 3, 0, 0, 1, 3, 3, 2}
+FallDownAndReplace({1, -1, 1, 2, 1, 2, 3, -1, 4, 1, 4, 1, 1, -1, 1, 4, 1, 4, 2, 1, 2, 1, 2, 1}) then #1 == {1, -2, 1, 2, 1, 2, 3, -2, 4, 1, 4, 1, 1, -2, 1, 4, 1, 4, 2, 1, 2, 1, 2, 1}
+FallDownAndReplace({1, 2, 3, 4, 1, 2, 3, 4, -1, -1, -1, 1, 4, 1, 3, 2, 3, 3, 1, 3, 1, 2, 1, 2}) then #1 == {1, 2, -2, -2, -2, 2, 3, 4, 3, 4, 1, 1, 4, 1, 3, 2, 3, 3, 1, 3, 1, 2, 1, 2}

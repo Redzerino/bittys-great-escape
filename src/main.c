@@ -267,10 +267,15 @@ static void LoadLevel(Game *g, int index, bool keepOldCode)
     VisualLearning_Enter();
     g->repairTest = 0;
     g->validating = false;
+    // First visit: Bitty walks in and explains the idea, then his notes open.
+    // Coming back to a level you've already cleared skips straight to the code.
     g->introDone = true;
     g->world.talking = false;
-    Talk_Skip();
     g->showLesson = false;
+    if (lv->talk[0] && !Save_IsDone(lv->file))
+        Talk_Start(lv->talk);
+    else
+        Talk_Skip();
     g->hintStep = 0;
 }
 
@@ -379,7 +384,7 @@ static void FinishRun(Game *g)
 static void CompleteStage(Game *g)
 {
     g->validating = false;
-    g->showEnding = strcmp(Levels_Get(g->level)->file, "9-5_bitty_breaks_free.txt") == 0;
+    g->showEnding = strcmp(Levels_Get(g->level)->file, "12-5_bitty_breaks_free.txt") == 0;
     if(g->showEnding)Ending_Reset();
     g->world.state = WORLD_WON;
     g->world.mood = MOOD_HAPPY;
@@ -713,6 +718,7 @@ static void RunTestFrame(Game *g, float dt)
     if (g->stepping && World_RoomBusy(&g->world) && !ff) return;
 
     int line = Vm_CurrentLine(g->vm);       // the line about to run
+    if (line <= 0) td->askGuesses = false;  // the first step only hands the function its arguments: nothing to guess
     if (g->stepping && (s == VM_PAUSED || s == VM_RUNNING))
     {
         // step mode: one line each time the player presses STEP
@@ -1668,10 +1674,16 @@ int main(void)
 
         if(g->showEnding)
         {
-            int completed=0;
-            for(int i=0;i<Levels_Count();i++)if(Save_IsDone(Levels_Get(i)->file))completed++;
+            // Count the same stages as the circuit map does (the optional bootcamp isn't one of them)
+            int completed=0,total=0;
+            for(int i=0;i<Levels_Count();i++)
+            {
+                if(Circuit_IsBootcamp(i))continue;
+                total++;
+                if(Save_IsDone(Levels_Get(i)->file))completed++;
+            }
             BeginDrawing();
-            bool back=Ending_Draw(g->codeFont,dt,completed,Levels_Count());
+            bool back=Ending_Draw(g->codeFont,dt,completed,total);
             EndDrawing();
             if(back){g->showEnding=false;g->showCircuit=true;Circuit_SelectLevel(g->level);}
             continue;
@@ -1780,8 +1792,11 @@ int main(void)
             else
             {
                 DrawWorldPanel(g);
+                // Name the mode in the panel's title bar, like RUN's "WATCH MODE", so the two read as one tool
                 if(g->lastRunStepped && visualLevel->type==LEVEL_REPAIR)
-                    DrawTextEx(g->codeFont,"STEP: predict, then advance one line",(Vector2){WORLD_PANEL.x+12,WORLD_PANEL.y+32},14,0,SKYBLUE);
+                    DrawTextEx(g->codeFont, g->mode == MODE_RUNNING ? "GUESS MODE: guess, then press STEP"
+                                                                    : "GUESS MODE: RUN to watch, STEP again",
+                               (Vector2){ WORLD_PANEL.x + 96, WORLD_PANEL.y + 7 }, 14, 0, (Color){ 255, 205, 90, 255 });
             }
             DrawQuiz(g);
             Talk_Draw(WORLD_PANEL, g->codeFont);

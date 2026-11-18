@@ -26,14 +26,17 @@
 #include "lexer.h"
 
 // ---------------------------------------------------------------------------
-// Types:  int, char*, int&, int[5], int[4][6], const char ...
+// Types:  int, char*, int&, int[5], int[4][6], const char, Node* ...
 // ---------------------------------------------------------------------------
 typedef enum {
     TYPE_INT = 0,
     TYPE_CHAR,
     TYPE_BOOL,
-    TYPE_VOID
+    TYPE_VOID,
+    TYPE_STRUCT         // a struct or class the player wrote; its name is in TypeInfo.structName
 } BaseType;
+
+#define STRUCT_NAME_MAX 32
 
 #define MAX_ARRAY_DIMS 2
 
@@ -44,6 +47,7 @@ typedef struct {
     bool     isRef;                       // C++ reference: int &x
     int      arrayDims;                   // 0 = not an array, 1 = int a[5], 2 = int a[4][6]
     int      arraySize[MAX_ARRAY_DIMS];   // -1 = size not given, e.g. a parameter int arr[]
+    char     structName[STRUCT_NAME_MAX]; // TYPE_STRUCT: e.g. "Node"
 } TypeInfo;
 
 // ---------------------------------------------------------------------------
@@ -66,6 +70,7 @@ typedef enum {
     NODE_INDEX,         // arr[i]           a = array, b = index
     NODE_MEMBER,        // n.next n->next   a = object, name = member, isArrow
     NODE_INIT_LIST,     // {1, 2, 3}        list = values (may contain nested lists)
+    NODE_NEW,           // new Node()       type = the struct, intValue = 1 if () was written
 
     // ---- Statements ----
     NODE_VAR_DECL,      // int x = 5;       type, name, a = initial value (or NULL)
@@ -82,10 +87,12 @@ typedef enum {
     NODE_RETURN,        // return x;        a = value (or NULL)
     NODE_EXPR_STMT,     // move(NORTH);     a = expression
     NODE_EMPTY,         // ;
+    NODE_DELETE,        // delete p;        a = the pointer
 
     // ---- Top level ----
     NODE_FUNCTION,      // int f(int a) {}  type = return type, name, list = PARAMs, a = body (NULL = prototype)
     NODE_PARAM,         // int a            type, name (may be empty in a prototype)
+    NODE_STRUCT_DEF,    // struct Node {}   name, list = VAR_DECLs (the fields, maybe with = default)
     NODE_PROGRAM,       // whole program    list = functions, globals and loose statements, in order
 
     NODE_KIND_COUNT

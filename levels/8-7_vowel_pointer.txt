@@ -1,0 +1,77 @@
+title: 8.7  Vowel Pointer
+type: repair
+ban_indexing: yes
+
+[story]
+Bitty: "Count the vowels again, but this time with a pointer and no [ ]."
+Write count_vowels(): walk the string with a pointer until '\0'.
+
+[talk]
+@walk EAST 1
+Remember End of Message? Same job, new tool: walk the string with a POINTER.
+`*p` is the letter the pointer is on. `p++` moves it to the next letter. Stop when `*p` is `'\0'`.
+Careful with "OpenAI": O, e, A AND I. That's 4 vowels, not 3!
+
+[lesson]
+Walking a string with a pointer:
+
+    char *p = str;           // start at the front
+    while (*p != '\0') {     // until the end
+        char c = *p;         // the letter here
+        ...
+        p++;                 // next letter
+    }
+
+Vowels: a e i o u, small or capital.
+
+Heads up: the Exam 2 sheet says "OpenAI"
+has 3 vowels. It has 4 (O, e, A, I).
+
+Exam 2, count_vowels.
+
+[hint]
+Use a pointer p that starts at str and moves along with p++ until *p is '\0'.
+For each letter c = *p, add 1 to count if it's any of a e i o u A E I O U (join the tests with ||).
+while (*p != '\0') { char c = *p; if (c == 'a' || c == 'e' || ... || c == 'U') count++; p++; }
+
+[code]
+// STAGE 8.7: VOWEL POINTER
+// Count the vowels (a e i o u, small or capital)
+// using a pointer. [ ] is not allowed!
+// count_vowels("OpenAI") -> 4
+
+int count_vowels(char *str) {
+    int count = 0;
+    char *p = str;
+    while (___) {
+        char c = *p;
+        if (c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u' ||
+            c == 'A' || c == 'E' || c == 'I' || c == 'O' || c == 'U') {
+            count++;
+        }
+        ___;
+    }
+    return count;
+}
+
+[solution]
+int count_vowels(char *str) {
+    int count = 0;
+    char *p = str;
+    while (*p != '\0') {
+        char c = *p;
+        if (c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u' ||
+            c == 'A' || c == 'E' || c == 'I' || c == 'O' || c == 'U') {
+            count++;
+        }
+        p++;
+    }
+    return count;
+}
+
+[tests]
+count_vowels("OpenAI") == 4
+count_vowels("Bitty") == 1
+count_vowels("AEIOU") == 5
+count_vowels("rhythm") == 0
+count_vowels("") == 0

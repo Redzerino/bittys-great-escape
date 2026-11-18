@@ -1,0 +1,67 @@
+title: 9.3  Make Room
+type: repair
+
+[story]
+Bitty: "A new box has to squeeze in at a set position. Everything after it shuffles right."
+Write insertElement(). Return false if the array is full or the position is wrong.
+
+[talk]
+@walk EAST 1
+A new value has to squeeze in at `insertIndex`. Everything from there onwards moves one box right.
+Start shuffling from the END, or you'll copy one value over and over! Then drop the new value in and add 1 to `count`.
+`size` is how many boxes there are, `count` is how many are in use. No room left, or a silly position? Return false.
+
+[lesson]
+size  = how many boxes the array has
+count = how many are in use (the rest are spare)
+
+Insert 9 at index 1 in {1, 2, 3, _, _}:
+    {1, 2, 3, 3, _}    shift from the END
+    {1, 2, 2, 3, _}
+    {1, 9, 2, 3, _}    drop it in, count++
+
+for (int i = count; i > insertIndex; i--)
+    arr[i] = arr[i - 1];
+
+Can't insert if:  count >= size  (full)
+or insertIndex < 0 or insertIndex > count.
+
+int& count: the caller's real count changes.
+
+Exam 1, Q11.
+
+[hint]
+First check for the false cases: the array is full (count >= size), or insertIndex < 0, or insertIndex > count.
+Shuffle from the end backwards: for (int i = count; i > insertIndex; i--) arr[i] = arr[i - 1];
+Then arr[insertIndex] = elementToInsert; count++; return true;
+
+[code]
+// STAGE 9.3: MAKE ROOM
+// Insert elementToInsert at insertIndex, shifting
+// the rest right. count is how many are in use.
+// Return false if it's full or the index is wrong.
+
+bool insertElement(int& size, int& count, int arr[], int elementToInsert, int insertIndex) {
+
+    return false;
+}
+
+[solution]
+bool insertElement(int& size, int& count, int arr[], int elementToInsert, int insertIndex) {
+    if (count >= size || insertIndex < 0 || insertIndex > count) {
+        return false;
+    }
+    for (int i = count; i > insertIndex; i--) {
+        arr[i] = arr[i - 1];
+    }
+    arr[insertIndex] = elementToInsert;
+    count++;
+    return true;
+}
+
+[tests]
+insertElement(&5, &3, {1, 2, 3, 0, 0}, 9, 1) == true then #3 == {1, 9, 2, 3, 0}, #2 == 4
+insertElement(&4, &2, {4, 5, 0, 0}, 7, 2) == true then #3 == {4, 5, 7, 0}, #2 == 3
+insertElement(&4, &2, {4, 5, 0, 0}, 7, 0) == true then #3 == {7, 4, 5, 0}, #2 == 3
+insertElement(&3, &3, {1, 2, 3}, 9, 0) == false then #3 == {1, 2, 3}, #2 == 3
+insertElement(&5, &2, {4, 5, 0, 0, 0}, 7, 3) == false then #2 == 2

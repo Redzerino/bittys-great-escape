@@ -1,4 +1,4 @@
-title: 9.2  Transfer Buffer
+title: 12.2  Transfer Buffer
 type: repair
 ban_indexing: yes
 
@@ -33,7 +33,7 @@ Loop while *src != '\0'. After the loop, put a '\0' on the end of dest.
 while (*src != '\0') { *dest = *src; dest++; src++; } then *dest = '\0';
 
 [code]
-// STAGE 9.2: TRANSFER BUFFER
+// STAGE 12.2: TRANSFER BUFFER
 // Copy src into dest, WITHOUT [ ].
 // Don't forget the '\0'!
 

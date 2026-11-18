@@ -1,0 +1,67 @@
+title: 9.4  Close the Gap
+type: repair
+
+[story]
+Bitty: "This box is corrupt. Delete it and slide everything after it left to close the gap."
+Write deleteElement(). Return false if deleteIndex isn't a box in use.
+
+[talk]
+@walk EAST 1
+The opposite of Make Room: delete the box at `deleteIndex` and close the gap.
+This time shuffle from the FRONT: each box takes the value from the box to its right.
+Then the old last box is spare: put 0 in it and take 1 off `count`. A bad index? Return false.
+
+[lesson]
+Delete index 1 from {1, 2, 3, 4, _}:
+    {1, 3, 3, 4, _}    shift from the FRONT
+    {1, 3, 4, 4, _}
+    {1, 3, 4, 0, _}    clear the spare, count--
+
+for (int i = deleteIndex; i < count - 1; i++)
+    arr[i] = arr[i + 1];
+arr[count - 1] = 0;
+count--;
+
+Can't delete if deleteIndex < 0
+or deleteIndex >= count.
+
+(The lab doesn't say what to leave in the
+spare box. This level puts 0 there.)
+
+Exam 1, Q12.
+
+[hint]
+First return false if deleteIndex < 0 or deleteIndex >= count.
+Shuffle from the front: for (int i = deleteIndex; i < count - 1; i++) arr[i] = arr[i + 1];
+Then arr[count - 1] = 0; count--; return true;
+
+[code]
+// STAGE 9.4: CLOSE THE GAP
+// Delete the element at deleteIndex and slide
+// everything after it one box left. Put 0 in
+// the box that's now spare, and update count.
+
+bool deleteElement(int& size, int& count, int arr[], int deleteIndex) {
+
+    return false;
+}
+
+[solution]
+bool deleteElement(int& size, int& count, int arr[], int deleteIndex) {
+    if (deleteIndex < 0 || deleteIndex >= count) {
+        return false;
+    }
+    for (int i = deleteIndex; i < count - 1; i++) {
+        arr[i] = arr[i + 1];
+    }
+    arr[count - 1] = 0;
+    count--;
+    return true;
+}
+
+[tests]
+deleteElement(&5, &4, {1, 2, 3, 4, 0}, 1) == true then #3 == {1, 3, 4, 0, 0}, #2 == 3
+deleteElement(&3, &3, {7, 8, 9}, 2) == true then #3 == {7, 8, 0}, #2 == 2
+deleteElement(&3, &3, {7, 8, 9}, 0) == true then #3 == {8, 9, 0}, #2 == 2
+deleteElement(&4, &2, {5, 6, 0, 0}, 2) == false then #3 == {5, 6, 0, 0}, #2 == 2
+deleteElement(&4, &2, {5, 6, 0, 0}, -1) == false then #2 == 2

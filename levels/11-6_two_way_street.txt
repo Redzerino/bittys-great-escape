@@ -1,0 +1,161 @@
+title: 11.6  Two-Way Street
+type: repair
+
+[story]
+Bitty: "A doubly linked list! Every node points forwards AND backwards, and the list knows its head and its tail."
+Write InsertAtBeginning() and InsertAtEnd() for a DoublyLinkedList.
+
+[talk]
+@walk EAST 1
+Each `DoublyLinkedNode` has TWO pointers: `nextPointer` forwards and `prevPointer` backwards. The list keeps `head` and `tail`.
+Adding at the front: the new node's next is the old head, and the old head's prev is the new node. Then it's the new head.
+If the list was empty, the new node is the head AND the tail. `InsertAtEnd` is the mirror image, using the tail.
+
+[lesson]
+NULL <- [1] <-> [2] <-> [3] -> NULL
+        head           tail
+
+InsertAtBeginning(list, value):
+    n->nextPointer = list->head;
+    if (list->head != nullptr)
+        list->head->prevPointer = n;
+    else
+        list->tail = n;          // was empty
+    list->head = n;
+
+InsertAtEnd is the mirror: swap head/tail
+and nextPointer/prevPointer.
+
+Every link goes BOTH ways, so fix both ends.
+
+Exam 2, Part 2: DoublyLinkedList.
+
+[hint]
+Front: make n, set n->nextPointer = list->head. If there was a head, its prevPointer becomes n; if not, n is also the tail. Then list->head = n.
+End: the mirror. n->prevPointer = list->tail. If there was a tail, its nextPointer becomes n; if not, n is also the head. Then list->tail = n.
+The test rig reads the list both ways, so if one direction is wrong, a prevPointer or nextPointer link is missing.
+
+[code]
+// STAGE 11.6: TWO-WAY STREET
+// Write InsertAtBeginning and InsertAtEnd for a
+// doubly linked list. Keep head, tail, nextPointer
+// and prevPointer all correct!
+
+class DoublyLinkedNode {
+public:
+    int data = 0;
+    DoublyLinkedNode *prevPointer = nullptr;
+    DoublyLinkedNode *nextPointer = nullptr;
+};
+
+class DoublyLinkedList {
+public:
+    DoublyLinkedNode *head = nullptr;
+    DoublyLinkedNode *tail = nullptr;
+};
+
+void InsertAtBeginning(DoublyLinkedList *list, int value) {
+    DoublyLinkedNode *n = new DoublyLinkedNode();
+    n->data = value;
+
+}
+
+void InsertAtEnd(DoublyLinkedList *list, int value) {
+    DoublyLinkedNode *n = new DoublyLinkedNode();
+    n->data = value;
+
+}
+
+// ---- Bitty's test rig: leave this alone ----
+// Reads the list front to back (1 2 3 -> 123) and back to front (321)
+int forwards(DoublyLinkedList *list) {
+    int number = 0;
+    for (DoublyLinkedNode *p = list->head; p != nullptr; p = p->nextPointer) number = number * 10 + p->data;
+    return number;
+}
+int backwards(DoublyLinkedList *list) {
+    int number = 0;
+    for (DoublyLinkedNode *p = list->tail; p != nullptr; p = p->prevPointer) number = number * 10 + p->data;
+    return number;
+}
+
+int testForwards(int a, int b, int c) {
+    DoublyLinkedList *list = new DoublyLinkedList();
+    InsertAtEnd(list, b);
+    InsertAtBeginning(list, a);
+    InsertAtEnd(list, c);
+    return forwards(list);
+}
+int testBackwards(int a, int b, int c) {
+    DoublyLinkedList *list = new DoublyLinkedList();
+    InsertAtBeginning(list, b);
+    InsertAtEnd(list, c);
+    InsertAtBeginning(list, a);
+    return backwards(list);
+}
+
+[solution]
+class DoublyLinkedNode {
+public:
+    int data = 0;
+    DoublyLinkedNode *prevPointer = nullptr;
+    DoublyLinkedNode *nextPointer = nullptr;
+};
+
+class DoublyLinkedList {
+public:
+    DoublyLinkedNode *head = nullptr;
+    DoublyLinkedNode *tail = nullptr;
+};
+
+void InsertAtBeginning(DoublyLinkedList *list, int value) {
+    DoublyLinkedNode *n = new DoublyLinkedNode();
+    n->data = value;
+    n->nextPointer = list->head;
+    if (list->head != nullptr) list->head->prevPointer = n;
+    else list->tail = n;
+    list->head = n;
+}
+
+void InsertAtEnd(DoublyLinkedList *list, int value) {
+    DoublyLinkedNode *n = new DoublyLinkedNode();
+    n->data = value;
+    n->prevPointer = list->tail;
+    if (list->tail != nullptr) list->tail->nextPointer = n;
+    else list->head = n;
+    list->tail = n;
+}
+
+// ---- Bitty's test rig: leave this alone ----
+// Reads the list front to back (1 2 3 -> 123) and back to front (321)
+int forwards(DoublyLinkedList *list) {
+    int number = 0;
+    for (DoublyLinkedNode *p = list->head; p != nullptr; p = p->nextPointer) number = number * 10 + p->data;
+    return number;
+}
+int backwards(DoublyLinkedList *list) {
+    int number = 0;
+    for (DoublyLinkedNode *p = list->tail; p != nullptr; p = p->prevPointer) number = number * 10 + p->data;
+    return number;
+}
+
+int testForwards(int a, int b, int c) {
+    DoublyLinkedList *list = new DoublyLinkedList();
+    InsertAtEnd(list, b);
+    InsertAtBeginning(list, a);
+    InsertAtEnd(list, c);
+    return forwards(list);
+}
+int testBackwards(int a, int b, int c) {
+    DoublyLinkedList *list = new DoublyLinkedList();
+    InsertAtBeginning(list, b);
+    InsertAtEnd(list, c);
+    InsertAtBeginning(list, a);
+    return backwards(list);
+}
+
+[tests]
+testForwards(1, 2, 3) == 123
+testBackwards(1, 2, 3) == 321
+testForwards(4, 5, 6) == 456
+testBackwards(7, 8, 9) == 987

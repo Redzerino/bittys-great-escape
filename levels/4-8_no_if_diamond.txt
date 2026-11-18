@@ -1,0 +1,53 @@
+title: 4.8  No-If Diamond
+type: repair
+
+[story]
+Bitty: "Same pyramid. But this terminal has no if statements at all!"
+Write drawIsocelesTriangle2(): 2 for loops, no if, no else, no ? :.
+
+[talk]
+@walk EAST 1
+Same pyramid as before, but this terminal has NO `if` statements!
+Here's the trick: a loop's condition can check two things at once with `&&`.
+Stop the A's when you reach the row number, OR when you reach `8 - row`, whichever comes first.
+
+[lesson]
+A for loop's condition is a question it asks
+every turn. It can ask two things with &&:
+
+for (int i = 1; i <= row && i <= 8 - row; i++)
+
+  row 2:  i <= 2  and  i <= 6   -> stops at 2
+  row 6:  i <= 6  and  i <= 2   -> stops at 2
+
+So the loop stops at whichever number is
+SMALLER. No if needed!
+
+Exam 1, Q19 (extra).
+
+[hint]
+The number of A's on a row is the smaller of row and 8 - row.
+A loop condition can test both: keep going only while i <= row && i <= 8 - row.
+for (int row = 1; row <= 7; row++) { for (int i = 1; i <= row && i <= 8 - row; i++) printf("A"); printf("\n"); }
+
+[code]
+// STAGE 4.8: NO-IF DIAMOND
+// Print the same 7-row pyramid,
+// using 2 for loops and NO if / else.
+
+void drawIsocelesTriangle2() {
+
+}
+
+[solution]
+void drawIsocelesTriangle2() {
+    for (int row = 1; row <= 7; row++) {
+        for (int i = 1; i <= row && i <= 8 - row; i++) {
+            printf("A");
+        }
+        printf("\n");
+    }
+}
+
+[tests]
+drawIsocelesTriangle2() prints "A\nAA\nAAA\nAAAA\nAAA\nAA\nA\n"
