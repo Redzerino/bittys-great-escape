@@ -33,9 +33,21 @@ typedef struct {
     bool token, fromTemp, toTemp;
     char registerName[16];
     bool character;
+    char explain[240];      // step mode: what this line does, in plain English
+    char written[64];       // variables this line wrote to (even with the same value)
 } SwapFrame;
 static SwapFrame swapFrames[16];
 static int swapCount;
+
+// STEP mode uses this same picture as RUN, one line per press. Every line
+// that has run is kept, so BACK can show it again.
+#define HISTORY_MAX 160
+static bool stepMode;
+static SwapFrame history[HISTORY_MAX];
+static int historyCount, viewIndex=-1;   // viewIndex: the line on screen
+static bool replaying;                   // swapFrames[0] is a replay of history[viewIndex]
+static bool nextRequested;
+static VmVisualTrace prevTrace;          // the trace before the line being recorded
 static float swapTime;
 static bool swapMode, replayRequested, walkthroughMode;
 static int lastReadRow, lastReadIndex=-1, lastReadValue;
@@ -56,17 +68,65 @@ void VisualLearning_SetFunction(const char *name)
     walkthroughMode=true;
     snprintf(functionName,sizeof functionName,"%s",name);
 }
-int VisualLearning_CurrentLine(void){return swapCount?swapFrames[0].line:0;}
+int VisualLearning_CurrentLine(void)
+{
+    if(swapCount)return swapFrames[0].line;
+    if(stepMode&&viewIndex>=0&&viewIndex<historyCount)return history[viewIndex].line;
+    return 0;
+}
+void VisualLearning_SetStepping(bool on){stepMode=on;}
+bool VisualLearning_TakeNext(void){bool n=nextRequested;nextRequested=false;return n;}
+void VisualLearning_ExplainLast(const char *text)
+{
+    if(swapCount)snprintf(swapFrames[swapCount-1].explain,sizeof swapFrames[0].explain,"%s",text);
+}
+// The frame on screen has finished animating: mark the cells, and in step mode keep it
+static void FinishFrame(void)
+{
+    if(!swapCount)return;
+    SwapFrame *f=&swapFrames[0];
+    if(f->sourceIndex>=0)visited[f->sourceRow][f->sourceIndex]=1;
+    if(f->destIndex>=0)visited[f->destRow][f->destIndex]=2;
+    if(stepMode&&!replaying)
+    {
+        if(historyCount==HISTORY_MAX){memmove(history,history+1,(HISTORY_MAX-1)*sizeof history[0]);historyCount--;}
+        history[historyCount++]=*f;
+        viewIndex=historyCount-1;
+    }
+    replaying=false;
+    memmove(swapFrames,swapFrames+1,(--swapCount)*sizeof swapFrames[0]);swapTime=0;
+}
+static void Replay(int index)
+{
+    viewIndex=index;
+    swapFrames[0]=history[index];swapCount=1;swapTime=0;replaying=true;
+}
+// NEXT: returns true if it was handled here (moving forward through lines already
+// seen); false means the game should run the next real line.
+bool VisualLearning_StepForward(void)
+{
+    bool wasReplay=replaying;
+    FinishFrame();
+    if(viewIndex>=0&&viewIndex<historyCount-1){Replay(viewIndex+1);return true;}
+    (void)wasReplay;
+    return false;
+}
+void VisualLearning_StepBack(void)
+{
+    FinishFrame();
+    if(viewIndex>0)Replay(viewIndex-1);
+}
 bool VisualLearning_TakeReplay(void)
 {
     bool requested=replayRequested;replayRequested=false;return requested;
 }
 void VisualLearning_ObserveLine(const TestDisplay *td,const VmAccess *log,int logCount,int line,const char *code)
 {
-    if(!walkthroughMode||td->fastForward||line<=0||logCount<=0||swapCount>=16)return;
+    if(!walkthroughMode||td->fastForward||line<=0||(logCount<=0&&!stepMode)||swapCount>=16)return;
     SwapFrame *frame=&swapFrames[swapCount++];
     memset(frame,0,sizeof *frame);
     frame->before=*td;frame->after=*td;frame->line=line;
+    frame->before.trace=prevTrace;prevTrace=td->trace;
     for(int k=0;k<frame->before.wireCount;k++)
         for(int j=0;j<previousSwapWireCount;j++)
             if(!strcmp(frame->before.wires[k].name,previousSwapWires[j].name))frame->before.wires[k]=previousSwapWires[j];
@@ -93,6 +153,9 @@ void VisualLearning_ObserveLine(const TestDisplay *td,const VmAccess *log,int lo
             else {frame->sourceRow=row;frame->sourceIndex=index;frame->value=log[i].value;lastReadRow=row;lastReadIndex=index;lastReadValue=log[i].value;}
             frame->character=td->rows[row].isChar;
         }
+        for(int r=0;r<td->regCount;r++)
+            if(log[i].write&&td->regs[r].address==log[i].address&&strlen(frame->written)+strlen(td->regs[r].name)<60)
+            { strcat(frame->written,td->regs[r].name); strcat(frame->written,","); }
         for(int r=0;r<td->regCount;r++)
             if(td->regs[r].address==log[i].address&&(!strcmp(td->regs[r].name,"temp")||!strcmp(td->regs[r].name,"max")||!strcmp(td->regs[r].name,"total")||!strcmp(td->regs[r].name,"count")))
             {
@@ -132,7 +195,8 @@ static const char *OperationText(const VmVisualTrace *t)
 
 void VisualLearning_Reset(void)
 {
-    swapCount=0;swapTime=0;swapMode=false;walkthroughMode=false;replayRequested=false;previousSwapWireCount=0;lastReadIndex=-1;inspectFailure=false;failureCall[0]=0;
+    swapCount=0;swapTime=0;swapMode=false;walkthroughMode=false;replayRequested=false;
+    historyCount=0;viewIndex=-1;replaying=false;nextRequested=false;memset(&prevTrace,0,sizeof prevTrace);previousSwapWireCount=0;lastReadIndex=-1;inspectFailure=false;failureCall[0]=0;
     queued=0; currentRow=0; currentIndex=0; travel=0;hasPosition=false;paused=false;
     memset(visited,0,sizeof visited);
     memset(checks,0,sizeof checks);checkDetail[0]=0;checkFailed=false;entrance=6;
@@ -157,16 +221,11 @@ void VisualLearning_Update(float dt,float speed)
 {
     timeNow+=dt;
     entrance+=dt;
-    if(paused)return;
+    if(paused&&!stepMode)return;
     if(swapCount)
     {
         swapTime+=dt*speed;
-        if(swapTime>=(swapFrames[0].before.rowCount>0?1.8f:0.85f)){
-            SwapFrame *f=&swapFrames[0];
-            if(f->sourceIndex>=0)visited[f->sourceRow][f->sourceIndex]=1;
-            if(f->destIndex>=0)visited[f->destRow][f->destIndex]=2;
-            memmove(swapFrames,swapFrames+1,(--swapCount)*sizeof swapFrames[0]);swapTime=0;
-        }
+        if(swapTime>=(swapFrames[0].before.rowCount>0?1.8f:0.85f))FinishFrame();
     }
     if(queued)
     {
@@ -180,7 +239,7 @@ void VisualLearning_Update(float dt,float speed)
         }
     }
 }
-bool VisualLearning_Busy(void){return paused||queued>0||swapCount>0;}
+bool VisualLearning_Busy(void){return (paused&&!stepMode)||queued>0||swapCount>0;}
 bool VisualLearning_HasData(const LevelTest *test)
 {
     if(!test)return false;
@@ -215,6 +274,40 @@ static void Preview(const LevelTest *test,TestDisplay *out)
         if(d->count>TEST_ROW_MAX)d->count=TEST_ROW_MAX;
         for(int i=0;i<d->count;i++)d->values[i]=arg->kind==VALUE_ARRAY?arg->values[i]:d->isChar?(i<=(int)strlen(arg->text)?(unsigned char)arg->text[i]:0):arg->value;
     }
+}
+// Word-wrapped text, up to maxLines lines; returns how many it used
+static int Wrapped(Font font,const char *s,float x,float y,float size,Color color,float width,int maxLines)
+{
+    int lines=0;
+    const char *p=s;
+    while(*p&&lines<maxLines)
+    {
+        int len=(int)strlen(p),fit=len;
+        char buf[256];
+        while(fit>0)
+        {
+            snprintf(buf,sizeof buf,"%.*s",fit,p);
+            if(MeasureTextEx(font,buf,size,0).x<=width)break;
+            int cut=fit-1;
+            while(cut>0&&p[cut]!=' ')cut--;
+            fit=cut>0?cut:fit-1;
+        }
+        if(fit<=0)fit=1;
+        if(lines==maxLines-1&&fit<len)
+        {   // last line: shrink to keep the rest rather than lose it
+            snprintf(buf,sizeof buf,"%.*s",len>250?250:len,p);
+            float sz=size;
+            while(sz>10&&MeasureTextEx(font,buf,sz,0).x>width)sz--;
+            DrawTextEx(font,buf,(Vector2){x,y+lines*(size+4)},sz,0,color);
+            return lines+1;
+        }
+        snprintf(buf,sizeof buf,"%.*s",fit,p);
+        DrawTextEx(font,buf,(Vector2){x,y+lines*(size+4)},size,0,color);
+        lines++;
+        p+=fit;
+        while(*p==' ')p++;
+    }
+    return lines;
 }
 static bool Button(Rectangle r,const char *name,Font font)
 {
@@ -301,7 +394,11 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
             }
     }
     const TestDisplay *td=actual?live:&sample;
-    if(walkthroughMode&&swapCount)td=swapTime<1.55f?&swapFrames[0].before:&swapFrames[0].after;
+    // The line on screen: the one animating, or (step mode) the one the player stopped on
+    const SwapFrame *cur=!walkthroughMode||!actual?NULL:swapCount?&swapFrames[0]:
+                         (stepMode&&viewIndex>=0&&viewIndex<historyCount)?&history[viewIndex]:NULL;
+    float ft=swapCount?swapTime:99.0f;
+    if(cur)td=ft<1.55f?&cur->before:&cur->after;
     int offsets[TEST_MAX_DATA_ROWS]={0};
     Vector3 positions[TEST_MAX_DATA_ROWS*TEST_ROW_MAX];
     int values[TEST_MAX_DATA_ROWS*TEST_ROW_MAX],seen[TEST_MAX_DATA_ROWS*TEST_ROW_MAX];
@@ -341,11 +438,11 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
     if(row>=td->rowCount)row=0;
     int index=queued?queue[0].index:currentIndex;
     if(td->rowCount&&index>=td->rows[row].count)index=0;
-    if(walkthroughMode&&swapCount)
+    if(cur)
     {
-        SwapFrame *frame=&swapFrames[0];
+        const SwapFrame *frame=cur;
         if(frame->sourceIndex>=0){row=frame->sourceRow;index=frame->sourceIndex;}
-        if(swapTime>0.9f&&frame->destIndex>=0){row=frame->destRow;index=frame->destIndex;}
+        if(ft>0.9f&&frame->destIndex>=0){row=frame->destRow;index=frame->destIndex;}
     }
     int target=dataScene?offsets[row]+index:0;
     if(queued&&queue[0].write&&travel>0.15f)values[target]=queue[0].before;
@@ -377,13 +474,13 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
         const TestDataRow *d=&td->rows[r];
         wireTo[wires]=positions[offsets[r]+(at<d->count?at:d->count-1)];
         if(at==d->count)wireTo[wires].x+=1.1f;
-        if(walkthroughMode&&swapCount)
-            for(int j=0;j<swapFrames[0].after.wireCount;j++)
+        if(cur)
+            for(int j=0;j<cur->after.wireCount;j++)
             {
-                const TestWire *next=&swapFrames[0].after.wires[j];
+                const TestWire *next=&cur->after.wires[j];
                 if(strcmp(next->name,wire->name)||next->row!=r||next->index<0||next->index>=d->count)continue;
                 Vector3 end=positions[offsets[r]+next->index];
-                float t=fminf(1,swapTime/1.5f);
+                float t=fminf(1,ft/1.5f);
                 wireTo[wires].x+=(end.x-wireTo[wires].x)*t;
                 wireTo[wires].z+=(end.z-wireTo[wires].z)*t;
             }
@@ -408,8 +505,9 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
     DrawTextureRec(canvas.texture,(Rectangle){0,0,(float)width,(float)-height},(Vector2){panel.x,panel.y},WHITE);
     DrawRectangleLinesEx(panel,2,cyan);
     Text(font,SceneTitle(test->func),panel.x+12,panel.y+10,19,cyan,panel.width-24);
-    Text(font,actual?"WATCH MODE  -  RUN plays your code. STEP goes one line at a time.":"WRITE YOUR CODE  -  RUN to watch it, STEP to go line by line",panel.x+12,panel.y+36,13,LIGHTGRAY,panel.width-24);
-    if(dataScene&&running&&Button((Rectangle){panel.x+panel.width-84,panel.y+8,72,26},paused?"PLAY":"PAUSE",font))paused=!paused;
+    bool stepping=stepMode&&running&&actual;
+    Text(font,stepping?"STEP MODE  -  NEXT runs one line. BACK shows the line before.":actual?"WATCH MODE  -  RUN plays your code. STEP goes one line at a time.":"WRITE YOUR CODE  -  RUN to watch it, STEP to go line by line",panel.x+12,panel.y+36,13,stepping?gold:LIGHTGRAY,panel.width-24);
+    if(dataScene&&running&&!stepping&&Button((Rectangle){panel.x+panel.width-84,panel.y+8,72,26},paused?"PLAY":"PAUSE",font))paused=!paused;
     if(!actual&&entrance>=1&&entrance<6&&!Talk_Active())   // Bitty's intro talk uses this space
     {
         Rectangle speech={panel.x+12,panel.y+86,panel.width-24,76};
@@ -430,14 +528,18 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
         const char *trackedName=swapMode?"temp":strstr(test->func,"Max")||strstr(test->func,"max")?"max":strstr(test->func,"count")||strstr(test->func,"Vowels")?"count":"total";
         for(int i=0;i<td->regCount;i++)if(!strcmp(td->regs[i].name,trackedName))temp=&td->regs[i];
         bool letters=strstr(test->func,"char")!=NULL;   // swap_chars: show 'A', not 65
-        Card(font,tempBox,swapMode?"TEMP / SPARE STORAGE":trackedName,temp&&temp->known?(letters?TextFormat("'%c'",temp->value):TextFormat("%d",temp->value)):"empty",gold);
+        if(temp||swapMode)   // only when the code really has that variable
+            Card(font,tempBox,swapMode?"TEMP / SPARE STORAGE":trackedName,temp&&temp->known?(letters?TextFormat("'%c'",temp->value):TextFormat("%d",temp->value)):"empty",gold);
         if(swapCount)
         {
             SwapFrame *frame=&swapFrames[0];
-            Rectangle explain={panel.x+12,panel.y+57,panel.width-24,57};
-            DrawRectangleRounded(explain,0.1f,4,(Color){9,24,38,245});
-            Text(font,frame->title,explain.x+9,explain.y+7,14,gold,explain.width-18);
-            Text(font,TextFormat("LINE %d: %s",frame->line,frame->code),explain.x+9,explain.y+31,15,WHITE,explain.width-18);
+            if(!stepping)
+            {
+                Rectangle explain={panel.x+12,panel.y+57,panel.width-24,57};
+                DrawRectangleRounded(explain,0.1f,4,(Color){9,24,38,245});
+                Text(font,frame->title,explain.x+9,explain.y+7,14,gold,explain.width-18);
+                Text(font,TextFormat("LINE %d: %s",frame->line,frame->code),explain.x+9,explain.y+31,15,WHITE,explain.width-18);
+            }
             if(frame->token)
             {
                 Vector2 start={tempBox.x+tempBox.width/2,tempBox.y+tempBox.height/2};
@@ -465,8 +567,8 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
                 Text(font,frame->character?TextFormat("'%c'",frame->value):TextFormat("%d",frame->value),p.x-14,p.y-10,20,WHITE,40);
             }
         }
-        else if(won)
-            Text(font,"Pointers met. Every swap is complete.",panel.x+12,panel.y+74,15,GREEN,panel.width-24);
+        else if(won&&!stepping)
+            Text(font,swapMode?"Pointers met. Every swap is complete.":"Every check passed. Nice work!",panel.x+12,panel.y+74,15,GREEN,panel.width-24);
     }
 
     if(won&&Button((Rectangle){panel.x+panel.width-140,panel.y+8,128,29},"REPLAY CODE",font))replayRequested=true;
@@ -553,8 +655,9 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
         Text(font,TextFormat("ACTUAL: %s",failureActual),error.x+10,error.y+79,14,ORANGE,error.width-20);
         if(Button((Rectangle){error.x+error.width-157,error.y+91,147,24},inspectFailure?"MAIN ARRAY":"FAILING INPUT",font))inspectFailure=!inspectFailure;
     }
-    float bottom=panel.y+panel.height-142;
-    DrawRectangle((int)panel.x+3,(int)bottom-4,(int)panel.width-6,143,(Color){8,18,30,245});
+    float bottomH=stepping?204:142;
+    float bottom=panel.y+panel.height-bottomH;
+    DrawRectangle((int)panel.x+3,(int)bottom-4,(int)panel.width-6,(int)bottomH+1,(Color){8,18,30,245});
     float cardW=(panel.width-36)/2;
     const char *focusName=dataScene?"CURRENT CELL":"FUNCTION",*focusValue=dataScene?TextFormat("%s = %d",labels[target],values[target]):test->func;
     if(dataScene&&strstr(test->func,"char")&&values[target]>=32&&values[target]<127)focusValue=TextFormat("%s = '%c'",labels[target],values[target]);
@@ -565,6 +668,77 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
     for(int i=0;i<td->regCount;i++)if(!strcmp(td->regs[i].name,preferred))tracked=&td->regs[i];
     if(!tracked&&td->regCount)tracked=&td->regs[td->regCount-1];
     Card(font,(Rectangle){panel.x+24+cardW,bottom,cardW,59},tracked?tracked->name:"YOUR VARIABLE",tracked&&tracked->known?TextFormat("%d",tracked->value):"not set",tracked&&tracked->flash>0?gold:cyan);
+    if(stepping)
+    {
+        // WHAT'S HAPPENING: the line, what it does in plain English, and what changed
+        Rectangle box={panel.x+12,bottom+65,panel.width-24,96};
+        DrawRectangleRounded(box,0.1f,4,(Color){44,38,16,250});
+        DrawRectangleRoundedLinesEx(box,0.1f,4,1,Fade(gold,0.8f));
+        if(cur)
+        {
+            Text(font,TextFormat("LINE %d   %s",cur->line,cur->title),box.x+10,box.y+7,13,gold,box.width-20);
+            const char *what=cur->explain[0]?cur->explain:cur->code;
+            Wrapped(font,what,box.x+10,box.y+27,14,WHITE,box.width-20,2);
+            // what changed: a check's answer, a value written, a variable updated
+            char changed[200]="";
+            const TestDisplay *b=&cur->before,*a=&cur->after;
+            const VmVisualTrace *ta=&a->trace,*tb=&b->trace;
+            if(ta->operationKnown&&(!tb->operationKnown||ta->left!=tb->left||ta->right!=tb->right||ta->result!=tb->result||strcmp(ta->operation,tb->operation)))
+                snprintf(changed,sizeof changed,"%s",OperationText(&a->trace));
+            for(int r=0;r<a->regCount&&strlen(changed)<120;r++)
+            {
+                const TestRegister *ra=&a->regs[r],*rb=NULL;
+                for(int k=0;k<b->regCount;k++)if(!strcmp(b->regs[k].name,ra->name))rb=&b->regs[k];
+                if(!ra->known)continue;
+                char tag[24];snprintf(tag,sizeof tag,"%s,",ra->name);
+                bool wrote=strstr(cur->written,tag)!=NULL;
+                if(rb&&rb->known&&rb->value==ra->value)
+                {
+                    if(wrote){size_t l=strlen(changed);snprintf(changed+l,sizeof changed-l,"%s%s = %d (same as before)",l?"    ":"",ra->name,ra->value);}
+                    continue;
+                }
+                size_t len=strlen(changed);
+                if(rb&&rb->known)snprintf(changed+len,sizeof changed-len,"%s%s: %d -> %d",len?"    ":"",ra->name,rb->value,ra->value);
+                else snprintf(changed+len,sizeof changed-len,"%s%s = %d",len?"    ":"",ra->name,ra->value);
+            }
+            if(cur->destIndex>=0&&cur->destRow<a->rowCount)
+            {
+                size_t len=strlen(changed);
+                int was=b->rows[cur->destRow].values[cur->destIndex],now=a->rows[cur->destRow].values[cur->destIndex];
+                bool ch=a->rows[cur->destRow].isChar&&now>=32&&now<127&&was>=32&&was<127;
+                const char *name=copy?(cur->destRow==0?"dest":"src"):a->rowCount>1?(cur->destRow==0?"a":"b"):"";
+                if(ch)snprintf(changed+len,sizeof changed-len,"%s%s[%d]: '%c' -> '%c'",len?"    ":"",name,cur->destIndex,was,now);
+                else snprintf(changed+len,sizeof changed-len,"%s%s[%d]: %d -> %d",len?"    ":"",name,cur->destIndex,was,now);
+            }
+            if(!changed[0])snprintf(changed,sizeof changed,"No boxes in the picture changed on this line.");
+            Text(font,changed,box.x+10,box.y+71,14,(Color){255,232,160,255},box.width-20);
+        }
+        else
+        {
+            Text(font,"READY",box.x+10,box.y+7,13,gold,box.width-20);
+            Wrapped(font,"The test data is in memory and your function is about to start. Press NEXT to run the first line.",box.x+10,box.y+27,14,WHITE,box.width-20,3);
+        }
+        // BACK / NEXT and where you are
+        float by=bottom+168;
+        bool canBack=viewIndex>0||(swapCount&&replaying&&viewIndex>0);
+        Rectangle back={panel.x+12,by,92,28},next={panel.x+112,by,92,28};
+        DrawRectangleRounded(back,0.2f,5,canBack?(Color){40,60,80,255}:(Color){24,32,42,255});
+        Text(font,"< BACK",back.x+16,back.y+6,15,canBack?WHITE:GRAY,back.width-20);
+        if(canBack&&CheckCollisionPointRec(GetMousePosition(),back)&&IsMouseButtonPressed(MOUSE_BUTTON_LEFT))VisualLearning_StepBack();
+        bool hoverNext=CheckCollisionPointRec(GetMousePosition(),next);
+        DrawRectangleRounded(next,0.2f,5,hoverNext?(Color){70,130,190,255}:(Color){50,110,170,255});
+        Text(font,"NEXT >",next.x+16,next.y+6,15,WHITE,next.width-20);
+        if(hoverNext&&IsMouseButtonPressed(MOUSE_BUTTON_LEFT))nextRequested=true;
+        const char *where=viewIndex<0?"Step 0":viewIndex<historyCount-1?TextFormat("Step %d of %d (back)",viewIndex+1,historyCount):TextFormat("Step %d",viewIndex+1);
+        float dx=panel.x+panel.width-18-level->testCount*16;
+        Text(font,where,panel.x+216,by+7,14,viewIndex<historyCount-1?gold:LIGHTGRAY,dx-panel.x-216-14);
+        for(int i=0;i<level->testCount;i++)
+        {
+            Color c=checks[i]>0?GREEN:checks[i]<0?ORANGE:(Color){65,85,105,255};
+            DrawCircle((int)(dx+i*16),(int)(by+14),5,c);
+        }
+        return;
+    }
     Rectangle operation={panel.x+12,bottom+65,panel.width-24,42};
     DrawRectangleRounded(operation,0.12f,4,(Color){20,37,54,255});
     const VmVisualTrace *trace=&td->trace;

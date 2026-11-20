@@ -19,4 +19,10 @@ void VisualLearning_Access(const TestDisplay *display, int row, int index, bool 
 void VisualLearning_Draw(Rectangle panel, Font font, const Level *level,
                          const TestDisplay *live, int testIndex, bool running, bool won, float victoryTime);
 void VisualLearning_Shutdown(void);
+// STEP mode: the same picture as RUN, one line per press, with BACK
+void VisualLearning_SetStepping(bool on);
+bool VisualLearning_StepForward(void);     // true = handled (replaying a line already seen)
+void VisualLearning_StepBack(void);
+bool VisualLearning_TakeNext(void);         // the panel's NEXT button was pressed
+void VisualLearning_ExplainLast(const char *text);
 #endif

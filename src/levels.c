@@ -10,6 +10,7 @@
 
 static Level levels[LEVEL_MAX_LEVELS];
 static int   levelCount = 0;
+static bool  endlessReady = false;       // levels[levelCount] holds the current endless challenge
 
 // A level that's always available, in case the levels folder is missing
 static const char *FALLBACK_LEVEL =
@@ -523,6 +524,7 @@ static char *ReadWholeFile(const char *path)
 int Levels_LoadFolder(const char *folder, char *error, int errorSize)
 {
     levelCount = 0;
+    endlessReady = false;
     if (error && errorSize > 0) error[0] = '\0';
 
     char path[512];
@@ -588,6 +590,20 @@ const Level *Levels_Get(int index)
         Level_Parse(FALLBACK_LEVEL, "(built in)", &levels[0], NULL, 0);
         levelCount = 1;
     }
+    if (index == levelCount && endlessReady) return &levels[index];
     if (index < 0 || index >= levelCount) index = 0;
     return &levels[index];
+}
+
+int Levels_SetEndless(const Level *challenge)
+{
+    if (levelCount >= LEVEL_MAX_LEVELS) return -1;
+    levels[levelCount] = *challenge;
+    endlessReady = true;
+    return levelCount;
+}
+
+bool Levels_IsEndless(int index)
+{
+    return endlessReady && index == levelCount;
 }

@@ -10,6 +10,8 @@ call test_vm.bat
 if errorlevel 1 set /a BITTY_FAILURES+=1
 call test_levels.bat
 if errorlevel 1 set /a BITTY_FAILURES+=1
+call test_endless.bat
+if errorlevel 1 set /a BITTY_FAILURES+=1
 call test_escape.bat
 if errorlevel 1 set /a BITTY_FAILURES+=1
 call test_vm_visuals.bat

@@ -27,10 +27,12 @@
 #include "repair.h"
 #include "save.h"
 #include "vm.h"
+#include "endless.h"
 
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #define SCREEN_W 1280      // starting window size (the game then goes fullscreen)
 #define SCREEN_H 720
@@ -122,6 +124,12 @@ typedef struct {
     bool       showWorkshop;
     VmVariable vars[MAX_VARS];
     int        varCount;
+
+    // ENDLESS MODE (random challenges, no hints)
+    bool       endless;         // the current level is an endless challenge
+    bool       endlessSolved;   // this challenge has been cleared (the streak already counts it)
+    int        endlessNumber;   // challenges started this session
+    int        endlessStreak;   // cleared in a row without skipping
     Font       codeFont;
     bool       ownsFont;
 } Game;
@@ -217,6 +225,7 @@ static void StopProgram(Game *g)
 // Keep the code typed for the current level (in memory; Save_Write puts it on disk)
 static void RememberCode(Game *g)
 {
+    if (g->endless) return;             // endless challenges are thrown away
     Save_SetCode(Levels_Get(g->level)->file, Editor_GetText(&g->editor));
 }
 
@@ -233,7 +242,7 @@ static void WriteProgress(Game *g)
 static void SaveNow(Game *g)
 {
     RememberCode(g);
-    Save_SetCurrent(Levels_Get(g->level)->file);
+    if (!g->endless) Save_SetCurrent(Levels_Get(g->level)->file);
     WriteProgress(g);
 }
 
@@ -243,25 +252,31 @@ static void LoadLevel(Game *g, int index, bool keepOldCode)
 
     StopProgram(g);
     g->level = index;
+    g->endless = Levels_IsEndless(index);
     g->lastRunStepped = false;
     g->showEnding = false;
     g->mode = MODE_EDITING;
     LoadWorld(g);
 
     const Level *lv = Levels_Get(index);
-    const char *saved = Save_GetCode(lv->file);
+    const char *saved = g->endless ? NULL : Save_GetCode(lv->file);
     Editor_SetText(&g->editor, saved ? saved : lv->starterCode);
     Editor_SelectNextBlank(&g->editor);     // fill-in-the-blank: the first gold gap is ready to type into
     World_PlayIntro(&g->world);     // Bitty drops into the new level
     g->editor.focused = true;
-    Save_SetCurrent(lv->file);
+    if (!g->endless) Save_SetCurrent(lv->file);
     WriteProgress(g);
 
     Console_Clear();
-    Console_PrintKind(CONSOLE_SUCCESS, TextFormat("%s:  %s\n", Circuit_StageName(g->level), lv->title + strcspn(lv->title, " ") + strspn(lv->title + strcspn(lv->title, " "), " ")));
+    if (g->endless)
+        Console_PrintKind(CONSOLE_SUCCESS, TextFormat("ENDLESS MODE   streak %d   best %d\n", g->endlessStreak, Endless_Best()));
+    else
+        Console_PrintKind(CONSOLE_SUCCESS, TextFormat("%s:  %s\n", Circuit_StageName(g->level), lv->title + strcspn(lv->title, " ") + strspn(lv->title + strcspn(lv->title, " "), " ")));
     Console_PrintKind(CONSOLE_STORY, TextFormat("%s\n", lv->story));
     if (lv->type == LEVEL_REPAIR)
         Console_PrintKind(CONSOLE_STORY, TextFormat("Your code must pass %d checks. Press RUN to try.\n", lv->testCount));
+    if (g->endless)
+        Console_PrintKind(CONSOLE_STORY, "No hints in endless mode. NEXT skips to a new challenge (and resets your streak).\n");
 
     // Enter the challenge before handing control to the player.
     VisualLearning_Enter();
@@ -392,10 +407,49 @@ static void CompleteStage(Game *g)
     g->world.talking = false;
     g->showLesson = false;
     Talk_Skip();
+    if (g->endless)
+    {
+        if (!g->endlessSolved)
+        {
+            g->endlessSolved = true;
+            g->endlessStreak++;
+            Endless_ReportStreak(g->endlessStreak);
+        }
+        FinishRun(g);
+        Console_PrintKind(CONSOLE_SUCCESS, TextFormat("CHALLENGE CLEARED! Streak %d  (best %d). Press NEXT for another.\n",
+                                                      g->endlessStreak, Endless_Best()));
+        return;
+    }
     Save_SetDone(Levels_Get(g->level)->file);
     SaveNow(g);
     FinishRun(g);
     Console_PrintKind(CONSOLE_SUCCESS, "SECTOR CLEARED! Use NEXT to continue.\n");
+}
+
+// ENDLESS MODE: roll a new challenge and load it. Skipping one you haven't
+// solved resets the streak.
+static void NextEndless(Game *g)
+{
+    static Level challenge;     // big: keep it off the stack
+    if (g->endless && !g->endlessSolved && g->endlessStreak > 0)
+    {
+        g->endlessStreak = 0;
+    }
+    if (!g->endless) g->endlessStreak = 0;     // a fresh run from the map
+
+    unsigned seed = (unsigned)time(NULL) ^ ((unsigned)GetRandomValue(0, 0x7fffffff) * 2654435761u) ^ (unsigned)(g->endlessNumber * 40503);
+    int topic = Endless_PickTopic(seed);
+    char err[300];
+    if (!Endless_Make(&challenge, topic, seed, g->endlessNumber + 1, err, sizeof err))
+    {
+        Console_PrintKind(CONSOLE_ERROR, TextFormat("Couldn't build an endless challenge: %s\n", err));
+        return;
+    }
+    int index = Levels_SetEndless(&challenge);
+    if (index < 0) return;
+    g->endlessNumber++;
+    g->endlessSolved = false;
+    LoadLevel(g, index, false);
 }
 
 // Hints come in steps: a nudge, a bigger nudge, then the answer.
@@ -433,6 +487,7 @@ static void NextHint(Game *g)
 {
     const Level *lv = Levels_Get(g->level);
     int count = HintCount(lv);
+    if (g->endless) { Console_PrintKind(CONSOLE_STORY, "Endless mode has no hints. Read the task in the comments at the top of the code!\n"); return; }
     if (count == 0) { Console_PrintKind(CONSOLE_STORY, "No hints for this one. You've got this!\n"); return; }
     int k = g->hintStep < count ? g->hintStep : count - 1;
     char text[400];
@@ -447,6 +502,7 @@ static void NextHint(Game *g)
 // After a failed try: the first nudge comes by itself, then the HINT button gives more
 static void ShowHint(Game *g)
 {
+    if (g->endless) return;
     if (g->hintStep == 0) NextHint(g);
     else if (g->hintStep < HintCount(Levels_Get(g->level)))
         Console_PrintKind(CONSOLE_STORY, "Stuck? Press HINT for another clue.\n");
@@ -646,7 +702,13 @@ static void UpdateTestDisplay(Game *g, const LevelTest *t, int line)
     }
     char code[128];
     CodeLine(g, line, code, sizeof code);
-    if(!g->stepping)VisualLearning_ObserveLine(td,log,logCount,line,code);
+    VisualLearning_ObserveLine(td,log,logCount,line,code);
+    if (g->stepping && line > 0)
+    {
+        // step mode: say what this line does, in plain English, under the picture
+        char said[240];
+        if (Explain_Line(Editor_GetText(&g->editor), line, said, sizeof said)) VisualLearning_ExplainLast(said);
+    }
     World_RoomStep(&g->world, list, listCount, !td->fastForward, line, code);
 }
 
@@ -712,10 +774,7 @@ static void RunTestFrame(Game *g, float dt)
     bool ff = !g->stepping && g->linesShown >= (visualData ? 128 : LINES_BEFORE_FF);
     td->fastForward = ff;
     td->waitingForStep = false;
-    td->askGuesses = g->stepping;           // step mode: guess what each line does before Bitty shows you
-
-    // Bitty is still acting out the last line (or still beaming in): wait for him
-    if (g->stepping && World_RoomBusy(&g->world) && !ff) return;
+    td->askGuesses = false;                 // step mode now walks the same picture as RUN (no room quiz)
 
     int line = Vm_CurrentLine(g->vm);       // the line about to run
     if (line <= 0) td->askGuesses = false;  // the first step only hands the function its arguments: nothing to guess
@@ -841,7 +900,6 @@ static void UpdateRepair(Game *g, float dt)
     if (!g->stepping && VisualLearning_Busy()) return;
     if (g->repairTimer > 0) { g->repairTimer -= dt; return; }
     if (!World_ActionDone(w)) return;
-    if (g->stepping && World_RoomBusy(w)) return;          // beaming in/out, or Bitty still busy in the room
 
     if (g->repairPhase == REPAIR_LEAVING)
     {
@@ -878,7 +936,7 @@ static void UpdateRepair(Game *g, float dt)
             return;
         }
 
-        if (!g->stepping && g->repairTest == 0 && VisualLearning_HasData(&lv->tests[0]))
+        if (g->repairTest == 0 && VisualLearning_HasData(&lv->tests[0]))
         {
             VisualLearning_Check(0, true, "visible array passed");
             g->validating = true;
@@ -1094,7 +1152,8 @@ static void DrawStageCompletion(Game *g)
     const char *title = "SECTOR CLEARED";
     Vector2 text = MeasureTextEx(g->codeFont,title,size,0);
     DrawTextEx(g->codeFont,title,(Vector2){box.x+(box.width-text.x)/2,box.y+12},size,0,(Color){130,255,180,255});
-    const char *hint = g->level < Levels_Count()-1 ? "NEXT is ready - continue your escape" : "All done! Open CIRCUIT to revisit stages";
+    const char *hint = g->endless ? TextFormat("Streak %d  -  NEXT for a new challenge", g->endlessStreak)
+                     : g->level < Levels_Count()-1 ? "NEXT is ready - continue your escape" : "All done! Open CIRCUIT to revisit stages";
     float small = 14;
     while(small > 10 && MeasureTextEx(g->codeFont,hint,small,0).x > box.width-20) small--;
     Vector2 sub = MeasureTextEx(g->codeFont,hint,small,0);
@@ -1426,7 +1485,18 @@ static void DrawExplainHover(Game *g)
 // A small button in the Code panel's title bar: put the starter code back (Ctrl+Z undoes it)
 static void DrawStarterButton(Game *g)
 {
+    // ENDLESS: no HINT button; the streak sits there instead
+    if (g->endless)
+    {
+        Rectangle b = EDITOR_PANEL;
+        Rectangle r = { b.x + b.width - 118 - 152, b.y + 5, 144, 22 };
+        DrawRectangleRounded(r, 0.4f, 6, (Color){ 58, 26, 82, 255 });
+        const char *label = TextFormat("STREAK %d  BEST %d", g->endlessStreak, Endless_Best());
+        float tw = MeasureTextEx(g->codeFont, label, 14, 0).x;
+        DrawTextEx(g->codeFont, label, (Vector2){ r.x + (r.width - tw) / 2, r.y + 4 }, 14, 0, (Color){ 230, 160, 255, 255 });
+    }
     // HINT: a nudge, a bigger nudge, then the answer
+    else
     {
         Rectangle b = EDITOR_PANEL;
         int count = HintCount(Levels_Get(g->level));
@@ -1490,13 +1560,14 @@ static void DrawToolbar(Game *g)
     {
         if (Levels_Get(g->level)->type == LEVEL_REPAIR)
         {
-            // gate tests: one line at a time, and Bitty acts out each one in the memory room
+            // gate tests: one line at a time, in the same picture RUN uses
             if (!running) StartProgram(g, true);
             else
             {
                 g->stepping = true;
                 g->lastRunStepped = true;
-                g->stepRequest = true;
+                VisualLearning_SetStepping(true);
+                if (!VisualLearning_StepForward()) g->stepRequest = true;   // forward through lines already seen first
             }
         }
         else if (running && g->vm && Vm_GetStatus(g->vm) == VM_PAUSED)
@@ -1540,18 +1611,21 @@ static void DrawToolbar(Game *g)
     }
     x += 76 * k;
 
-    if (Button((Rectangle){ x, y, 70 * k, h }, "< PREV", (Color){ 70, 70, 100, 255 }, !running && g->level > 0))
+    if (Button((Rectangle){ x, y, 70 * k, h }, "< PREV", (Color){ 70, 70, 100, 255 }, !running && g->level > 0 && !g->endless))
         LoadLevel(g, g->level - 1, true);
     x += 78 * k;
 
-    bool canNext = !running && g->level < Levels_Count() - 1;
+    bool canNext = !running && (g->endless || g->level < Levels_Count() - 1);
     bool cleared = g->world.state == WORLD_WON;
     float nextPulse = 0.5f + 0.5f*sinf((float)GetTime()*4);
     Color nextCol = cleared ? (Color){40,(unsigned char)(155+50*nextPulse),85,255} : (Color){70,70,100,255};
     if(cleared && canNext)
         DrawRectangleRoundedLinesEx((Rectangle){x-3,y-3,70*k+6,h+6},0.3f,6,2,Fade((Color){130,255,180,255},0.5f+0.5f*nextPulse));
     if (Button((Rectangle){ x, y, 70 * k, h }, "NEXT >", nextCol, canNext))
-        LoadLevel(g, g->level + 1, true);
+    {
+        if (g->endless) NextEndless(g);
+        else LoadLevel(g, g->level + 1, true);
+    }
 
     bool hasLesson = Levels_Get(g->level)->lesson[0] != '\0';
     if (Button((Rectangle){ W - 100, y, 90, h }, "LESSON", (Color){ 120, 90, 170, 255 }, hasLesson && !running))
@@ -1625,6 +1699,7 @@ int main(void)
 
     // Pick up where the player left off
     Save_Load(TextFormat("%sbitty_save.txt", GetApplicationDirectory()));
+    Endless_LoadBest(TextFormat("%sbitty_endless.txt", GetApplicationDirectory()));
     Circuit_Init();
     int start = -1;
     for (int i = 0; i < Levels_Count(); i++)
@@ -1694,7 +1769,13 @@ int main(void)
             BeginDrawing();
             int stage = Circuit_Draw(g->codeFont, dt);
             EndDrawing();
-            if (stage >= 0)
+            if (stage == CIRCUIT_ENDLESS)
+            {
+                g->endless = false;         // a fresh run: the streak starts at 0
+                NextEndless(g);
+                g->showCircuit = false;
+            }
+            else if (stage >= 0)
             {
                 LoadLevel(g, stage, true);
                 g->showCircuit = false;
@@ -1756,9 +1837,12 @@ int main(void)
         if (!g->showWorkshop)
         {
             if(g->mode != MODE_RUNNING && VisualLearning_TakeReplay())StartProgram(g,false);
+            bool repairStep = g->stepping && g->mode == MODE_RUNNING && Levels_Get(g->level)->type == LEVEL_REPAIR;
+            VisualLearning_SetStepping(repairStep);
+            if (VisualLearning_TakeNext() && repairStep && !VisualLearning_StepForward()) g->stepRequest = true;
             VisualLearning_Update(dt, SPEEDS[g->speedIndex]);
             UpdateProgram(g, dt);
-            if(!g->stepping && g->mode == MODE_RUNNING && VisualLearning_CurrentLine()>0)
+            if(g->mode == MODE_RUNNING && VisualLearning_CurrentLine()>0)
                 g->editor.runLine=VisualLearning_CurrentLine();
             if (g->world.state == WORLD_WON)
                 Customisation_RecordCompletion(g->level);
@@ -1785,18 +1869,13 @@ int main(void)
             DrawStarterButton(g);
             const Level *visualLevel = Levels_Get(g->level);
             int visualTest = g->repairTest < visualLevel->testCount ? g->repairTest : visualLevel->testCount - 1;
-            if (!g->lastRunStepped && visualLevel->type == LEVEL_REPAIR && visualTest >= 0 &&
+            if (visualLevel->type == LEVEL_REPAIR && visualTest >= 0 &&
                 visualLevel->testCount > 0)
                 VisualLearning_Draw(WORLD_PANEL, g->codeFont, visualLevel, &g->world.test,
                                     visualTest, g->mode == MODE_RUNNING, g->world.state == WORLD_WON, g->world.winTime);
             else
             {
                 DrawWorldPanel(g);
-                // Name the mode in the panel's title bar, like RUN's "WATCH MODE", so the two read as one tool
-                if(g->lastRunStepped && visualLevel->type==LEVEL_REPAIR)
-                    DrawTextEx(g->codeFont, g->mode == MODE_RUNNING ? "GUESS MODE: guess, then press STEP"
-                                                                    : "GUESS MODE: RUN to watch, STEP again",
-                               (Vector2){ WORLD_PANEL.x + 96, WORLD_PANEL.y + 7 }, 14, 0, (Color){ 255, 205, 90, 255 });
             }
             DrawQuiz(g);
             Talk_Draw(WORLD_PANEL, g->codeFont);
