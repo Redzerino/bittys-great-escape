@@ -28,6 +28,10 @@
 #include "save.h"
 #include "vm.h"
 #include "endless.h"
+#include "sfx.h"
+#include "cloud.h"
+#include "labs.h"
+#include "login.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -130,6 +134,9 @@ typedef struct {
     bool       endlessSolved;   // this challenge has been cleared (the streak already counts it)
     int        endlessNumber;   // challenges started this session
     int        endlessStreak;   // cleared in a row without skipping
+
+    // SHOW ME: step through the level's answer, then go back to your own code
+    bool       demo;            // the editor is showing the answer, not the player's code
     Font       codeFont;
     bool       ownsFont;
 } Game;
@@ -151,11 +158,13 @@ static bool HostCallBuiltin(void *user, VmBuiltin id, const int *args, int argc,
         case VM_BUILTIN_MOVE:
         {
             Action a = { ACT_MOVE, (Direction)args[0], 0, Vm_CurrentLine(g->vm) };
+            Sfx_PlayPitched(SFX_MOVE, 0.9f + 0.05f * (float)GetRandomValue(0, 4));
             return World_StartAction(&g->world, a);
         }
         case VM_BUILTIN_WRITE:
         {
             Action a = { ACT_WRITE, NORTH, args[0], Vm_CurrentLine(g->vm) };
+            Sfx_PlayPitched(SFX_STEP, 1.3f);
             return World_StartAction(&g->world, a);
         }
         case VM_BUILTIN_READ:
@@ -218,20 +227,27 @@ static void StopProgram(Game *g)
     g->vm = NULL;
     g->varCount = 0;
     g->stepping = false;
-    g->editor.readOnly = false;
+    g->editor.readOnly = g->demo;      // the answer in SHOW ME stays read-only
     g->editor.runLine = 0;
 }
 
 // Keep the code typed for the current level (in memory; Save_Write puts it on disk)
+static char demoSaved[LEVEL_CODE_MAX * 2];   // the player's own code while SHOW ME is on
+
 static void RememberCode(Game *g)
 {
     if (g->endless) return;             // endless challenges are thrown away
+    if (g->demo) { Save_SetCode(Levels_Get(g->level)->file, demoSaved); return; }   // never save the answer as theirs
     Save_SetCode(Levels_Get(g->level)->file, Editor_GetText(&g->editor));
 }
+
+static bool  cloudDirty;          // the save changed since it was last sent to the cloud
+static float cloudTimer;
 
 static void WriteProgress(Game *g)
 {
     bool ok = Save_Write();
+    if (ok) cloudDirty = true;
     if (!ok && !g->saveFailed)
         Console_PrintKind(CONSOLE_WARNING, "Progress could not be saved. Check folder access; the game will retry.\n");
     g->saveFailed = !ok;
@@ -249,6 +265,7 @@ static void SaveNow(Game *g)
 static void LoadLevel(Game *g, int index, bool keepOldCode)
 {
     if (keepOldCode) RememberCode(g);
+    g->demo = false;                    // leaving a level always leaves SHOW ME
 
     StopProgram(g);
     g->level = index;
@@ -308,6 +325,7 @@ static void Bark(Game *g, const char *a, const char *b, const char *c)
 // ===========================================================================
 static void StartProgram(Game *g, bool step)
 {
+    Sfx_Play(step ? SFX_STEP : SFX_RUN);
     g->lastRunStepped = step;
     g->validating = false;
     Talk_Skip();
@@ -357,6 +375,7 @@ static void StartProgram(Game *g, bool step)
             Bark(g, "Bzzt. I can't read that. Check the red line?", "Hmm, that line confuses me. Look at the red one.", NULL);
         }
         g->editor.errorLine = g->friendlyOn ? g->friendly.line : result.line;
+        Sfx_Play(SFX_ERROR);
         g->world.mood = MOOD_ERROR;
         g->world.shake = 0.4f;
         g->mode = MODE_EDITING;
@@ -391,7 +410,7 @@ static void StartProgram(Game *g, bool step)
 static void FinishRun(Game *g)
 {
     g->mode = MODE_DONE;
-    g->editor.readOnly = false;
+    g->editor.readOnly = g->demo;
     g->stepping = false;
 }
 
@@ -407,12 +426,22 @@ static void CompleteStage(Game *g)
     g->world.talking = false;
     g->showLesson = false;
     Talk_Skip();
+    if (g->demo)
+    {
+        // the answer passing doesn't clear the stage: the player's own code has to
+        Sfx_Play(SFX_PASS);
+        FinishRun(g);
+        Console_PrintKind(CONSOLE_SUCCESS, "That's the answer working! Press MY CODE, then try writing it yourself.\n");
+        Console_PrintKind(CONSOLE_STORY, "The stage clears when YOUR code passes the checks.\n");
+        return;
+    }
     if (g->endless)
     {
         if (!g->endlessSolved)
         {
             g->endlessSolved = true;
             g->endlessStreak++;
+            Sfx_Play(SFX_STREAK);
             Endless_ReportStreak(g->endlessStreak);
         }
         FinishRun(g);
@@ -422,6 +451,7 @@ static void CompleteStage(Game *g)
     }
     Save_SetDone(Levels_Get(g->level)->file);
     SaveNow(g);
+    Sfx_Play(SFX_CLEAR);
     FinishRun(g);
     Console_PrintKind(CONSOLE_SUCCESS, "SECTOR CLEARED! Use NEXT to continue.\n");
 }
@@ -783,6 +813,7 @@ static void RunTestFrame(Game *g, float dt)
         // step mode: one line each time the player presses STEP
         if (!g->stepRequest) { td->waitingForStep = true; return; }
         g->stepRequest = false;
+        Sfx_Play(SFX_STEP);
         g->linesShown++;
         Vm_PauseAtNextLine(g->vm);
         s = Vm_Run(g->vm, 200000);
@@ -871,6 +902,8 @@ static void UpdateRepair(Game *g, float dt)
         char detail[240];
         snprintf(detail, sizeof detail, "%.110s -> %.110s", check->text, g->repairOutcome.summary);
         VisualLearning_Check(g->validationIndex, g->repairOutcome.passed, detail);
+        if (g->repairOutcome.passed) Sfx_PlayPitched(SFX_PASS, 1.0f + 0.06f * g->validationIndex);
+        else Sfx_Play(SFX_FAIL);
         if (!g->repairOutcome.passed)VisualLearning_ShowFailure(g->validationIndex, check, &g->repairOutcome);
         Console_PrintKind(g->repairOutcome.passed ? CONSOLE_SUCCESS : CONSOLE_ERROR, TextFormat("%s\n", g->repairOutcome.message));
         if (!g->repairOutcome.passed)
@@ -919,6 +952,8 @@ static void UpdateRepair(Game *g, float dt)
         TestOutcome *o = &g->repairOutcome;
         Console_PrintKind(o->passed ? CONSOLE_SUCCESS : CONSOLE_ERROR, TextFormat("%s\n", o->message));
 
+        if (o->passed) Sfx_PlayPitched(SFX_PASS, 1.0f + 0.06f * g->repairTest);
+        else Sfx_Play(o->crashed ? SFX_CRASH : SFX_FAIL);
         if (!o->passed)
         {
             if (VisualLearning_HasData(&lv->tests[0])) { VisualLearning_Check(0, false, o->summary); VisualLearning_ShowFailure(g->repairTest, &lv->tests[g->repairTest], o); }
@@ -995,6 +1030,7 @@ static void UpdateProgram(Game *g, float dt)
     }
     if (w->state == WORLD_SEGFAULT)
     {
+        Sfx_Play(SFX_CRASH);
         Console_PrintKind(CONSOLE_ERROR, "SEGMENTATION FAULT! Bitty stepped into unallocated memory and vanished.\n");
         Console_PrintKind(CONSOLE_STORY, "Use scan() to check a tile before you move into it.\n");
         ShowHint(g);
@@ -1027,6 +1063,7 @@ static void UpdateProgram(Game *g, float dt)
         if (w->state != WORLD_WON)
         {
             Console_PrintKind(CONSOLE_WARNING, "The program finished, but Bitty hasn't reached the EXIT yet.\n");
+            Sfx_Play(SFX_FAIL);
             ShowHint(g);
         }
         w->mood = MOOD_IDLE;
@@ -1036,6 +1073,7 @@ static void UpdateProgram(Game *g, float dt)
     {
         Console_PrintKind(CONSOLE_ERROR, TextFormat("%s\n", Vm_ErrorMessage(g->vm)));
         Bark(g, "Ouch! Something broke in memory.", "Zzzt! That line crashed me.", NULL);
+        Sfx_Play(SFX_CRASH);
         g->editor.errorLine = Vm_ErrorLine(g->vm);
         w->mood = MOOD_ERROR;
         VmErrorKind kind = Vm_GetErrorKind(g->vm);
@@ -1060,7 +1098,9 @@ static bool Button(Rectangle r, const char *text, Color base, bool enabled)
     int fw = MeasureText(text, 16);
     DrawText(text, (int)(r.x + (r.width - fw) / 2), (int)(r.y + (r.height - 16) / 2), 16,
              enabled ? WHITE : (Color){ 110, 115, 130, 255 });
-    return hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    bool clicked = hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    if (clicked) Sfx_Play(SFX_CLICK);
+    return clicked;
 }
 
 static void DrawWorldPanel(Game *g)
@@ -1149,10 +1189,11 @@ static void DrawStageCompletion(Game *g)
     Rectangle box = {p.x + 16, p.y + p.height - 61, p.width - 32, 51};
     DrawRectangleRounded(box, 0.12f, 6, (Color){8,24,22,235});
     DrawRectangleRoundedLinesEx(box, 0.12f, 6, 2, (Color){110,245,165,255});
-    const char *title = "SECTOR CLEARED";
+    const char *title = g->demo ? "THE ANSWER WORKS" : "SECTOR CLEARED";
     Vector2 text = MeasureTextEx(g->codeFont,title,size,0);
     DrawTextEx(g->codeFont,title,(Vector2){box.x+(box.width-text.x)/2,box.y+12},size,0,(Color){130,255,180,255});
-    const char *hint = g->endless ? TextFormat("Streak %d  -  NEXT for a new challenge", g->endlessStreak)
+    const char *hint = g->demo ? "Press MY CODE and try writing it yourself"
+                     : g->endless ? TextFormat("Streak %d  -  NEXT for a new challenge", g->endlessStreak)
                      : g->level < Levels_Count()-1 ? "NEXT is ready - continue your escape" : "All done! Open CIRCUIT to revisit stages";
     float small = 14;
     while(small > 10 && MeasureTextEx(g->codeFont,hint,small,0).x > box.width-20) small--;
@@ -1482,9 +1523,67 @@ static void DrawExplainHover(Game *g)
         DrawTextEx(g->codeFont, lines[i], (Vector2){ x + 12, y + 24 + i * (size + 3) }, size, 0, Fade((Color){ 30, 32, 48, 255 }, fade));
 }
 
+// SHOW ME: put the answer in the editor and step through it line by line.
+// The player's own code is kept and comes back with MY CODE.
+static void StartShowMe(Game *g)
+{
+    const Level *lv = Levels_Get(g->level);
+    if (g->demo || g->endless || !lv->solution[0]) return;
+    StopProgram(g);
+    snprintf(demoSaved, sizeof demoSaved, "%s", Editor_GetText(&g->editor));
+    g->demo = true;
+    Editor_SetText(&g->editor, lv->solution);
+    StartProgram(g, true);
+    Console_PrintKind(CONSOLE_SUCCESS, "SHOW ME: here is one way to solve this stage.\n");
+    Console_PrintKind(CONSOLE_STORY, "Press NEXT (or STEP) to go one line at a time and read what each line does.\n");
+    Console_PrintKind(CONSOLE_STORY, "Press MY CODE when you're ready to try it yourself. Your code is safe.\n");
+}
+
+static void EndShowMe(Game *g)
+{
+    if (!g->demo) return;
+    StopProgram(g);
+    g->demo = false;
+    g->mode = MODE_EDITING;
+    LoadWorld(g);
+    VisualLearning_Reset();             // the answer's green checks aren't the player's
+    Editor_SetText(&g->editor, demoSaved);
+    g->editor.readOnly = false;
+    g->editor.focused = true;
+    Console_Clear();
+    Console_PrintKind(CONSOLE_STORY, "Back to your own code. Now try it yourself - you can press SHOW ME again any time.\n");
+}
+
 // A small button in the Code panel's title bar: put the starter code back (Ctrl+Z undoes it)
 static void DrawStarterButton(Game *g)
 {
+    // SHOW ME is on: say so, and offer the way back instead of the usual buttons
+    if (g->demo)
+    {
+        Rectangle b = EDITOR_PANEL;
+        Rectangle tag = { b.x + b.width - 118 - 160, b.y + 5, 152, 22 };
+        DrawRectangleRounded(tag, 0.4f, 6, (Color){ 30, 90, 70, 255 });
+        float tw = MeasureTextEx(g->codeFont, "THE ANSWER", 15, 0).x;
+        DrawTextEx(g->codeFont, "THE ANSWER", (Vector2){ tag.x + (tag.width - tw) / 2, tag.y + 3 }, 15, 0, (Color){ 150, 255, 200, 255 });
+        Rectangle r = { b.x + b.width - 118, b.y + 5, 110, 22 };
+        bool hover = CheckCollisionPointRec(GetMousePosition(), r);
+        DrawRectangleRounded(r, 0.4f, 6, hover ? (Color){ 70, 110, 170, 255 } : (Color){ 50, 90, 150, 255 });
+        tw = MeasureTextEx(g->codeFont, "< MY CODE", 15, 0).x;
+        DrawTextEx(g->codeFont, "< MY CODE", (Vector2){ r.x + (r.width - tw) / 2, r.y + 3 }, 15, 0, WHITE);
+        if (hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) { Sfx_Play(SFX_BACK); EndShowMe(g); }
+        return;
+    }
+    // SHOW ME: step through the answer (not in endless mode, which has no help)
+    if (!g->endless && g->mode != MODE_RUNNING)
+    {
+        Rectangle b = EDITOR_PANEL;
+        Rectangle r = { b.x + b.width - 118 - 92 - 92, b.y + 5, 84, 22 };
+        bool hover = CheckCollisionPointRec(GetMousePosition(), r);
+        DrawRectangleRounded(r, 0.4f, 6, hover ? (Color){ 40, 120, 90, 255 } : (Color){ 26, 84, 62, 255 });
+        float tw = MeasureTextEx(g->codeFont, "SHOW ME", 15, 0).x;
+        DrawTextEx(g->codeFont, "SHOW ME", (Vector2){ r.x + (r.width - tw) / 2, r.y + 3 }, 15, 0, (Color){ 150, 255, 200, 255 });
+        if (hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) { Sfx_Play(SFX_SELECT); StartShowMe(g); return; }
+    }
     // ENDLESS: no HINT button; the streak sits there instead
     if (g->endless)
     {
@@ -1506,7 +1605,7 @@ static void DrawStarterButton(Game *g)
         DrawRectangleRounded(r, 0.4f, 6, hover ? (Color){ 120, 90, 30, 255 } : (Color){ 82, 62, 24, 255 });
         float tw = MeasureTextEx(g->codeFont, label, 15, 0).x;
         DrawTextEx(g->codeFont, label, (Vector2){ r.x + (r.width - tw) / 2, r.y + 3 }, 15, 0, (Color){ 255, 220, 140, 255 });
-        if (hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) NextHint(g);
+        if (hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) { Sfx_Play(SFX_CLICK); NextHint(g); }
     }
 
     if (g->mode == MODE_RUNNING) return;
@@ -1616,7 +1715,7 @@ static void DrawToolbar(Game *g)
     x += 78 * k;
 
     bool canNext = !running && (g->endless || g->level < Levels_Count() - 1);
-    bool cleared = g->world.state == WORLD_WON;
+    bool cleared = g->world.state == WORLD_WON && !g->demo;
     float nextPulse = 0.5f + 0.5f*sinf((float)GetTime()*4);
     Color nextCol = cleared ? (Color){40,(unsigned char)(155+50*nextPulse),85,255} : (Color){70,70,100,255};
     if(cleared && canNext)
@@ -1638,6 +1737,7 @@ static void DrawToolbar(Game *g)
         g->showHelp = g->showWorkshop = false;
         Circuit_SelectLevel(g->level);
         g->showCircuit = true;
+        Sfx_Play(SFX_WHOOSH);
     }
     if (Button((Rectangle){ W - 240, y, 32, h }, "?", (Color){ 70, 70, 100, 255 }, true) || IsKeyPressed(KEY_F1))
         g->showHelp = !g->showHelp;
@@ -1671,6 +1771,22 @@ static Font LoadCodeFont(bool *owned)
     return GetFontDefault();
 }
 
+// Open the level the player was last on (first time: stage 1.1; the bootcamp is there if they want it)
+static void PickStartLevel(Game *g)
+{
+    int start = -1;
+    for (int i = 0; i < Levels_Count(); i++)
+        if (strcmp(Levels_Get(i)->file, Save_GetCurrent()) == 0) start = i;
+    if (start < 0)
+    {
+        start = 0;
+        while (start < Levels_Count() - 1 && Circuit_IsBootcamp(start)) start++;
+    }
+    g->level = start;
+    LoadLevel(g, start, false);
+    Circuit_SelectLevel(start);
+}
+
 int main(void)
 {
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
@@ -1697,35 +1813,30 @@ int main(void)
     snprintf(folderCopy, sizeof folderCopy, "%s", folder);
     int loaded = Levels_LoadFolder(folderCopy, levelError, sizeof levelError);
 
-    // Pick up where the player left off
+    // Pick up where the player left off (the login screen swaps in their own save)
     Save_Load(TextFormat("%sbitty_save.txt", GetApplicationDirectory()));
     Endless_LoadBest(TextFormat("%sbitty_endless.txt", GetApplicationDirectory()));
     Circuit_Init();
-    int start = -1;
-    for (int i = 0; i < Levels_Count(); i++)
-        if (strcmp(Levels_Get(i)->file, Save_GetCurrent()) == 0) start = i;
-    if (start < 0)          // first time: point at stage 1.1 (the bootcamp is there if they want it)
-    {
-        start = 0;
-        while (start < Levels_Count() - 1 && Circuit_IsBootcamp(start)) start++;
-    }
-    g->level = start;
-    LoadLevel(g, start, false);
+    PickStartLevel(g);
     if (levelError[0])
         Console_PrintKind(loaded ? CONSOLE_WARNING : CONSOLE_ERROR, TextFormat("Level problem: %s\n", levelError));
 
-    Circuit_SelectLevel(start);
     g->showCircuit = true;
     Talk_Skip();
     Startup_Init(g->codeFont);
     Talk_Init();
-    bool startupActive = true;
+    Sfx_Init();
+    Cloud_Init(GetApplicationDirectory());
+    Labs_Init(Cloud_LabsEnd());
+    Login_Init(g->codeFont, GetApplicationDirectory());
+    bool startupActive = true, loginActive = true, showLabs = false;
 
     while (!WindowShouldClose())
     {
         float dt = GetFrameTime();
 
         if (IsKeyPressed(KEY_F11)) ToggleBorderlessWindowed();
+        Sfx_Update();
         UpdateLayout();
         {
             // leave room under the code for the code buttons, on levels that have them
@@ -1744,6 +1855,53 @@ int main(void)
             BeginDrawing();
             Startup_Draw();
             EndDrawing();
+            if (!startupActive) Sfx_Play(SFX_WHOOSH);
+            continue;
+        }
+
+        // keep the cloud copy up to date (at most every 20 seconds, without waiting)
+        cloudTimer -= dt;
+        if (cloudDirty && cloudTimer <= 0)
+        {
+            Login_Upload(false);
+            cloudDirty = false;
+            cloudTimer = 20.0f;
+        }
+
+        if (loginActive)
+        {
+            BeginDrawing();
+            bool in = Login_Draw(dt);
+            EndDrawing();
+            if (in)
+            {
+                loginActive = false;
+                PickStartLevel(g);              // this player's own progress
+                showLabs = Labs_Active();       // the limited-time class labs come first
+                if (showLabs) Labs_Open(true);
+                Sfx_Play(SFX_WHOOSH);
+            }
+            continue;
+        }
+
+        if (showLabs)
+        {
+            BeginDrawing();
+            int pick = Labs_Draw(g->codeFont, dt);
+            EndDrawing();
+            if (pick == LABS_TO_MAP)
+            {
+                showLabs = false;
+                g->showCircuit = true;
+                Sfx_Play(SFX_WHOOSH);
+            }
+            else if (pick >= 0)
+            {
+                LoadLevel(g, pick, true);
+                Circuit_SelectLevel(pick);
+                showLabs = false;
+                g->showCircuit = false;
+            }
             continue;
         }
 
@@ -1769,7 +1927,13 @@ int main(void)
             BeginDrawing();
             int stage = Circuit_Draw(g->codeFont, dt);
             EndDrawing();
-            if (stage == CIRCUIT_ENDLESS)
+            if (stage == CIRCUIT_ENDLESS || stage == CIRCUIT_LABS || stage >= 0) Sfx_Play(SFX_WHOOSH);
+            if (stage == CIRCUIT_LABS)
+            {
+                showLabs = true;
+                Labs_Open(true);
+            }
+            else if (stage == CIRCUIT_ENDLESS)
             {
                 g->endless = false;         // a fresh run: the streak starts at 0
                 NextEndless(g);
@@ -1898,8 +2062,11 @@ int main(void)
     }
 
     SaveNow(g);
+    if (cloudDirty) Login_Upload(true);     // last copy to the cloud before closing
     StopProgram(g);
     VisualLearning_Shutdown();
+    Labs_Shutdown();
+    Sfx_Shutdown();
     Talk_Shutdown();
     Ending_Shutdown();
     Startup_Shutdown();

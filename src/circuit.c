@@ -10,6 +10,8 @@
 
 #include "circuit.h"
 #include "endless.h"
+#include "labs.h"
+#include "sfx.h"
 #include "levels.h"
 #include "save.h"
 
@@ -239,6 +241,7 @@ static bool DrawNode(Font font, int world, int stage, Vector2 mouse, bool click)
         DrawRectangle((int)n.x + 6, (int)n.y + 8, 7, 6, color);
         DrawCircleLines((int)n.x + 9, (int)n.y + 8, 3, color);
     }
+    if (hover && click) Sfx_PlayPitched(SFX_CLICK, 0.9f + 0.04f * stage);
     return hover && click;
 }
 
@@ -387,6 +390,25 @@ int Circuit_Draw(Font font, float dt)
               (Color){ 225, 140, 255, 255 });
         Label(font, "Every exam topic, remixed at random. No hints.", 952, 595, 12, LIGHTGRAY);
         if (hover && click) launch = CIRCUIT_ENDLESS;
+    }
+
+    // CLASS LABS: limited-time button for the Advanced Programming lab questions
+    if (Labs_Active())
+    {
+        Rectangle b = { 492, 44, 232, 74 };
+        bool hover = CheckCollisionPointRec(mouse, b);
+        float glow = 0.55f + 0.45f * sinf(clockTime * 3.0f);
+        DrawRectangleGradientH((int)b.x, (int)b.y, (int)b.width, (int)b.height,
+                               hover ? (Color){ 30, 120, 120, 255 } : (Color){ 16, 70, 80, 255 },
+                               hover ? (Color){ 150, 50, 120, 255 } : (Color){ 90, 30, 80, 255 });
+        DrawRectangleLinesEx(b, 2, Fade((Color){ 255, 200, 120, 255 }, hover ? 1 : glow));
+        Label(font, "CLASS LABS  >", 506, 52, 21, WHITE);
+        Label(font, "C  |  C++   Lab 1 & Lab 2", 506, 78, 13, (Color){ 255, 220, 150, 255 });
+        int days = Labs_DaysLeft();
+        DrawRectangle((int)b.x + 150, (int)b.y - 10, 92, 20, (Color){ 230, 30, 60, 255 });
+        Label(font, days == 1 ? "LAST DAY" : TextFormat("%d DAYS LEFT", days), b.x + 156, b.y - 7, 12, WHITE);
+        Label(font, "LIMITED TIME", 506, 97, 12, Fade(WHITE, 0.7f));
+        if (hover && click) launch = CIRCUIT_LABS;
     }
 
     Label(font, "USB EXIT", 1140, 634, 16, accents[WORLDS - 1]);

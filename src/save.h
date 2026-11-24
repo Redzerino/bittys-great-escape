@@ -11,6 +11,8 @@
 
 void        Save_Load(const char *path);                 // call once at startup (fine if the file doesn't exist)
 bool        Save_Write(void);                            // writes everything to the file
+void        Save_Clear(void);                            // forget everything in memory (before loading another player's save)
+const char *Save_Path(void);                             // the file Save_Write writes to
 
 const char *Save_GetCode(const char *levelFile);         // NULL if nothing saved for that level
 void        Save_SetCode(const char *levelFile, const char *code);

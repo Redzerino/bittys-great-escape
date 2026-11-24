@@ -82,6 +82,15 @@ static char *CopyString(const char *s, size_t n)
     return c;
 }
 
+void Save_Clear(void)
+{
+    for (int i = 0; i < entryCount; i++) free(entries[i].code);
+    entryCount = 0;
+    current[0] = '\0';
+}
+
+const char *Save_Path(void) { return savePath; }
+
 void Save_Load(const char *path)
 {
     snprintf(savePath, sizeof savePath, "%s", path);

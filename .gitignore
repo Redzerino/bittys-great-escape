@@ -21,3 +21,9 @@ bitty-customisation.save
 # Ready-to-play copies made by release.bat
 release/
 *.zip
+
+# Accounts and cloud sync (per computer; bitty_cloud.txt holds your database address)
+bitty_save_*.txt
+bitty_accounts.txt
+bitty_last_user.txt
+bitty_cloud_*

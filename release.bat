@@ -21,6 +21,8 @@ if exist release rmdir /s /q release
 mkdir release\BittysGreatEscape
 move /y bitty_release.exe release\BittysGreatEscape\bitty.exe >nul
 xcopy levels release\BittysGreatEscape\levels\ /e /i /q >nul
+REM Cloud saves: the database address goes with the game
+if exist bitty_cloud.txt copy /y bitty_cloud.txt release\BittysGreatEscape\ >nul
 
 REM Zip it up
 if exist BittysGreatEscape.zip del BittysGreatEscape.zip

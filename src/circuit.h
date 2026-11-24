@@ -12,6 +12,7 @@ void Circuit_SelectLevel(int level);     // highlight this level's node
 // Draw and handle the map. Returns a level index when a stage is chosen, otherwise -1.
 // Returns the level index to play, CIRCUIT_ENDLESS for endless mode, or -1
 #define CIRCUIT_ENDLESS (-2)
+#define CIRCUIT_LABS    (-3)     // the limited-time CLASS LABS button
 int  Circuit_Draw(Font font, float dt);
 
 int         Circuit_WorldOf(int level);     // which chip a level is on: 1-9, or 0 for the bootcamp

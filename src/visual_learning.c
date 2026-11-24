@@ -1,4 +1,5 @@
 #include "visual_learning.h"
+#include "sfx.h"
 #include "world_visuals.h"
 #include "circuit.h"
 #include "customisation.h"
@@ -113,6 +114,7 @@ bool VisualLearning_StepForward(void)
 }
 void VisualLearning_StepBack(void)
 {
+    Sfx_Play(SFX_BACK);
     FinishFrame();
     if(viewIndex>0)Replay(viewIndex-1);
 }
@@ -728,7 +730,7 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
         bool hoverNext=CheckCollisionPointRec(GetMousePosition(),next);
         DrawRectangleRounded(next,0.2f,5,hoverNext?(Color){70,130,190,255}:(Color){50,110,170,255});
         Text(font,"NEXT >",next.x+16,next.y+6,15,WHITE,next.width-20);
-        if(hoverNext&&IsMouseButtonPressed(MOUSE_BUTTON_LEFT))nextRequested=true;
+        if(hoverNext&&IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){nextRequested=true;Sfx_Play(SFX_CLICK);}
         const char *where=viewIndex<0?"Step 0":viewIndex<historyCount-1?TextFormat("Step %d of %d (back)",viewIndex+1,historyCount):TextFormat("Step %d",viewIndex+1);
         float dx=panel.x+panel.width-18-level->testCount*16;
         Text(font,where,panel.x+216,by+7,14,viewIndex<historyCount-1?gold:LIGHTGRAY,dx-panel.x-216-14);

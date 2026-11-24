@@ -1,0 +1,5 @@
+# Copy this file to bitty_cloud.txt and put your Firebase Realtime Database address below.
+# (Firebase console > Build > Realtime Database, the address at the top of the Data tab)
+url https://YOUR-PROJECT-default-rtdb.europe-west1.firebasedatabase.app
+# Last day the CLASS LABS screen is shown (year-month-day)
+labs_end 2026-12-19
