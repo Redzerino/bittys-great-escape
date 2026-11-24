@@ -1,6 +1,7 @@
 // console.c - the Console panel. Keeps the most recent lines, newest at the bottom.
 
 #include "console.h"
+#include "ui.h"
 #include "game_api.h"
 
 #include <string.h>
@@ -105,9 +106,7 @@ static int WrapLine(const char *text, Font font, float size, float maxWidth, int
 
 void Console_Draw(Rectangle b, Font font)
 {
-    DrawRectangleRec(b, (Color){ 20, 24, 36, 255 });
-    DrawRectangleLinesEx(b, 2, (Color){ 60, 200, 255, 255 });
-    DrawText("CONSOLE", (int)b.x + 10, (int)b.y + 8, 18, (Color){ 60, 200, 255, 255 });
+    UI_Panel(b, "CONSOLE", (Color){ 120, 150, 255, 255 }, false);
 
     const float size = 16, lineH = 19;
     float maxWidth = b.width - 36;

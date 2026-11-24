@@ -1,5 +1,6 @@
 #include "visual_learning.h"
 #include "sfx.h"
+#include "ui.h"
 #include "world_visuals.h"
 #include "circuit.h"
 #include "customisation.h"
@@ -505,7 +506,7 @@ void VisualLearning_Draw(Rectangle panel,Font font,const Level *level,
     }
     World_DrawDataScene(&scene);
     DrawTextureRec(canvas.texture,(Rectangle){0,0,(float)width,(float)-height},(Vector2){panel.x,panel.y},WHITE);
-    DrawRectangleLinesEx(panel,2,cyan);
+    UI_PanelBorder(panel,cyan,false);
     Text(font,SceneTitle(test->func),panel.x+12,panel.y+10,19,cyan,panel.width-24);
     bool stepping=stepMode&&running&&actual;
     Text(font,stepping?"STEP MODE  -  NEXT runs one line. BACK shows the line before.":actual?"WATCH MODE  -  RUN plays your code. STEP goes one line at a time.":"WRITE YOUR CODE  -  RUN to watch it, STEP to go line by line",panel.x+12,panel.y+36,13,stepping?gold:LIGHTGRAY,panel.width-24);

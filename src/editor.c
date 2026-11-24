@@ -1,6 +1,7 @@
 // editor.c - the Code panel. See editor.h.
 
 #include "editor.h"
+#include "ui.h"
 
 #include <ctype.h>
 #include <math.h>
@@ -673,15 +674,13 @@ void Editor_Draw(const Editor *e)
 {
     Rectangle b = e->bounds;
     float gutter = GutterWidth(e);
-    DrawRectangleRec(b, (Color){ 20, 24, 36, 255 });
-    DrawRectangleLinesEx(b, 2, e->focused ? (Color){ 90, 220, 255, 255 } : (Color){ 60, 200, 255, 160 });
-    DrawText("CODE", (int)b.x + 10, (int)b.y + 8, 18, (Color){ 60, 200, 255, 255 });
+    UI_Panel(b, "CODE", (Color){ 70, 200, 255, 255 }, e->focused);
     if (e->readOnly)
-        DrawText("running...", (int)(b.x + b.width - 90), (int)b.y + 10, 14, (Color){ 90, 230, 120, 255 });
+        UI_Text("running...", b.x + b.width - 84, b.y + 8, 13, (Color){ 90, 230, 120, 255 });
 
     // Gutter
-    DrawRectangle((int)b.x + 2, (int)TextTop(e) - 4, (int)gutter, (int)(b.height - TITLE_HEIGHT + 2),
-                  (Color){ 16, 19, 29, 255 });
+    DrawRectangle((int)b.x + 2, (int)TextTop(e), (int)gutter, (int)(b.height - TITLE_HEIGHT - 8),
+                  (Color){ 13, 16, 27, 200 });
 
     BeginScissorMode((int)b.x + 2, (int)TextTop(e) - 4, (int)b.width - 4, (int)(b.height - TITLE_HEIGHT + 2));
 

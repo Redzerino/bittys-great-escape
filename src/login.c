@@ -3,6 +3,7 @@
 #include "cloud.h"
 #include "save.h"
 #include "sfx.h"
+#include "ui.h"
 
 #include <ctype.h>
 #include <math.h>
@@ -185,12 +186,37 @@ static float Width(const char *s, float size) { return MeasureTextEx(font, s, si
 
 static bool Button(Rectangle r, const char *label, Color base, Vector2 mouse, bool click, bool enabled)
 {
-    bool hover = enabled && CheckCollisionPointRec(mouse, r);
-    Color c = hover ? (Color){ (unsigned char)fminf(255, base.r + 30), (unsigned char)fminf(255, base.g + 30), (unsigned char)fminf(255, base.b + 30), 255 } : base;
-    DrawRectangleRounded(r, 0.25f, 6, enabled ? c : (Color){ 40, 44, 52, 255 });
-    Text(label, r.x + r.width / 2 - Width(label, 18) / 2, r.y + r.height / 2 - 9, 18, enabled ? WHITE : GRAY);
-    if (hover && click) { Sfx_Play(SFX_CLICK); return true; }
-    return false;
+    (void)click;
+    return UI_ButtonAt(r, label, base, enabled, UI_ICON_NONE, mouse);
+}
+
+// Bitty peeking over the sign-in box: eyes follow the mouse and blink
+static void Mascot(Vector2 at, Vector2 mouse)
+{
+    float bob = sinf(clockTime * 2.2f) * 3;
+    Rectangle head = { at.x - 46, at.y - 38 + bob, 92, 70 };
+    UI_Glow((Vector2){ at.x, at.y + bob }, 90, (Color){ 70, 200, 255, 255 }, 0.18f);
+    DrawLineEx((Vector2){ at.x, head.y }, (Vector2){ at.x + 6, head.y - 20 }, 3, (Color){ 150, 165, 185, 255 });
+    DrawCircleV((Vector2){ at.x + 6, head.y - 22 }, 5, (Color){ 120, 255, 220, 255 });
+    UI_Glow((Vector2){ at.x + 6, head.y - 22 }, 14, (Color){ 120, 255, 220, 255 }, 0.5f + 0.3f * sinf(clockTime * 5));
+    DrawRectangleRounded(head, 0.4f, 10, (Color){ 140, 150, 170, 255 });
+    DrawRectangleRounded((Rectangle){ head.x, head.y, head.width, head.height * 0.5f }, 0.5f, 10, (Color){ 165, 175, 195, 255 });
+    Rectangle face = { head.x + 10, head.y + 12, head.width - 20, head.height - 26 };
+    DrawRectangleRounded(face, 0.4f, 10, (Color){ 14, 24, 44, 255 });
+    float dx = fmaxf(-5, fminf(5, (mouse.x - at.x) / 60)), dy = fmaxf(-3, fminf(3, (mouse.y - at.y) / 80));
+    bool blink = fmodf(clockTime, 3.6f) < 0.12f;
+    for (int e = -1; e <= 1; e += 2)
+    {
+        Vector2 eye = { at.x + e * 16 + dx, face.y + face.height / 2 + dy + bob * 0 };
+        if (blink) DrawRectangle((int)eye.x - 7, (int)eye.y, 14, 3, (Color){ 120, 240, 255, 255 });
+        else
+        {
+            UI_Glow(eye, 14, (Color){ 90, 220, 255, 255 }, 0.5f);
+            DrawRectangleRounded((Rectangle){ eye.x - 6, eye.y - 8, 12, 16 }, 0.6f, 6, (Color){ 120, 240, 255, 255 });
+        }
+    }
+    DrawRectangleRounded((Rectangle){ head.x - 8, head.y + 24, 10, 22 }, 0.5f, 6, (Color){ 110, 120, 140, 255 });     // ears
+    DrawRectangleRounded((Rectangle){ head.x + head.width - 2, head.y + 24, 10, 22 }, 0.5f, 6, (Color){ 110, 120, 140, 255 });
 }
 
 static void Field(Rectangle r, const char *label, const char *value, bool secret, bool active, Vector2 mouse, bool click, int which)
@@ -283,18 +309,17 @@ bool Login_Draw(float dt)
     float beam = fmodf(clockTime * 160, 900) - 90;
     DrawRectangleGradientV(0, (int)beam, 1280, 90, Fade((Color){ 90, 240, 210, 255 }, 0), Fade((Color){ 90, 240, 210, 255 }, 0.07f));
 
+    UI_Glow((Vector2){ 640, 380 }, 520, (Color){ 40, 160, 150, 255 }, 0.12f);
     const char *title = "BITTY'S GREAT ESCAPE";
-    Text(title, 640 - Width(title, 44) / 2 + 3, 70 + 3, 44, Fade(BLACK, 0.6f));
-    Text(title, 640 - Width(title, 44) / 2, 70, 44, (Color){ 150, 255, 210, 255 });
-    const char *sub = "SIGN IN";
-    Text(sub, 640 - Width(sub, 20) / 2, 128, 20, LIGHTGRAY);
+    UI_Title(title, 640 - UI_TitleWidth(title, 58) / 2, 34, 58, (Color){ 150, 255, 210, 255 });
+    const char *sub = "SIGN IN TO CONTINUE YOUR ESCAPE";
+    UI_Text(sub, 640 - UI_TextWidth(sub, 15) / 2, 104, 15, (Color){ 170, 190, 200, 255 });
 
     float sx = shake > 0 ? sinf(clockTime * 80) * 10 * shake : 0;
     shake = fmaxf(0, shake - dt);
     Rectangle panel = { 400 + sx, 170, 480, 420 };
-    DrawRectangleRounded((Rectangle){ panel.x + 10, panel.y + 12, panel.width, panel.height }, 0.06f, 6, Fade(BLACK, 0.45f));
-    DrawRectangleRounded(panel, 0.06f, 6, (Color){ 12, 26, 37, 250 });
-    DrawRectangleRoundedLinesEx(panel, 0.06f, 6, 2, Fade((Color){ 90, 240, 210, 255 }, 0.6f + 0.2f * sinf(clockTime * 2)));
+    Mascot((Vector2){ panel.x + panel.width - 70, panel.y - 18 }, mouse);
+    UI_Card(panel, (Color){ 90, 240, 210, 255 }, true);
 
     // cloud badge
     bool cloud = Cloud_Configured();

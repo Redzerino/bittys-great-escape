@@ -11,6 +11,7 @@
 #include "circuit.h"
 #include "endless.h"
 #include "labs.h"
+#include "ui.h"
 #include "sfx.h"
 #include "levels.h"
 #include "save.h"
@@ -28,6 +29,9 @@ static int   stageCount[WORLDS];              // how many stages each chip shows
 static int   bootcamp[BOOTCAMP_STAGES];       // level index of each bootcamp stage (-1 = none)
 static int   selectedWorld = 0, selectedStage = 0;
 static float clockTime = 0;
+static char  player[20];                    // signed-in name shown under the progress bar
+
+void Circuit_SetPlayer(const char *name) { snprintf(player, sizeof player, "%s", name ? name : ""); }
 
 static const char *worldNames[] = {
     "BOOT SECTOR", "REGISTER BANK", "CPU CONTROL UNIT", "PROCESSING CORE", "SYSTEM LIBRARY",
@@ -220,9 +224,11 @@ static bool DrawNode(Font font, int world, int stage, Vector2 mouse, bool click)
 
     if (selectedWorld == world && selectedStage == stage)
         DrawCircleLines((int)n.x, (int)n.y, r + 6 + 2 * sinf(clockTime * 3), accent);
-    if (hover) DrawCircleV(n, r + 6, Fade(accent, 0.17f));
+    if (index >= 0) UI_Glow(n, r * (hover ? 2.6f : 1.9f), color, done ? 0.35f : hover ? 0.4f : 0.16f + 0.05f * sinf(clockTime * 2 + stage));
+    if (hover) DrawCircleV(n, r + 5, Fade(accent, 0.22f));
     DrawCircleV(n, r, done ? color : (Color){ 8, 20, 29, 255 });
-    DrawCircleLines((int)n.x, (int)n.y, r, color);
+    if (!done) DrawCircleV((Vector2){ n.x, n.y - r * 0.25f }, r * 0.7f, Fade(color, 0.08f));
+    DrawRing(n, r - 1.5f, r, 0, 360, 32, color);
 
     // white pointer over the last level played
     if (index >= 0 && strcmp(Levels_Get(index)->file, Save_GetCurrent()) == 0)
@@ -265,24 +271,47 @@ int Circuit_Draw(Font font, float dt)
     BeginMode2D(camera);
 
     // the board
-    DrawRectangleGradientV(0, 0, 1280, 720, (Color){ 10, 35, 38, 255 }, (Color){ 5, 15, 24, 255 });
+    DrawRectangleGradientV(0, 0, 1280, 720, (Color){ 9, 30, 38, 255 }, (Color){ 5, 10, 22, 255 });
+    UI_Glow((Vector2){ 300 + 60 * sinf(clockTime * 0.15f), 380 }, 520, (Color){ 40, 160, 150, 255 }, 0.10f);
+    UI_Glow((Vector2){ 1050, 650 + 30 * cosf(clockTime * 0.2f) }, 420, (Color){ 140, 70, 200, 255 }, 0.10f);
     for (int x = 16; x < 1280; x += 24)
-        for (int y = 16; y < 720; y += 24) DrawCircle(x, y, 1, (Color){ 22, 48, 51, 255 });
+        for (int y = 16; y < 720; y += 24) DrawCircle(x, y, 1, (Color){ 22, 52, 58, 255 });
+    float scan = fmodf(clockTime * 90, 900) - 90;      // a slow scanning beam
+    DrawRectangleGradientV(0, (int)scan, 1280, 90, Fade((Color){ 120, 255, 220, 255 }, 0), Fade((Color){ 120, 255, 220, 255 }, 0.035f));
 
-    Label(font, "BITTY'S ESCAPE CIRCUIT", 32, 28, 32, (Color){ 150, 255, 210, 255 });
-    Label(font, "Trace a route through the computer.", 34, 73, 16, LIGHTGRAY);
-    Label(font, "Choose a stage to write your escape.", 34, 92, 16, LIGHTGRAY);
-    Label(font, TextFormat("%02d / %d CLEARED   |   %d stages playable", cleared, total, available), 34, 120, 17, SKYBLUE);
+    {
+        float ts = 40;
+        while (ts > 24 && UI_TitleWidth("BITTY'S ESCAPE CIRCUIT", ts) > 440) ts -= 1;   // stay clear of CLASS LABS
+        UI_Title("BITTY'S ESCAPE CIRCUIT", 32, 22 + (40 - ts) / 2, ts, (Color){ 150, 255, 210, 255 });
+    }
+    UI_Text("Trace a route through the computer.", 34, 72, 14, (Color){ 175, 195, 205, 255 });
+    {   // progress bar
+        Rectangle bar = { 34, 100, 430, 10 };
+        float f = total > 0 ? (float)cleared / total : 0;
+        DrawRectangleRounded(bar, 1, 8, (Color){ 20, 40, 48, 255 });
+        if (f > 0) DrawRectangleRounded((Rectangle){ bar.x, bar.y, fmaxf(bar.height, bar.width * f), bar.height }, 1, 8, (Color){ 110, 245, 165, 255 });
+        float sweep = fmodf(clockTime * 0.4f, 1.0f) * bar.width * f;
+        if (f > 0) UI_Glow((Vector2){ bar.x + sweep, bar.y + 5 }, 14, WHITE, 0.35f);
+        UI_Text(TextFormat("%d / %d CLEARED", cleared, total), 34, 116, 15, (Color){ 130, 255, 190, 255 });
+        UI_Text(TextFormat("%d stages playable", available), 200, 116, 15, (Color){ 120, 190, 255, 255 });
+        if (player[0]) UI_Pill((Rectangle){ 360, 114, 104, 20 }, player, (Color){ 30, 80, 70, 255 }, (Color){ 170, 255, 220, 255 });
+    }
 
     // copper tracks between the chips, with a pulse of data running along each
     for (int w = 0; w < WORLDS - 1; w++)
     {
         Rectangle a = Chip(w), b = Chip(w + 1);
         Vector2 from = { a.x + a.width / 2, a.y + a.height / 2 }, to = { b.x + b.width / 2, b.y + b.height / 2 };
-        DrawLineEx(from, to, 7, (Color){ 20, 65, 67, 255 });
-        DrawLineEx(from, to, 2, Fade(accents[w], 0.4f));
-        float p = fmodf(clockTime * 0.2f + w * 0.13f, 1);
-        DrawCircleV((Vector2){ from.x + (to.x - from.x) * p, from.y + (to.y - from.y) * p }, 3, accents[w]);
+        DrawLineEx(from, to, 9, (Color){ 16, 52, 58, 255 });
+        DrawLineEx(from, to, 4, Fade(accents[w], 0.18f));
+        DrawLineEx(from, to, 1.5f, Fade(accents[w], 0.55f));
+        for (int k = 0; k < 3; k++)
+        {
+            float p = fmodf(clockTime * 0.25f + w * 0.13f + k / 3.0f, 1);
+            Vector2 at = { from.x + (to.x - from.x) * p, from.y + (to.y - from.y) * p };
+            UI_Glow(at, 10, accents[w], 0.5f);
+            DrawCircleV(at, 2.5f, WHITE);
+        }
     }
 
     // the twelve chips
@@ -298,8 +327,10 @@ int Circuit_Draw(Font font, float dt)
         bool worldComplete = true;
         for (int s = 0; s < StageCount(w); s++)
             if (!Done(stages[w][s])) worldComplete = false;
-        DrawRectangleRounded(chip, 0.08f, 4, worldComplete ? (Color){ 22, 105, 68, 255 } : (Color){ 12, 27, 36, 255 });
-        DrawRectangleRoundedLinesEx(chip, 0.08f, 4, selectedWorld == w ? 2 : 1, Fade(accent, selectedWorld == w ? 1 : 0.45f));
+        bool chipHover = CheckCollisionPointRec(mouse, chip);
+        UI_Card(chip, accent, selectedWorld == w || chipHover);
+        if (worldComplete) DrawRectangleRounded(chip, 0.08f, 4, Fade((Color){ 40, 200, 120, 255 }, 0.22f));
+        DrawRectangleRounded((Rectangle){ chip.x + 8, chip.y + 1, chip.width - 16, 3 }, 1, 4, Fade(accent, selectedWorld == w ? 0.9f : 0.45f));
         Label(font, TextFormat("%02d", w + 1), chip.x + 13, chip.y + 10, 16, accent);
         FitLabel(font, worldNames[w], chip.x + 44, chip.y + 10, 18, 212, WHITE);
         Label(font, topics[w], chip.x + 14, chip.y + 30, 12, (Color){ 155, 178, 187, 255 });
@@ -324,8 +355,8 @@ int Circuit_Draw(Font font, float dt)
         bool bootComplete = true;
         for (int s = 0; s < BOOTCAMP_STAGES; s++)
             if (!Done(bootcamp[s])) bootComplete = false;
-        DrawRectangleRounded(chip, 0.1f, 4, bootComplete ? (Color){ 22, 105, 68, 255 } : (Color){ 12, 24, 38, 255 });
-        DrawRectangleRoundedLinesEx(chip, 0.1f, 4, selectedWorld == BOOTCAMP ? 2 : 1, Fade(accent, selectedWorld == BOOTCAMP ? 1 : 0.5f));
+        UI_Card(chip, accent, selectedWorld == BOOTCAMP || CheckCollisionPointRec(mouse, chip));
+        if (bootComplete) DrawRectangleRounded(chip, 0.1f, 4, Fade((Color){ 40, 200, 120, 255 }, 0.22f));
         Label(font, "00", chip.x + 13, chip.y + 12, 16, accent);
         Label(font, "BOOTCAMP", chip.x + 44, chip.y + 11, 18, WHITE);
         Label(font, "OPTIONAL", chip.x + 152, chip.y + 14, 13, accent);
@@ -346,8 +377,7 @@ int Circuit_Draw(Font font, float dt)
     // details of the selected stage
     Rectangle details = { 935, 150, 313, 400 };
     Color accent = accents[selectedWorld];
-    DrawRectangleRounded(details, 0.06f, 6, (Color){ 12, 26, 37, 255 });
-    DrawRectangleRoundedLinesEx(details, 0.06f, 6, 1, Fade(accent, 0.6f));
+    UI_Card(details, accent, true);
 
     int selected = LevelAt(selectedWorld, selectedStage);
     bool boot = (selectedWorld == BOOTCAMP);
@@ -374,16 +404,18 @@ int Circuit_Draw(Font font, float dt)
     }
 
     Rectangle play = { 956, 489, 270, 48 };
-    DrawRectangleRounded(play, 0.15f, 6, selected >= 0 ? (Color){ 30, 100, 92, 255 } : (Color){ 30, 43, 52, 255 });
-    Label(font, selected >= 0 ? "ENTER STAGE  >" : "NOT AVAILABLE YET", 976, 505, 18, selected >= 0 ? WHITE : GRAY);
-    if (selected >= 0 && ((click && CheckCollisionPointRec(mouse, play)) || IsKeyPressed(KEY_ENTER))) launch = selected;
+    if (UI_ButtonAt(play, selected >= 0 ? "ENTER STAGE" : "NOT AVAILABLE YET", (Color){ 28, 130, 110, 255 }, selected >= 0,
+                    selected >= 0 ? UI_ICON_PLAY : UI_ICON_NONE, mouse)) launch = selected;
+    if (selected >= 0 && IsKeyPressed(KEY_ENTER)) launch = selected;
 
     // ENDLESS MODE: random remixes of every topic, no hints
     {
         Rectangle e = { 935, 560, 313, 58 };
         bool hover = CheckCollisionPointRec(mouse, e);
         float glow = 0.55f + 0.45f * sinf(clockTime * 2.5f);
-        DrawRectangleRounded(e, 0.15f, 6, hover ? (Color){ 78, 36, 104, 255 } : (Color){ 46, 22, 66, 255 });
+        DrawRectangleRounded((Rectangle){ e.x - 3, e.y - 3, e.width + 6, e.height + 6 }, 0.2f, 8, Fade((Color){ 200, 110, 255, 255 }, 0.10f + 0.1f * glow));
+        DrawRectangleGradientH((int)e.x + 2, (int)e.y + 2, (int)e.width - 4, (int)e.height - 4, hover ? (Color){ 92, 40, 130, 255 } : (Color){ 52, 22, 80, 255 },
+                               hover ? (Color){ 40, 30, 110, 255 } : (Color){ 24, 18, 60, 255 });
         DrawRectangleRoundedLinesEx(e, 0.15f, 6, 2, Fade((Color){ 225, 140, 255, 255 }, hover ? 1 : glow));
         Label(font, "ENDLESS MODE  >", 952, 568, 19, WHITE);
         Label(font, Endless_Best() > 0 ? TextFormat("BEST STREAK %d", Endless_Best()) : "NO HINTS", 1130, 572, 12,

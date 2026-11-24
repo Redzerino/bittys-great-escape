@@ -8,6 +8,7 @@
 // Values that were never set show as "?" in red: garbage.
 
 #include "inspector.h"
+#include "ui.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -84,9 +85,7 @@ static void DrawArrow(Vector2 from, Vector2 to, bool up, Color col)
 
 void Inspector_Draw(const VmVariable *vars, int count, Rectangle b, Font font, int currentLine)
 {
-    DrawRectangleRec(b, (Color){ 20, 24, 36, 255 });
-    DrawRectangleLinesEx(b, 2, (Color){ 60, 200, 255, 255 });
-    DrawText("INSPECTOR", (int)b.x + 10, (int)b.y + 8, 18, (Color){ 60, 200, 255, 255 });
+    UI_Panel(b, "INSPECTOR", (Color){ 190, 140, 255, 255 }, currentLine > 0);
     if (currentLine > 0)
         DrawTextEx(font, TextFormat("line %d", currentLine), (Vector2){ b.x + b.width - 70, b.y + 9 }, 15, 0,
                    (Color){ 255, 220, 90, 255 });

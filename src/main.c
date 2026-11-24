@@ -29,6 +29,7 @@
 #include "vm.h"
 #include "endless.h"
 #include "sfx.h"
+#include "ui.h"
 #include "cloud.h"
 #include "labs.h"
 #include "login.h"
@@ -1088,31 +1089,19 @@ static void UpdateProgram(Game *g, float dt)
 // ===========================================================================
 static bool Button(Rectangle r, const char *text, Color base, bool enabled)
 {
-    Vector2 m = GetMousePosition();
-    bool hover = enabled && CheckCollisionPointRec(m, r);
-    Color fill = enabled ? base : (Color){ 50, 55, 70, 255 };
-    if (hover) fill = (Color){ (unsigned char)(fill.r + (255 - fill.r) / 5), (unsigned char)(fill.g + (255 - fill.g) / 5),
-                               (unsigned char)(fill.b + (255 - fill.b) / 5), 255 };
-
-    DrawRectangleRounded(r, 0.3f, 6, fill);
-    int fw = MeasureText(text, 16);
-    DrawText(text, (int)(r.x + (r.width - fw) / 2), (int)(r.y + (r.height - 16) / 2), 16,
-             enabled ? WHITE : (Color){ 110, 115, 130, 255 });
-    bool clicked = hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-    if (clicked) Sfx_Play(SFX_CLICK);
-    return clicked;
+    UiIcon icon = strcmp(text, "RUN") == 0 ? UI_ICON_PLAY : strcmp(text, "STEP") == 0 ? UI_ICON_STEP
+                : strcmp(text, "STOP") == 0 ? UI_ICON_STOP : strcmp(text, "RESET") == 0 ? UI_ICON_RESET : UI_ICON_NONE;
+    return UI_Button(r, text, base, enabled, icon);
 }
 
 static void DrawWorldPanel(Game *g)
 {
     Rectangle b = WORLD_PANEL;
-    DrawRectangleRec(b, (Color){ 20, 24, 36, 255 });
-    DrawRectangleLinesEx(b, 2, (Color){ 60, 200, 255, 255 });
-    DrawText("MEMORY", (int)b.x + 10, (int)b.y + 8, 18, (Color){ 60, 200, 255, 255 });
+    UI_Panel(b, "MEMORY", (Color){ 80, 230, 200, 255 }, false);
 
     const char *title = Levels_Get(g->level)->title;
-    int tw = MeasureText(title, 16);
-    DrawText(title, (int)(b.x + b.width - tw - 12), (int)b.y + 10, 16, (Color){ 120, 255, 160, 255 });
+    float tw = UI_TextWidth(title, 15);
+    UI_Text(title, b.x + b.width - tw - 14, b.y + 7, 15, (Color){ 130, 255, 180, 255 });
 
     World *w = &g->world;
     w->viewX = b.x + 2;
@@ -1128,11 +1117,10 @@ static void DrawWorldPanel(Game *g)
         bool won = w->state == WORLD_WON;
         const char *msg = won ? "SECTOR CLEARED" : "SEGMENTATION FAULT";
         Color col = won ? (Color){ 110, 240, 140, 255 } : (Color){ 255, 90, 110, 255 };
-        int fw = MeasureText(msg, 30);
-        Rectangle banner = { b.x + 20, b.y + b.height - 62, b.width - 40, 44 };
-        DrawRectangleRec(banner, (Color){ 10, 12, 20, 220 });
-        DrawRectangleLinesEx(banner, 2, col);
-        DrawText(msg, (int)(b.x + (b.width - fw) / 2), (int)banner.y + 8, 30, col);
+        Rectangle banner = { b.x + 20, b.y + b.height - 66, b.width - 40, 50 };
+        DrawRectangleRounded(banner, 0.25f, 8, (Color){ 30, 8, 16, 235 });
+        DrawRectangleRoundedLinesEx(banner, 0.25f, 8, 2, col);
+        UI_Title(msg, b.x + (b.width - UI_TitleWidth(msg, 32)) / 2, banner.y + 8, 32, col);
     }
 }
 
@@ -1187,11 +1175,13 @@ static void DrawStageCompletion(Game *g)
     Rectangle p = WORLD_PANEL;
     float size = Clamp(p.width / 20.0f, 17, 24);
     Rectangle box = {p.x + 16, p.y + p.height - 61, p.width - 32, 51};
-    DrawRectangleRounded(box, 0.12f, 6, (Color){8,24,22,235});
-    DrawRectangleRoundedLinesEx(box, 0.12f, 6, 2, (Color){110,245,165,255});
+    float pulse = 0.5f + 0.5f * sinf((float)GetTime() * 3);
+    DrawRectangleRounded((Rectangle){box.x-4,box.y-4,box.width+8,box.height+8}, 0.2f, 8, Fade((Color){110,245,165,255}, 0.10f + 0.08f*pulse));
+    DrawRectangleRounded(box, 0.2f, 8, (Color){8,26,24,240});
+    DrawRectangleRoundedLinesEx(box, 0.2f, 8, 2, (Color){110,245,165,255});
     const char *title = g->demo ? "THE ANSWER WORKS" : "SECTOR CLEARED";
-    Vector2 text = MeasureTextEx(g->codeFont,title,size,0);
-    DrawTextEx(g->codeFont,title,(Vector2){box.x+(box.width-text.x)/2,box.y+12},size,0,(Color){130,255,180,255});
+    size += 4;
+    UI_Title(title, box.x+(box.width-UI_TitleWidth(title,size))/2, box.y+4, size, (Color){130,255,180,255});
     const char *hint = g->demo ? "Press MY CODE and try writing it yourself"
                      : g->endless ? TextFormat("Streak %d  -  NEXT for a new challenge", g->endlessStreak)
                      : g->level < Levels_Count()-1 ? "NEXT is ready - continue your escape" : "All done! Open CIRCUIT to revisit stages";
@@ -1623,7 +1613,23 @@ static void DrawStarterButton(Game *g)
 
 static void DrawToolbar(Game *g)
 {
-    DrawText("BITTY'S GREAT ESCAPE", 10, 12, 26, (Color){ 120, 255, 160, 255 });
+    // header bar with the logo
+    {
+        float W = (float)GetScreenWidth();
+        DrawRectangleGradientV(0, 0, (int)W, 46, (Color){ 20, 26, 46, 255 }, (Color){ 11, 14, 26, 255 });
+        DrawRectangleGradientH(0, 45, (int)W, 1, Fade((Color){ 90, 240, 200, 255 }, 0.7f), Fade((Color){ 190, 120, 255, 255 }, 0.5f));
+        // a tiny Bitty: rounded head, blinking eyes, antenna
+        float t = (float)GetTime();
+        bool blink = fmodf(t, 4.0f) < 0.12f;
+        Rectangle head = { 12, 11, 28, 24 };
+        DrawRectangleRounded(head, 0.45f, 8, (Color){ 70, 200, 255, 255 });
+        DrawRectangleRounded((Rectangle){ head.x + 3, head.y + 4, head.width - 6, head.height - 9 }, 0.45f, 8, (Color){ 12, 20, 38, 255 });
+        for (int e = 0; e < 2; e++)
+            DrawRectangle((int)head.x + 8 + e * 9, (int)head.y + (blink ? 11 : 8), 4, blink ? 1 : 5, (Color){ 120, 255, 200, 255 });
+        DrawLineEx((Vector2){ 26, 11 }, (Vector2){ 26, 5 }, 2, (Color){ 70, 200, 255, 255 });
+        DrawCircleV((Vector2){ 26, 5 }, 2.5f, Fade((Color){ 255, 220, 120, 255 }, 0.6f + 0.4f * sinf(t * 4)));
+        UI_Title("BITTY'S GREAT ESCAPE", 50, 9, 27, (Color){ 130, 255, 190, 255 });
+    }
 
     if (Button((Rectangle){ (float)GetScreenWidth() - 346, 10, 96, 30 },
                g->showWorkshop ? "BACK" : "WORKSHOP",
@@ -1823,6 +1829,7 @@ int main(void)
 
     g->showCircuit = true;
     Talk_Skip();
+    UI_Init();
     Startup_Init(g->codeFont);
     Talk_Init();
     Sfx_Init();
@@ -1876,6 +1883,7 @@ int main(void)
             if (in)
             {
                 loginActive = false;
+                Circuit_SetPlayer(Login_User());
                 PickStartLevel(g);              // this player's own progress
                 showLabs = Labs_Active();       // the limited-time class labs come first
                 if (showLabs) Labs_Open(true);
@@ -2013,7 +2021,7 @@ int main(void)
         }
 
         BeginDrawing();
-        ClearBackground((Color){ 10, 12, 20, 255 });
+        UI_Backdrop((float)GetScreenWidth(), (float)GetScreenHeight());
 
         DrawToolbar(g);
         if (g->showWorkshop)
@@ -2066,6 +2074,7 @@ int main(void)
     StopProgram(g);
     VisualLearning_Shutdown();
     Labs_Shutdown();
+    UI_Shutdown();
     Sfx_Shutdown();
     Talk_Shutdown();
     Ending_Shutdown();

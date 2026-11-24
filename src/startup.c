@@ -1,4 +1,5 @@
 #include "startup.h"
+#include "ui.h"
 #include "game_api.h"
 #include "customisation.h"
 #include "rlgl.h"
@@ -163,7 +164,7 @@ void Startup_Draw(void)
     else if(!title && elapsed<6)
     {
         bool running=elapsed>=4;
-        Text(running?"FIND A WAY OUT.":"WAKE UP, BITTY.",64,178,38,WHITE);
+        UI_Title(running?"FIND A WAY OUT.":"WAKE UP, BITTY.",64,168,58,WHITE);
         Text("SYSTEM SHUTDOWN INITIATED",64,255,22,(Color){255,125,135,255});
         Text(running?"Your code is his only escape.":"One tiny bot. One enormous computer.",64,310,19,LIGHTGRAY);
         ActorScene(Ease((elapsed-2)/0.8f),running?(elapsed-4)/2:0,false);
@@ -172,19 +173,27 @@ void Startup_Draw(void)
     {
         float reveal=title?1:Ease((elapsed-6)/0.7f);
         float offset=(1-reveal)*35;
-        Text("BITTY'S",64,177+offset,66,Fade(WHITE,reveal));
-        Text("GREAT",64,247+offset,78,Fade(cyan,reveal));
-        Text("ESCAPE",64,330+offset,78,Fade(cyan,reveal));
-        Text("WRITE CODE. BREAK FREE.",68,430,21,Fade(LIGHTGRAY,reveal));
+        UI_Glow((Vector2){250,300},380,cyan,0.12f*reveal);
+        // a quick glitch every few seconds: the title splits into red and cyan
+        float glitch=fmodf(elapsed,4.5f)<0.12f?6:0;
+        if(glitch>0)
+        {
+            UI_Title("GREAT",64-glitch,232+offset,104,Fade((Color){255,60,120,255},0.6f*reveal));
+            UI_Title("ESCAPE",64+glitch,330+offset,104,Fade((Color){60,255,240,255},0.6f*reveal));
+        }
+        UI_Title("BITTY'S",66,150+offset,72,Fade(WHITE,reveal));
+        UI_Title("GREAT",64,232+offset,104,Fade(cyan,reveal));
+        UI_Title("ESCAPE",64,330+offset,104,Fade((Color){130,255,200,255},reveal));
+        UI_Text("WRITE CODE. BREAK FREE.",68,446,20,Fade(LIGHTGRAY,reveal));
         ActorScene(1,0,true);
         if(title)
         {
             float pulse=0.7f+0.3f*sinf(elapsed*3);
             Rectangle button={64,500,350,62};
             bool hover=CheckCollisionPointRec(Mouse(),button);
-            DrawRectangleRounded(button,0.18f,8,hover?(Color){35,85,105,255}:(Color){20,50,68,255});
+            DrawRectangleRounded((Rectangle){button.x-5,button.y-5,button.width+10,button.height+10},0.25f,8,Fade(cyan,0.12f*pulse));
+            UI_ButtonAt(button,"PRESS ENTER TO START",hover?(Color){30,120,140,255}:(Color){22,90,110,255},true,UI_ICON_PLAY,Mouse());
             DrawRectangleRoundedLinesEx(button,0.18f,8,2,Fade(cyan,pulse));
-            Text("PRESS ENTER TO START",85,520,22,WHITE);
             Text("R  replay intro",68,582,15,(Color){140,165,185,255});
         }
     }
