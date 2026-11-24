@@ -1,9 +1,25 @@
 // ui.c - shared look (see ui.h)
 #include "ui.h"
 #include "sfx.h"
+#include "rlgl.h"
 
 #include <math.h>
 #include <string.h>
+
+// A soft round glow. Drawn directly with rlgl because DrawCircleGradient
+// changed its arguments between raylib versions (ints in 5.0, a Vector2 in 5.5+).
+static void Radial(float cx, float cy, float r, Color in, Color out)
+{
+    rlBegin(RL_TRIANGLES);
+    for (int i = 0; i < 360; i += 10)
+    {
+        float a0 = DEG2RAD * i, a1 = DEG2RAD * (i + 10);
+        rlColor4ub(in.r, in.g, in.b, in.a);    rlVertex2f(cx, cy);
+        rlColor4ub(out.r, out.g, out.b, out.a); rlVertex2f(cx + cosf(a1) * r, cy + sinf(a1) * r);
+        rlColor4ub(out.r, out.g, out.b, out.a); rlVertex2f(cx + cosf(a0) * r, cy + sinf(a0) * r);
+    }
+    rlEnd();
+}
 
 static Font small, large, poster;      // UI font at two sizes (sharper text), poster font
 static bool ownSmall, ownLarge, ownPoster;
@@ -91,8 +107,8 @@ void UI_Backdrop(float w, float h)
     float t = (float)GetTime();
     DrawRectangleGradientV(0, 0, (int)w, (int)h, (Color){ 13, 17, 32, 255 }, (Color){ 6, 8, 15, 255 });
     // two big slow glows
-    DrawCircleGradient((int)(w * 0.25f + sinf(t * 0.11f) * w * 0.08f), (int)(h * 0.3f), h * 0.7f, Fade((Color){ 40, 90, 160, 255 }, 0.16f), Fade(BLACK, 0));
-    DrawCircleGradient((int)(w * 0.8f + cosf(t * 0.09f) * w * 0.06f), (int)(h * 0.85f), h * 0.6f, Fade((Color){ 120, 50, 160, 255 }, 0.12f), Fade(BLACK, 0));
+    Radial(w * 0.25f + sinf(t * 0.11f) * w * 0.08f, h * 0.3f, h * 0.7f, Fade((Color){ 40, 90, 160, 255 }, 0.16f), Fade(BLACK, 0));
+    Radial(w * 0.8f + cosf(t * 0.09f) * w * 0.06f, h * 0.85f, h * 0.6f, Fade((Color){ 120, 50, 160, 255 }, 0.12f), Fade(BLACK, 0));
     // faint grid
     for (float x = 0; x < w; x += 32) DrawLineV((Vector2){ x, 0 }, (Vector2){ x, h }, Fade((Color){ 80, 120, 190, 255 }, 0.035f));
     for (float y = 0; y < h; y += 32) DrawLineV((Vector2){ 0, y }, (Vector2){ w, y }, Fade((Color){ 80, 120, 190, 255 }, 0.035f));
@@ -206,7 +222,7 @@ void UI_Pill(Rectangle r, const char *text, Color fill, Color textColor)
 
 void UI_Glow(Vector2 c, float radius, Color col, float strength)
 {
-    DrawCircleGradient((int)c.x, (int)c.y, radius, Fade(col, strength), Fade(col, 0));
+    Radial(c.x, c.y, radius, Fade(col, strength), Fade(col, 0));
 }
 
 void UI_Card(Rectangle b, Color accent, bool lit)
