@@ -132,4 +132,9 @@ int Levels_LoadFolder(const char *folder, char *error, int errorSize);
 int          Levels_Count(void);
 const Level *Levels_Get(int index);
 
+// ENDLESS MODE: the current challenge lives in one extra slot just past the
+// last real level (index == Levels_Count()), so the map and NEXT never see it.
+int  Levels_SetEndless(const Level *challenge);   // returns its index (-1 = no room)
+bool Levels_IsEndless(int index);
+
 #endif

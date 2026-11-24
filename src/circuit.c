@@ -9,6 +9,7 @@
 // saves, which are keyed by file name, keep working when the map changes.
 
 #include "circuit.h"
+#include "endless.h"
 #include "levels.h"
 #include "save.h"
 
@@ -340,7 +341,7 @@ int Circuit_Draw(Font font, float dt)
     }
 
     // details of the selected stage
-    Rectangle details = { 935, 150, 313, 448 };
+    Rectangle details = { 935, 150, 313, 400 };
     Color accent = accents[selectedWorld];
     DrawRectangleRounded(details, 0.06f, 6, (Color){ 12, 26, 37, 255 });
     DrawRectangleRoundedLinesEx(details, 0.06f, 6, 1, Fade(accent, 0.6f));
@@ -373,6 +374,20 @@ int Circuit_Draw(Font font, float dt)
     DrawRectangleRounded(play, 0.15f, 6, selected >= 0 ? (Color){ 30, 100, 92, 255 } : (Color){ 30, 43, 52, 255 });
     Label(font, selected >= 0 ? "ENTER STAGE  >" : "NOT AVAILABLE YET", 976, 505, 18, selected >= 0 ? WHITE : GRAY);
     if (selected >= 0 && ((click && CheckCollisionPointRec(mouse, play)) || IsKeyPressed(KEY_ENTER))) launch = selected;
+
+    // ENDLESS MODE: random remixes of every topic, no hints
+    {
+        Rectangle e = { 935, 560, 313, 58 };
+        bool hover = CheckCollisionPointRec(mouse, e);
+        float glow = 0.55f + 0.45f * sinf(clockTime * 2.5f);
+        DrawRectangleRounded(e, 0.15f, 6, hover ? (Color){ 78, 36, 104, 255 } : (Color){ 46, 22, 66, 255 });
+        DrawRectangleRoundedLinesEx(e, 0.15f, 6, 2, Fade((Color){ 225, 140, 255, 255 }, hover ? 1 : glow));
+        Label(font, "ENDLESS MODE  >", 952, 568, 19, WHITE);
+        Label(font, Endless_Best() > 0 ? TextFormat("BEST STREAK %d", Endless_Best()) : "NO HINTS", 1130, 572, 12,
+              (Color){ 225, 140, 255, 255 });
+        Label(font, "Every exam topic, remixed at random. No hints.", 952, 595, 12, LIGHTGRAY);
+        if (hover && click) launch = CIRCUIT_ENDLESS;
+    }
 
     Label(font, "USB EXIT", 1140, 634, 16, accents[WORLDS - 1]);
     DrawRectangleLinesEx((Rectangle){ 936, 630, 185, 28 }, 2, accents[WORLDS - 1]);
